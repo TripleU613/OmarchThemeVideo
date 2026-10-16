@@ -52,16 +52,39 @@ OM.scene({
     });
 
     // The flock's shape: a folding, wheeling blob, its course turning on the snares.
+    // The flock's course: a Lissajous glide whose snare bends spread over a full second each.
+    const course = (T) => {
+      let turn = 0;
+      for (const s of TURNS) turn += OM.smooth(OM.prog(T, s - 0.5, s + 0.5));
+      const wild = C.sm(T, WILD, WILD + 1.3);
+      return [960 + 430 * Math.sin(T * 0.9 + turn * 0.7) * (0.6 + 0.4 * wild), 470 + 150 * Math.sin(T * 1.3 + 1 + turn * 0.55)];
+    };
+    // From the wild section on, the course is re-timed to an even glide speed (just under the speed it had going in),
+    // so it never surges or brakes into a turn. Before it, course time is song time, untouched.
+    const WARP = (() => {
+      const dt = 1 / 240, out = [WILD];
+      const sp = (u) => { const a = course(u), b = course(u + 1e-3); return Math.hypot(b[0] - a[0], b[1] - a[1]) / 1e-3; };
+      const v0 = sp(WILD);
+      let u = WILD;
+      for (let T = WILD; T < start + duration + 0.2; T += dt) {
+        u += dt * OM.lerp(1, (0.85 * v0) / Math.max(1, sp(u)), C.sm(T, WILD, WILD + 0.8)); // a touch slower than going in, so the tightest arc stays gentle
+        out.push(u);
+      }
+      return (T) => {
+        if (T <= WILD) return T;
+        const f = (T - WILD) * 240, i = Math.min(out.length - 2, Math.floor(f));
+        return OM.lerp(out[i], out[i + 1], f - i);
+      };
+    })();
     const flockAt = (b, T) => {
       let turn = 0;
-      for (const s of TURNS) turn += OM.ease.inOutCubic(OM.prog(T, s - 0.05, s + 0.3));
-      const wild = C.sm(T, WILD, WILD + 0.5);
-      const cx = 960 + 430 * Math.sin(T * 0.9 + turn * 2.2) * (0.6 + 0.4 * wild);
-      const cy = 470 + 150 * Math.sin(T * 1.3 + 1 + turn * 1.7);
-      const A = 520 + 220 * Math.sin(T * 1.1 + turn), Bv = 150 + 90 * Math.sin(T * 1.7 + turn * 2);
-      const th = 0.5 * Math.sin(T * 0.55 + turn * 1.3);
+      for (const s of TURNS) turn += OM.smooth(OM.prog(T, s - 0.5, s + 0.5));
+      const wild = C.sm(T, WILD, WILD + 1.3);
+      const [cx, cy] = course(WARP(T));
+      const A = 520 + 220 * Math.sin(T * 1.1 + turn * 0.35), Bv = 150 + 90 * Math.sin(T * 1.7 + turn * 0.65);
+      const th = 0.5 * Math.sin(T * 0.55 + turn * 0.45);
       let x = b.u * A, y = b.v * Bv;
-      x += 130 * Math.sin(b.v * 3 + T * 2.2 + turn);
+      x += 130 * Math.sin(b.v * 3 + T * 2.2 + turn * 0.35);
       y += 70 * Math.sin(b.u * 4 - T * 1.6) * (0.5 + wild);
       return [cx + x * Math.cos(th) - y * Math.sin(th), cy + x * Math.sin(th) + y * Math.cos(th)];
     };

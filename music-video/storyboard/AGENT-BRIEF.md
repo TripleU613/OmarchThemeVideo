@@ -117,6 +117,10 @@ rounds. Don't run assemble and don't edit any other file; the orchestrator does 
 - Your files: `assets/scenes/<id>.js` for each scene in your section, and only those.
 - Facts: `node scripts/scene-facts.mjs <id> <id> ...` prints each scene's window, its
   word timings (timing only) and the music inside it.
+- **Timing accuracy:** the beat grid (beats and downbeats) runs about 46 ms late
+  against the real drums, measured across the whole song. Kick and snare events
+  and word onsets are accurate. For a hard visual hit, use the nearest kick or
+  snare event rather than the downbeat until the grid is corrected.
 - Ideas: your section in `storyboard/IDEAS.md`. Scenes marked **keep** get refined:
   keep their device, give their words the words-as-motion treatment, and meet the cuts.
 - The approved bar is chorus 1: read a couple of `assets/scenes/c1-0*.js` to see

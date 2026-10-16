@@ -16,11 +16,36 @@ OM.scene({
     const word = OM.WORDMARK;
     const home = OM.cellAt(L, 960, 540);
     const T0 = start;
-    const LAND = 20.95; // the hit: kick envelope peaks at 20.967 (one 30fps frame)
+    // Hits measured from the drums at 3 ms (the beat grid runs 50-85 ms late here): [time, strength].
+    const FILL_A = [[20.946, 1.9], [21.08, 1.25], [21.35, 1.23], [21.617, 1.66], [22.16, 1.66]]; // the implosion punches through these
+    const FILL_B = [[23.234, 1.35], [23.506, 1.1], [23.771, 1.4], [24.18, 1.07]];
+    const FILL_C = [[24.853, 1.04], [25.135, 0.94], [25.384, 1.1], [25.651, 1.22], [25.791, 0.93], [25.927, 1.19], [26.197, 1.04], [26.328, 1.11]];
+    const PULSES = [...FILL_B, ...FILL_C];
+    const LAND = 22.16 + 0.03; // the mark lands on the last hit of fill A (its step takes one frame)
     const FRAME = 1 / 30;
-    const ROLL = [22.245, 24.474]; // accelerating hi-hat roll after the hit
-    const TURNS = OM.beatsIn(26.3, 28.3); // 26.517, 27.051, 27.585, 28.119
-    const TURN = 0.3;
+    const ROLL = [22.245, 24.474]; // the light runs the spiral after the landing
+    const TURNS = [26.461, 27.001, 27.535, 28.075]; // the snare pulse: one quarter turn on each
+    const TURN = 0.22;
+    // The pull's progress: a slow draw-in to the big kick, then one hard step per hit, sized by its strength.
+    const G0 = 0.3, SUM = FILL_A.reduce((n, h) => n + h[1], 0);
+    const LEVELS = [G0];
+    for (const [, st] of FILL_A) LEVELS.push(LEVELS[LEVELS.length - 1] + ((1 - G0) * st) / SUM);
+    const pull = (T) => {
+      if (T < FILL_A[0][0]) return G0 * OM.ease.inCubic(OM.prog(T, start, FILL_A[0][0]));
+      let i = 0;
+      while (i + 1 < FILL_A.length && T >= FILL_A[i + 1][0]) i++;
+      const h = FILL_A[i][0], dur = i === FILL_A.length - 1 ? 0.03 : 0.06;
+      return OM.lerp(LEVELS[i], LEVELS[i + 1], OM.ease.outCubic(OM.prog(T, h, h + dur)));
+    };
+    /** A decaying flash per hit, sized by strength (0 outside 0.4 s after each). */
+    const hitPulse = (hits, T, tau) => {
+      let v = 0;
+      for (const [h, st] of hits) {
+        const x = T - h;
+        if (x >= 0 && x < 0.4) v = Math.max(v, st * Math.exp(-x / tau) * (1 - x / 0.4));
+      }
+      return v;
+    };
     const N = 60; // 15 logo pixels x 4 cells
     const H = N / 2;
     const inWord = (col, row) => row >= 0 && row < word.h && col >= 0 && col < word.w && word.rows[row][col] === '1';
@@ -105,6 +130,7 @@ OM.scene({
       const k = OM.prog(T, LAND + FRAME, LAND + 0.5); // dithered cooling after the one-frame crest
       const head = (maxD + 24) * Math.pow(OM.prog(T, ROLL[0], ROLL[1]), 1.5);
       const running = T >= ROLL[0] && T < ROLL[1] + 0.6;
+      const pf = 0.55 * hitPulse(PULSES, T, 0.12) / 1.4;
       for (const j of targets) {
         const u = j % N, v = (j / N) | 0;
         if (T < LAND + FRAME) { cellInk[j] = 4; continue; }
@@ -118,6 +144,7 @@ OM.scene({
           if (behind >= 0 && behind < 3) id = 4;
           else if (behind >= 3 && behind < 14 && th < 1 - (behind - 3) / 11) id = Math.max(id, 3);
         }
+        if (pf > 0.05 && th < pf) id = 4; // the fill's thump flashes the cells
         cellInk[j] = id;
       }
     }
@@ -151,8 +178,8 @@ vec4 effect(vec2 uv) {
       a: 6.283 * OM.hash(i, 1, 71), r: 520 + 520 * OM.hash(i, 2, 71), t0: T0 + 0.15 + 0.5 * OM.hash(i, 3, 71), spin: 2.6 + 1.6 * OM.hash(i, 4, 71),
     }));
     const cX = Cx, cY = Cy;
-    const KICKS = [22.198, 24.358, ...TURNS]; // downbeats, then the four quarter turns (the first on 26.517)
-    const SNARES = [23.081, 25.913, 28.444];
+    const KICKS = [23.234, 24.853, ...TURNS]; // the fills' first hits, then the four quarter turns
+    const SNARES = [23.771, 25.651, 25.927];
     const sparks = (ctx, T) => {
       if (T >= LAND) return;
       const show = OM.smooth(OM.prog(T, T0 + 0.1, T0 + 0.7));
@@ -175,15 +202,20 @@ vec4 effect(vec2 uv) {
         if (T < LAND) {
           // The pull: slow at first, then a rush into the hit, swirling as it closes.
           const ids = [[], [], [], [], []];
+          const G = pull(T);
+          const flash = hitPulse(FILL_A, T, 0.09) / 1.9; // the light flashes on each hit
+          let pi = 0;
           for (const p of P) {
-            const e = Math.pow(OM.prog(T, T0 + p.delay, LAND), 3);
+            pi++;
+            const dd = (p.delay - 0.06) * 1.1, e = OM.clamp((G - dd) / (1 - dd));
             const r = p.rs + (p.rg - p.rs) * e;
             const a = p.as + p.da * e;
             // Each cell flies as a square, shrinking from the dawn's cell size to the home lattice's;
             // at e = 0 it is exactly its dawn cell, at e = 1 exactly its cell of the mark.
             const w = OM.lerp(LD.cw, L.cw, e), h = OM.lerp(LD.ch, L.ch, e);
             const x = L.x0 + (home.col + r * Math.cos(a)) * L.cw - w / 2, y = L.y0 + (home.row + r * Math.sin(a)) * L.ch - h / 2;
-            ids[e > 0.82 ? 4 : e > 0.45 ? Math.max(p.ink, 3) : p.ink].push(x, y, w, h);
+            const lit = flash > 0.05 && OM.hash(pi, 3, 17) < flash ? 4 : e > 0.82 ? 4 : e > 0.45 ? Math.max(p.ink, 3) : p.ink;
+            ids[lit].push(x, y, w, h);
           }
           const sn = (v) => Math.round(v * dpr) / dpr;
           for (let i = 0; i < 5; i++) {
@@ -200,7 +232,8 @@ vec4 effect(vec2 uv) {
         markInks(T);
         const deg = angle(T);
         const q = Math.round(deg / 90);
-        if (Math.abs(deg - q * 90) < 0.02) {
+        const sc = 1 + 0.035 * hitPulse(PULSES, T, 0.12); // the scale punch on each thump
+        if (Math.abs(deg - q * 90) < 0.02 && sc === 1) {
           // At rest: exactly on the lattice, the turned bitmap indexed cell for cell.
           const turns = ((q % 4) + 4) % 4;
           for (let i = 1; i < 5; i++) {
@@ -218,7 +251,7 @@ vec4 effect(vec2 uv) {
         // so a quarter turn lands each cell exactly on a lattice cell.
         const rad = (deg * Math.PI) / 180, cs = Math.cos(rad), sn = Math.sin(rad);
         ctx.save();
-        ctx.setTransform(dpr * L.cw * cs, dpr * L.ch * sn, -dpr * L.cw * sn, dpr * L.ch * cs, dpr * Cx, dpr * Cy);
+        ctx.setTransform(dpr * sc * L.cw * cs, dpr * sc * L.ch * sn, -dpr * sc * L.cw * sn, dpr * sc * L.ch * cs, dpr * Cx, dpr * Cy);
         for (let i = 1; i < 5; i++) {
           ctx.fillStyle = INKS[i];
           for (const j of targets) if (cellInk[j] === i) ctx.fillRect((j % N) - H - 0.02, ((j / N) | 0) - H - 0.02, 1.04, 1.04);
@@ -232,8 +265,9 @@ vec4 effect(vec2 uv) {
         draw(ctx, c.dpr, T);
         sparks(ctx, T);
         // Camera: a spiral zoom turning against the implosion, locking on the hit with a punch, then at rest.
-        const g = OM.smooth(OM.prog(T, T0, LAND));
+        const g = pull(T);
         const pre = T < LAND;
+        const thump = pre ? 0.022 * hitPulse(FILL_A, T, 0.08) : 0; // the camera punches with each hit of the implosion
         const punch = pre ? 0 : 0.035 * Math.exp(-(T - LAND) / 0.1) * (1 - OM.prog(T, LAND, LAND + 0.6));
         // After the lock: a counter-roll kick (about 1.5 degrees, against the mark's clockwise turns) on each
         // downbeat and quarter turn, settling firmly; a slow push that swells and returns to rest for the cut,
@@ -253,7 +287,7 @@ vec4 effect(vec2 uv) {
         const zoom = Math.max(1 + punch + push + accent, 1 + 1.85 * Math.abs(rot));
         fx.apply(T, {
           amount: pre ? Math.pow(g, 1.5) : 0,
-          cam: pre ? { zoom: 1 + 0.12 * g, rot: -0.05 * g } : { zoom, rot },
+          cam: pre ? { zoom: 1 + 0.12 * g + thump, rot: -0.05 * g } : { zoom, rot },
           p0: [2.4, 0.95 - 0.5 * g, cX / 1920, 1 - cY / 1080],
         });
       },
