@@ -53,7 +53,10 @@ ideas    ──► storyboard/        one idea per line              IDEAS.md, s
    `http://localhost:3123/dev.html`. Snapshots render exact frames, and seams are
    checked by comparing the frames either side of every cut.
 7. **Render.** `npm run render:preview` for a quick draft, `npm run render:4k`
-   for the final.
+   for the final (`scripts/render-final.mjs`). The final script stops if the
+   song or lyrics are still placeholders. It rebuilds and checks the pages,
+   renders 4K at 60 fps at low CPU priority, then checks the size, frame rate,
+   sound and length of the file. Add `-- --dry-run` to see what it will run.
 
 ### Built with agents
 
@@ -93,7 +96,7 @@ then checked every cut and scene and sent fixes back.
 | `npm run verify` | Repo hygiene: scenes, words, nothing local tracked |
 | `npm run snapshot -- --at 81.2,85.0 -o .hyperframes/check` | Exact frames as a contact sheet |
 | `npm run render:preview` | Draft 1080p render at 24 fps |
-| `npm run render:4k` | Final 4K render at 60 fps |
+| `npm run render:4k` | Final 4K render at 60 fps, checked before and after (`-- --dry-run`, `-- --workers 4`, `-- --probe <file>`) |
 
 The live player's keys: space to play or pause, arrows to move 2 s, Shift+arrows
 for the previous or next scene, `,` and `.` for one frame, L to loop the scene,

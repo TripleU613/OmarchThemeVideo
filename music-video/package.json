@@ -15,7 +15,7 @@
     "check": "npx --yes hyperframes@0.8.162 check",
     "render": "npx --yes hyperframes@0.8.162 render",
     "render:preview": "npx --yes hyperframes@0.8.162 render --quality draft --fps 24 --workers 6 --player-ready-timeout 120000 -o renders/preview.mp4",
-    "render:4k": "npx --yes hyperframes@0.8.162 render --resolution 4k --fps 60 --quality delivery --player-ready-timeout 120000 -o renders/omarchy-4k.mp4",
+    "render:4k": "node scripts/render-final.mjs",
     "publish": "npx --yes hyperframes@0.8.162 publish",
     "audio:placeholder": "node scripts/placeholder-audio.mjs"
   },
