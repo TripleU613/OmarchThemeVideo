@@ -33,6 +33,10 @@ jobs:
       - name: Repo hygiene (no song audio, no lyric text, no stray scenes, no big files)
         run: node scripts/verify.mjs
 
-      # Static checks of the composition. HyperFrames is pinned so results match local runs.
+      # Static checks of the composition. The song never lives in the repo, so a silent
+      # placeholder of the same length stands in. HyperFrames is pinned to match local runs.
+      - name: Placeholder audio
+        run: node scripts/placeholder-audio.mjs
+
       - name: HyperFrames lint
         run: npx --yes hyperframes@0.8.162 lint

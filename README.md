@@ -85,6 +85,7 @@ then checked every cut and scene and sent fixes back.
 | `npm run lyrics:from <file>` | Lay your word-by-word lyric file onto the timing |
 | `npm run lyrics:build` | Build `lyrics.js` from `lyrics.txt` (counts only, no text printed) |
 | `npm run lyrics:placeholder` | Timed placeholder words, for working without lyrics |
+| `npm run audio:placeholder` | A silent song of the film's length, for working without the audio |
 | `npm run verify` | Repo hygiene: scenes, words, nothing local tracked |
 | `npm run snapshot -- --at 81.2,85.0 -o .hyperframes/check` | Exact frames as a contact sheet |
 | `npm run render:preview` | Draft 1080p render at 24 fps |
