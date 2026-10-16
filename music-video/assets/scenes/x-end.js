@@ -82,9 +82,8 @@ vec4 effect(vec2 uv) {
   }
   vec2 dp = (p * uRes) / (uRes.x / 1920.0);
   float n = vnoise(vec2(dp.x / 16.0, dp.y / 12.3) + vec2(0.0, uTime * 5.0)) - 0.5;
-  float roll = exp(-pow((uv.y - fract(1.0 - uTime * 0.31)) / 0.035, 2.0));
   vec3 green = vec3(0.62, 0.81, 0.42);
-  c = c * (1.0 + uAmount * uP0.x * (0.16 * n + 0.07 * roll)) + uAmount * uP0.y * b * green * 1.3;
+  c = c * (1.0 + uAmount * uP0.x * 0.16 * n) + uAmount * uP0.y * b * green * 1.3;
   return vec4(c, 1.0);
 }`;
 
@@ -171,7 +170,7 @@ vec4 effect(vec2 uv) {
       // ---- the burst: tiles fly out of the core on unwinding spirals and land edge to edge ----
       // The face emerges as the music ends, holds through the silence, then dissolves into the even field,
       // which holds still for the last frames.
-      const EM0 = 299.3, EM1 = 301.2, DISS0 = end - 1.95, DISS1 = end - 0.35;
+      const EM0 = FORMED, EM1 = 301.4, DISS0 = end - 1.95, DISS1 = end - 0.35;
       const burst = (ctx, T, dpr) => {
         const P = prepaint(dpr);
         ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -192,7 +191,7 @@ vec4 effect(vec2 uv) {
           for (const t of P.tiles) {
             if (T < t.s) continue;
             const u = OM.prog(T, t.s, t.e);
-            const src = u < t.cool ? P.hot : T < EM0 ? P.flat : P.face;
+            const src = u < t.cool ? P.hot : P.flat; // landed tiles are the settled plain field, pixel for pixel
             if (u >= 1) {
               ctx.drawImage(src, t.sx, t.sy, t.sw, t.sh, t.sx, t.sy, t.sw, t.sh);
               continue;
@@ -245,9 +244,10 @@ vec4 effect(vec2 uv) {
           // Effect: bloom from the late charge through the flight, then only a barely visible shimmer, still before the end.
           const bloom = T < SNARE ? 0.6 * OM.smooth(OM.prog(T, 294.3, SNARE)) : 1 - OM.smooth(OM.prog(T, KICK, FORMED));
           const shim = OM.smooth(OM.prog(T, 298.5, FORMED)) * 0.2 * (1 - OM.smooth(OM.prog(T, DISS0, DISS1)));
-          const cut = T < HOLD0 || T >= end - 0.07;
+          // The pass runs unbroken from the in-cut to the last frame (there is no outgoing cut), so no still frame ever switches it.
+          const cut = T < HOLD0;
           fx.apply(T, {
-            amount: !cut && (bloom > 0 || shim > 0) ? 1 : 0,
+            amount: cut ? 0 : 1,
             cam: cut ? null : { zoom: z, rot },
             p0: [shim, Math.max(0, bloom), 0, 0],
           });

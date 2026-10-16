@@ -39,11 +39,35 @@ vec4 effect(vec2 uv) {
       // Strikes: one per word, plus the kicks that fall between words, which re-hit the last word.
       const strikes = on.map((t, k) => ({ t, k, p: k === N - 1 ? 2 : 1 }));
       for (const t of KICKS) {
-        if (on.some((o) => Math.abs(o - t) < 0.15)) continue;
+        if (on.some((o) => Math.abs(o - t) < 0.1)) continue;
         const k = OM.hitCount(on, t) - 1;
         if (k >= 0) strikes.push({ t, k, p: 0.55 });
       }
       strikes.sort((a, b) => a.t - b.t);
+      // Per blow: wind-up angle, drop time, contact hold, camera weight. The key word is the heavy one.
+      for (const s of strikes) {
+        const key = s.p >= 2, light = s.p < 1;
+        s.W = key ? 0.44 : light ? 0.23 : 0.3;
+        s.D = key ? 0.13 : 0.1;
+        s.hold = key ? 0.05 : 0.03;
+        s.cw = key ? 3 : light ? 0.6 : 1;
+      }
+
+      // The cross-peen hammer, drawn with its striking face centred on the origin, face down, the
+      // handle running out along +x. It swings rigidly about a shoulder off-frame at the upper right.
+      const SC = 1.2, REST = 0.17, PIV = [1100, -700];
+      const HEAD = new Path2D('M-50 0L50 0L56-6L56-40L48-50L48-150L40-168L12-222L8-226L-8-226L-12-222L-40-168L-48-150L-48-50L-56-40L-56-6Z');
+      const HANDLE = new Path2D('M30-119Q120-114 200-116L430-122L604-126Q632-128 640-114L640-96Q632-82 604-84L430-88L200-94Q120-96 30-91Z');
+      const part = (ctx, path, body, rim, rx, ry) => {
+        ctx.fillStyle = rim;
+        ctx.fill(path);
+        ctx.save();
+        ctx.clip(path);
+        ctx.translate(rx, ry);
+        ctx.fillStyle = body;
+        ctx.fill(path);
+        ctx.restore();
+      };
 
       const get = V.lazy(PROBE, () => {
         const L = V.layout('v1-06', { weight: WEIGHT, cap: 112, maxW: 1740 });
@@ -98,8 +122,8 @@ vec4 effect(vec2 uv) {
         for (const s of strikes) {
           const age = T - s.t;
           if (age < 0) continue;
-          punch += 0.035 * s.p * Math.exp(-age / 0.09);
-          jolt += 10 * s.p * Math.exp(-age / 0.07) * Math.cos(age * 60);
+          punch += 0.03 * s.cw * Math.exp(-age / 0.09);
+          jolt += 9 * s.cw * Math.exp(-age / 0.07) * Math.cos(age * 60);
         }
         const world = OM.smooth(OM.prog(T, start + H, start + 0.3)) * (1 - OM.prog(T, FLARE + 0.05, DRAW1));
         if (world > 0) {
@@ -152,6 +176,18 @@ vec4 effect(vec2 uv) {
             for (let x = 438; x < 1656; x += 24) ctx.fillRect(x, FACE - 2 + 4 * ring * Math.sin(x * 0.05 + T * 90), 24, 3 + 3 * ring);
             ctx.globalAlpha = 1;
           }
+          // Heat rings: each blow rings a bright ellipse of heat out across the anvil face.
+          for (const s of strikes) {
+            const age = T - s.t, life = s.p >= 2 ? 0.6 : 0.4;
+            if (age < 0 || age > life) continue;
+            const f = age / life, r = (50 + (s.p >= 2 ? 520 : 260 * Math.min(1, s.p)) * OM.ease.outCubic(f));
+            ctx.globalAlpha = world * (1 - f) * Math.min(1, 0.5 + 0.5 * s.p);
+            ctx.strokeStyle = f < 0.3 ? ink.crest : ink.hover;
+            ctx.lineWidth = (s.p >= 2 ? 10 : 6) * (1 - f) + 1;
+            ctx.beginPath();
+            ctx.ellipse(words[s.k].cx, FACE + 2, r, r * 0.07 + 3, 0, 0, Math.PI * 2);
+            ctx.stroke();
+          }
           ctx.globalAlpha = 1;
           // The words: forged on their strike, squashed by it, cooling.
           for (const wd of words) {
@@ -188,60 +224,131 @@ vec4 effect(vec2 uv) {
               if (x >= a && x <= b) OM.cell(ctx, HM, col, hrow, dpr);
             }
           }
-          // The hammer: hangs raised over the next word, drops onto it, recoils.
-          if (world > 0.01) {
-            let i = strikes.findIndex((s) => s.t > T);
+          // The hammer. Between blows it recoils and hangs raised; before each blow it rises and cocks
+          // back, then whips down an accelerating arc about the off-frame shoulder and stops dead on the
+          // onset, its face driven into the squashed metal.
+          const sqOf = (k, t) => {
+            let sq = 0;
+            for (const s of strikes) if (s.k === k && t >= s.t) sq = Math.max(sq, s.p * Math.exp(-(t - s.t) / 0.07));
+            return Math.min(1, sq);
+          };
+          const tgt = (s, t) => {
+            const wd = words[s.k];
+            return [wd.cx, wd.base - wd.cap * (1 - 0.32 * sqOf(s.k, t))];
+          };
+          const pose = (t) => {
+            let i = strikes.findIndex((s) => s.t > t);
             if (i < 0) i = strikes.length;
             const prev = strikes[i - 1], next = strikes[i];
-            const target = (s) => (s ? words[s.k] : null);
-            const xOf = (s) => (s ? target(s).cx : 960), yOf = (s) => (s ? target(s).top : FACE);
-            let x, y, ang;
-            const since = prev ? T - prev.t : 9;
-            const until = next ? next.t - T : 9;
-            if (until < 0.1) {
-              const a = OM.ease.inCubic(1 - until / 0.1);
-              x = xOf(next);
-              y = OM.lerp(yOf(next) - 300, yOf(next), a);
-              ang = OM.lerp(-0.45, 0, a);
+            const lift = (tt) => {
+              let a;
+              if (prev) {
+                const u = tt - prev.t;
+                const rest = prev.p >= 2 ? REST + 0.07 : REST;
+                a = u < prev.hold ? 0 : rest * OM.ease.outBack(OM.prog(u, prev.hold, prev.hold + 0.17), 2.6);
+              } else a = OM.lerp(0.62, REST, OM.smooth(OM.prog(tt, start + H, next.t - next.D - 0.12)));
+              if (next) {
+                const gap = next.t - (prev ? prev.t : start + H);
+                const A = Math.max(0.04, Math.min(next.p >= 2 ? 0.38 : 0.28, gap - next.D - 0.17));
+                const w = REST + (next.W - REST) * Math.min(1, gap / 0.45);
+                a += (w - REST) * OM.ease.inOutCubic(OM.prog(tt, next.t - next.D - A, next.t - next.D));
+              } else a += 0.5 * OM.ease.inCubic(OM.prog(tt, prev.t + 0.32, FLARE + 0.03));
+              return a;
+            };
+            let ang, x, y, smear = 0;
+            if (next && t > next.t - next.D) {
+              const f = 1 - (next.t - t) / next.D;
+              ang = lift(next.t - next.D) * (1 - f * f * f);
+              smear = f;
+              [x, y] = tgt(next, t);
             } else {
-              const up = OM.ease.outCubic(OM.clamp(since / 0.28));
-              const mv = next ? OM.smooth(OM.prog(T, prev ? prev.t + 0.15 : start, next.t - 0.1)) : 0;
-              x = OM.lerp(xOf(prev || next), xOf(next || prev), mv);
-              y = OM.lerp(yOf(prev || next), OM.lerp(yOf(prev || next), yOf(next || prev), mv) - 300, up);
-              ang = OM.lerp(0, -0.45, up);
+              ang = lift(t);
+              const a = prev ? tgt(prev, t) : tgt(next, t), b = next ? tgt(next, t) : a;
+              const mv = prev && next ? OM.smooth(OM.prog(t, prev.t + 0.06, next.t - next.D)) : 0;
+              x = OM.lerp(a[0], b[0], mv);
+              y = OM.lerp(a[1], b[1], mv);
+            }
+            // The shudder of the stop.
+            const u = prev ? t - prev.t : 9;
+            const shake = u < 0.25 ? 0.02 * Math.min(prev.p, 1.6) * Math.exp(-u / 0.05) * Math.sin(u * 120) : 0;
+            const px = x + PIV[0], py = y + PIV[1], cs = Math.cos(ang), sn = Math.sin(ang);
+            return { x: px + (x - px) * cs - (y - py) * sn, y: py + (x - px) * sn + (y - py) * cs, ang: ang + shake, smear, prev, u };
+          };
+          if (world > 0.01) {
+            const P = pose(T);
+            const hot = P.prev ? Math.exp(-P.u / (P.prev.p >= 2 ? 0.35 : 0.2)) * Math.min(1, P.prev.p) : 0;
+            // Motion smear: the head's own silhouette trailing up the arc on the fastest frames.
+            if (P.smear > 0.45) {
+              for (let j = 5; j >= 1; j--) {
+                const G2 = pose(T - j * 0.006);
+                ctx.save();
+                ctx.globalAlpha = world * 0.42 * (P.smear - 0.35) * (6 - j) / 5;
+                ctx.translate(G2.x, G2.y);
+                ctx.rotate(G2.ang);
+                ctx.scale(SC, SC);
+                ctx.fillStyle = j < 3 ? ink.mid : th['border-strong'];
+                ctx.fill(HEAD);
+                ctx.restore();
+              }
             }
             ctx.save();
             ctx.globalAlpha = world;
-            ctx.translate(x, y);
-            ctx.rotate(ang);
+            ctx.translate(P.x, P.y);
+            ctx.rotate(P.ang);
+            ctx.scale(SC, SC);
+            // Rim light from the forge below: the body is shifted away from the light inside its own outline.
+            const r = 4 + 3 * hot, rx = -r * Math.sin(P.ang), ry = -r * Math.cos(P.ang);
+            const rim = hot > 0.5 ? ink.crest : hot > 0.15 ? ink.hover : ink.lit;
+            part(ctx, HANDLE, th['surface-2'], ink.mid, rx * 0.6, ry * 0.6);
             ctx.fillStyle = th['border-strong'];
-            ctx.fillRect(80, -78, 680, 26); // the handle, up and to the right
+            for (let gx = 440; gx < 596; gx += 15) { // the grip wrap
+              ctx.beginPath();
+              ctx.moveTo(gx, -122 - (gx - 430) * 0.024);
+              ctx.lineTo(gx + 7, -122 - (gx - 430) * 0.024);
+              ctx.lineTo(gx + 1, -88 + (gx - 430) * 0.024);
+              ctx.lineTo(gx - 6, -88 + (gx - 430) * 0.024);
+              ctx.fill();
+            }
+            part(ctx, HEAD, th['border-strong'], rim, rx, ry);
             ctx.fillStyle = th['surface-2'];
-            ctx.fillRect(-95, -112, 190, 112);
+            ctx.fillRect(22, -148, 20, 96); // the shadowed cheek
+            ctx.fillRect(-40, -170, 80, 3); // where the peen starts its wedge
+            ctx.fillRect(-48, -52, 96, 3); // the face's shoulder
             ctx.fillStyle = th['text-muted'];
-            ctx.fillRect(-95, -112, 190, 6);
-            ctx.fillStyle = ink.mid;
-            ctx.fillRect(-95, -6, 190, 6); // lit from below by the metal
+            ctx.fillRect(-42, -146, 5, 90); // a cold glint down the steel
+            // The striking face glows with the blow.
+            if (hot > 0.01) {
+              ctx.globalAlpha = world * hot;
+              ctx.fillStyle = ink.crest;
+              ctx.fillRect(-52, -7, 104, 7);
+            }
             ctx.restore();
+            // The flash at the contact point.
+            if (P.prev && P.u < 0.2) {
+              const s = P.prev, [cx, cy] = tgt(s, T), k = Math.exp(-P.u / (s.p >= 2 ? 0.09 : 0.05));
+              pool(ctx, cx, cy, 120 + 110 * s.p, 46 + 40 * s.p, ink.crest, world * k * (s.p >= 2 ? 0.95 : 0.45 + 0.3 * s.p));
+            }
           }
-          // Sparks off the letters: cells flung up and out, falling, cooling.
+          // Sparks: cells bursting off the contact point, flung up and out, falling, cooling.
           ctx.globalAlpha = world;
           for (const s of strikes) {
             const age = T - s.t;
-            if (age < 0 || age > 1.1) continue;
+            if (age < 0 || age > 1.2) continue;
             const wd = words[s.k];
-            if (!wd.cells.length) continue;
-            const n = Math.round(34 * s.p * s.p);
+            const key = s.p >= 2, n = key ? 130 : Math.round(44 * s.p);
+            const ox = wd.cx, oy = wd.base - wd.cap * (1 - 0.32 * Math.min(1, s.p));
+            const seed = Math.round(s.t * 1000);
             for (let i = 0; i < n; i++) {
-              const h1 = OM.hash(i, Math.round(s.t * 1000), 61), h2 = OM.hash(i, Math.round(s.t * 1000), 62), h3 = OM.hash(i, Math.round(s.t * 1000), 63);
-              const life = 0.4 + 0.6 * h3;
+              const h1 = OM.hash(i, seed, 61), h2 = OM.hash(i, seed, 62), h3 = OM.hash(i, seed, 63);
+              const life = (key ? 0.5 : 0.35) + 0.6 * h3;
               if (age > life) continue;
-              const [q, r] = wd.cells[Math.floor(h1 * wd.cells.length)];
-              const a = -Math.PI / 2 + (h2 - 0.5) * 2.6, v = (380 + 700 * h3) * (0.8 + 0.3 * s.p);
-              const x = G.x0 + q * G.cw + Math.cos(a) * v * age, y = G.y0 + r * G.ch + Math.sin(a) * v * age + 900 * age * age;
-              const f = age / life;
+              const a = -Math.PI / 2 + (h2 - 0.5) * 3.0, v = (420 + 900 * h3) * (key ? 1.35 : 0.75 + 0.25 * s.p);
+              const x0 = ox + (h1 - 0.5) * 104;
+              const x = x0 + Math.cos(a) * v * age, y = oy + Math.sin(a) * v * age + 1300 * age * age;
+              const f = age / life, sz = key && f < 0.4 ? 8 : 6;
               ctx.fillStyle = f < 0.25 ? ink.crest : f < 0.55 ? ink.hover : f < 0.8 ? ink.lit : ink.mid;
-              ctx.fillRect(x, y, 6, 6);
+              ctx.fillRect(x, y, sz, sz);
+              if (age < 0.1) ctx.fillRect(x - Math.cos(a) * v * 0.016, y - Math.sin(a) * v * 0.016, sz - 2, sz - 2); // streak
             }
           }
           ctx.globalAlpha = 1;

@@ -143,7 +143,7 @@ vec4 effect(vec2 uv) {
             ctx.lineTo(r.x - r.len * 0.06, y + r.len);
             ctx.stroke();
           }
-          if (T < 55.1) V.letterRain(ctx, T, dpr);
+          if (T < 55.5) V.letterRain(ctx, T, dpr);
           // The words, traced in beads on the glass.
           const flash = OM.pulse([BEAT], T, 0.12);
           const run = OM.prog(T, RUN0, RUN1);

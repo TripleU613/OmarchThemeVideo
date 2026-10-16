@@ -1,10 +1,11 @@
 // Frame effects: a page-wide layer above the scenes and below the captions that
-// draws only in a 40px band along the frame's edges, on the sides whose margin
-// is empty for a whole sentence (assets/lib/frame-need.js, measured by
-// scripts/edge-need.mjs). One idea per section, synced to the kicks, snares and
-// the corrected beat grid, each with its own way in and out. Every pixel is a
-// pure function of song time T: the on/off schedule is fixed at load, and the
-// envelope is 0 at every edge of an on stretch, so nothing steps at a cut.
+// draws only in a 40px band along the frame's edges, all the way round, in every
+// sentence that leaves a margin empty (assets/lib/frame-need.js, measured by
+// scripts/edge-need.mjs), and subtler where only some margins are empty. One
+// idea per section, synced to the kicks, snares and the corrected beat grid,
+// each with its own way in and out. Every pixel is a pure function of song time
+// T: the on/off schedule is fixed at load, and the envelope is 0 at every edge
+// of an on stretch, so nothing steps at a cut.
 (() => {
   const N = window.OM_FRAME_NEED;
   if (!N || !OM.T) return;
@@ -427,12 +428,15 @@
     if (d === null || d > lim) d = lim;
     return d;
   };
-  let RUNS = null;
+  // A frame on only one to three sides reads as stray pieces (the owner's call), so a sentence with any
+  // empty margin gets the whole frame, all four sides, at SUBTLE strength unless every margin is empty.
+  const SUBTLE = 0.45;
+  let RUNS = null, SC = null;
   function schedule() {
-    const scenes = [...document.querySelectorAll('#root > section.scene')].map((el) => {
-      const id = el.id.slice(2), a = +el.dataset.start;
-      return { a, e: a + +el.dataset.duration, m: N.overrides[id] ?? N.sides[id] ?? 0 };
-    });
+    const scenes = (SC = [...document.querySelectorAll('#root > section.scene')].map((el) => {
+      const id = el.id.slice(2), a = +el.dataset.start, m = N.overrides[id] ?? N.sides[id] ?? 0;
+      return { a, e: a + +el.dataset.duration, m: m ? 15 : 0, s: m === 15 ? 1 : SUBTLE };
+    }));
     const runs = [[], [], [], []];
     for (let k = 0; k < 4; k++) {
       let cur = null;
@@ -452,9 +456,71 @@
     }
     return runs;
   }
+  /** The frame's strength at T: its sentence's, eased from the previous sentence's from the cut to the next beat. */
+  const strength = (T) => {
+    let i = SC.length - 1;
+    while (i > 0 && T < SC[i].a) i--;
+    const c = SC[i], p = SC[i - 1];
+    if (!p || !p.m || p.s === c.s) return c.s;
+    const end = first(beats, c.a + 0.25) ?? c.a + 0.5;
+    return p.s + (c.s - p.s) * OM.smooth(clamp((T - c.a) / (end - c.a)));
+  };
   // Per side, this frame: on?, the mask and its p, and the morph front (-1 when none).
   const S_ON = [0, 0, 0, 0], S_MASK = [null, null, null, null], S_P = [1, 1, 1, 1], S_F = [-1, -1, -1, -1];
   let pass = 0; // 0: the current idea; 1: the previous idea travelling out during a morph
+
+  // ---------- the rim fog: always on, beneath the section effects ----------
+  // A pixelated haze round the whole film: low-frequency noise drifting slowly, quantized into 20 px
+  // cells, densest at the edge and gone by about 170 px in, peaking near 0.16 opacity. It breathes
+  // ±15% on every corrected beat and a little more on kicks (smooth attack, no flash). Its colour is
+  // the theme green, merging into the picture's own edge colour (scripts/edge-need.mjs samples it
+  // every 0.25 s) wherever that isn't the dark Tokyo Night ground: pale mist on white, the hue of a
+  // coloured wallpaper. It never switches on or off, so it is continuous across every cut.
+  const FC = 20, FW = W / FC, FH = H / FC, FDEP = 170, FCLEAR = 180;
+  const FG_A = OM.rgb(F.mid), FG_B = OM.rgb(F.lit), GROUND = OM.rgb(F.bg);
+  const EDGE = N.edge || null;
+  let fogCv = null, fogCtx = null, fogImg = null;
+  const edgeAt = (T) => {
+    if (!EDGE) return GROUND;
+    const n = EDGE.rgb.length / 3, x = clamp(T / EDGE.dt - 0.5, 0, n - 1), i = Math.floor(x), f = x - i, j = Math.min(n - 1, i + 1);
+    return [0, 1, 2].map((c) => EDGE.rgb[i * 3 + c] * (1 - f) + EDGE.rgb[j * 3 + c] * f);
+  };
+  const kickSwell = (T) => {
+    const i = last(KICK, T);
+    if (i < 0) return 0;
+    const a = T - KICK[i];
+    return a < 0.05 ? a / 0.05 : Math.exp(-(a - 0.05) / 0.18);
+  };
+  function fog(ctx, T) {
+    if (!fogCv) {
+      fogCv = document.createElement('canvas'); fogCv.width = FW; fogCv.height = FH;
+      fogCtx = fogCv.getContext('2d'); fogImg = fogCtx.createImageData(FW, FH);
+    }
+    const bp = beatPos(T), breath = 1 + 0.15 * Math.cos(2 * Math.PI * (bp - Math.floor(bp))) + 0.12 * kickSwell(T);
+    const e = edgeAt(T), lum = 0.2126 * e[0] + 0.7152 * e[1] + 0.0722 * e[2];
+    const away = clamp((Math.hypot(e[0] - GROUND[0], e[1] - GROUND[1], e[2] - GROUND[2]) - 14) / 45);
+    const tint = e.map((v) => clamp(lum > 140 ? v * 0.8 : v * 1.6 + 12, 0, 255)); // readable on its own ground
+    const px = fogImg.data, deep = Math.ceil(FDEP / FC);
+    px.fill(0);
+    for (let y = 0; y < FH; y++) for (let x = 0; x < FW; x++) {
+      if (y >= deep && y < FH - deep && x === deep) x = FW - deep; // skip the open middle
+      const cx = (x + 0.5) * FC, cy = (y + 0.5) * FC;
+      const d = Math.min(cx, W - cx, cy, H - cy), prof = 1 - d / FDEP;
+      if (prof <= 0) continue;
+      const n = OM.heroNoise(cx * 0.006 + T * 0.05, cy * 0.006 - T * 0.03);
+      const m = OM.heroNoise(cx * 0.0025 - T * 0.02 + 61, cy * 0.0025 + 23);
+      const a = 0.16 * Math.pow(prof, 1.6) * (0.35 + 0.65 * OM.smooth(clamp((n - 0.25) / 0.6))) * breath;
+      const i = (y * FW + x) * 4;
+      for (let c = 0; c < 3; c++) {
+        const g = FG_A[c] + (FG_B[c] - FG_A[c]) * m;
+        px[i + c] = g + (tint[c] - g) * away;
+      }
+      px[i + 3] = 255 * Math.min(1, a);
+    }
+    fogCtx.putImageData(fogImg, 0, 0);
+    ctx.imageSmoothingEnabled = false; // square fog cells, not a blur
+    ctx.drawImage(fogCv, 0, 0, W, H);
+  }
 
   // ---------- the layer ----------
   let cv = null, cnv = null;
@@ -471,7 +537,6 @@
       else if (T >= r.dOut) { S_MASK[k] = I.mask && I.mask.out; S_P[k] = (r.e - T) / (r.e - r.dOut); }
       for (const [t, d] of r.morphs) if (T >= t && T < d) { S_F[k] = OM.smooth((T - t) / (d - t)); morph = 1; } // starts at rest on the cut
     }
-    if (!any) { if (cv) cv.style.display = 'none'; return; }
     if (!cv) {
       cv = document.createElement('canvas');
       cv.id = 'om-frames';
@@ -479,11 +544,13 @@
       (document.getElementById('root') || document.body).appendChild(cv);
       cnv = OM.canvas(cv);
     }
-    cv.style.display = 'block';
     const ctx = cnv.ensure();
-    ctx.clearRect(0, 0, W, B); ctx.clearRect(0, H - B, W, B); ctx.clearRect(0, B, B, H - 2 * B); ctx.clearRect(W - B, B, B, H - 2 * B);
+    const Q = FCLEAR;
+    ctx.clearRect(0, 0, W, Q); ctx.clearRect(0, H - Q, W, Q); ctx.clearRect(0, Q, Q, H - 2 * Q); ctx.clearRect(W - Q, Q, Q, H - 2 * Q);
+    fog(ctx, T); // always there, beneath everything else
+    if (!any) return;
     peak = Math.max(pulse(beats, T, 0.05), pulse(KICK, T, 0.05));
-    gain = 0.6 + 0.5 * peak; // a touch more vivid on the beat
+    gain = (0.6 + 0.5 * peak) * strength(T); // a touch more vivid on the beat
     for (const b of BUCKET) b.length = 0;
     pass = 0;
     I.draw(T, { a: SECTIONS[si][1], e: SECTIONS[si][2] });

@@ -5,8 +5,8 @@
 // gate that slams shut round it, a padlock on its corner. The gates rattle on
 // the snares, and on the 44.745 kick they all clamp tighter. After the line
 // has read, the camera tilts up the strings (into the 45.836 downbeat) to the
-// hand on the control bar that owns them; it yanks every string, lifts out of
-// frame and leaves the white page for v1-03.
+// hand on the control bar that owns them; it yanks every string and hauls
+// them up, and what rises on them is v1-03's fare meter (V.rig, the shared cut).
 OM.ownWords.add('v1-02');
 (() => {
   const V = OM.v1;
@@ -31,7 +31,7 @@ vec4 effect(vec2 uv) {
       const W = OM.theme('white'), WI = OM.fieldInks('white');
       const on = OM.sung('v1-02').map((w) => w.t0);
       const LAP = V.LAP, LID = V.LID, DK = V.DECK, LCY = V.LCY;
-      const TILT0 = 45.25, YANK = 45.836, EXIT = 46.15;
+      const TILT0 = 45.25, YANK = 45.836;
       const RATTLE = [42.284, 44.211, 44.745], CLAMP = 44.745; // snare and kick events
       const BAR = -720; // the control bar's height in world px
       const FLY = 0.13; // a word's fall from the notch
@@ -48,7 +48,7 @@ vec4 effect(vec2 uv) {
         };
       });
       // The camera: holds on the laptop through the line, then the tilt to the hand, then out past it.
-      const camY = (T) => 1000 * OM.ease.inOutCubic(OM.prog(T, TILT0, YANK)) + 1500 * OM.ease.inOutCubic(OM.prog(T, YANK + 0.1, EXIT));
+      const camY = (T) => 1000 * OM.ease.inOutCubic(OM.prog(T, TILT0, YANK));
       const yank = (T) => (T < YANK ? 0 : 1) * Math.exp(-(T - YANK) / 0.12) * 40;
       // String pluck: on the 45.53 kick in the pause every string twangs, bowing and settling.
       const PLUCK = 45.53;
@@ -96,7 +96,7 @@ vec4 effect(vec2 uv) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + H0) return V.laptopFrame(ctx);
-          if (T >= END - H) return OM.handoff('white', ctx, T, dpr);
+          if (T >= V.RIG0) return V.rig(ctx, T); // the hand hauls the meter up: the cut frame v1-03 opens on
           pluck = T >= PLUCK ? 26 * Math.exp(-(T - PLUCK) / 0.18) * Math.sin((T - PLUCK) * 38) : 0;
           const L = lay();
           const cy = camY(T), yk = yank(T), dy = cy - yk;
@@ -162,29 +162,7 @@ vec4 effect(vec2 uv) {
             V.notch(ctx, dy);
           }
           // The control bar and the hand that holds it.
-          if (by > -400) {
-            const tip = Math.sin(OM.clamp((T - YANK) / 0.3) * Math.PI) * 0.06;
-            ctx.save();
-            ctx.translate(960, by);
-            ctx.rotate(tip);
-            ctx.fillStyle = WI.lit;
-            ctx.fillRect(-680, -14, 1360, 28);
-            ctx.fillRect(-14, -230, 28, 300);
-            ctx.fillStyle = W.text;
-            ctx.beginPath();
-            ctx.roundRect(-110, -250, 220, 190, 34);
-            ctx.fill();
-            for (let f = 0; f < 4; f++) {
-              ctx.beginPath();
-              ctx.roundRect(-104 + f * 54, -80, 46, 112, 20);
-              ctx.fill();
-            }
-            ctx.beginPath();
-            ctx.roundRect(96, -190, 54, 120, 24);
-            ctx.fill();
-            ctx.fillRect(-90, -520, 180, 280);
-            ctx.restore();
-          }
+          if (by > -400) V.hand(ctx, by, Math.sin(OM.clamp((T - YANK) / 0.3) * Math.PI) * 0.06);
         },
         release: () => {
           fx.release();

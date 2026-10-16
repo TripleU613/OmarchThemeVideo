@@ -52,9 +52,12 @@ ideas    ──► storyboard/        one idea per line              IDEAS.md, s
    runs through that shader on the GPU. At the cuts both ease to rest and the
    pass switches itself off, so the handoff frames stay pixel exact.
    Around the picture, a frame-effects layer (`assets/lib/frames.js`) adds one
-   beat-synced border idea per section. It appears only where a scene leaves its
-   edges empty. To find those scenes, `scripts/edge-need.mjs` measures a draft
-   rendered without the layer (`NO_FRAMES=1 npm run assemble`).
+   beat-synced border idea per section. It runs all the way round in scenes that
+   leave an edge empty, and subtler where only some edges are. Under it, a faint
+   pixelated fog rims the whole film, breathing on the beat in the colour of the
+   picture's edge. To find the empty edges and those colours,
+   `scripts/edge-need.mjs` measures a draft rendered without the layer
+   (`NO_FRAMES=1 npm run assemble`).
 6. **Watch and check.** `npm run serve` opens the live player at
    `http://localhost:3123/dev.html`. Snapshots render exact frames, and seams are
    checked by comparing the frames either side of every cut.

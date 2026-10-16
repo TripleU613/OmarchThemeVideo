@@ -129,10 +129,10 @@ OM.ownWords.add('v1-01');
   V.rect = (x0, y0, x1, y1) => [x0 / 1920, 1 - y1 / 1080, x1 / 1920, 1 - y0 / 1080];
 
   // ---------- match cuts ----------
-  // Letter rain (v1-04 > v1-05): v1-04's green letters let go cell by cell and
-  // fall as rain down v1-05's glass, turning from green to the rain's own ink.
+  // Letter rain (v1-04 > v1-05): v1-04's green letters liquefy and fall as
+  // rain down v1-05's glass, turning from green to the rain's own ink.
   // Both scenes draw it, so the cut frame is one shared state.
-  V.RAIN0 = 54.28;
+  V.RAIN0 = 54.2;
   V.words04 = V.lazy(V.font(800, 100), () => {
     const HM = OM.HOME, G = { x0: HM.x0, y0: HM.y0, cw: HM.cw / 2, ch: HM.ch / 2 };
     const L = V.layout('v1-04', { weight: 800, cap: 124, maxW: 1760 });
@@ -146,24 +146,57 @@ OM.ownWords.add('v1-01');
     const f = (wd.G.y0 + (r + 0.5) * wd.G.ch - (wd.base - wd.cap)) / wd.cap;
     return f < 0.34 ? ink.crest : f < 0.67 ? ink.hover : ink.lit;
   };
-  V.letterRain = (ctx, T, dpr) => {
-    const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
-    for (const wd of V.words04()) {
-      const G = wd.G;
-      for (const [q, r] of wd.cells) {
-        const a = T - (V.RAIN0 + 0.14 * OM.hash(q, 7, 404));
-        if (a <= 0) {
-          ctx.fillStyle = V.band04(wd, r, ink);
-          OM.cell(ctx, G, q, r, dpr);
-          continue;
-        }
-        const y = G.y0 + r * G.ch + 2100 * a * a;
-        if (y > 1110) continue;
-        const tail = Math.min(80, 4200 * a * 0.02), w = OM.lerp(G.cw, 2.5, OM.clamp(a / 0.22));
-        ctx.fillStyle = a < 0.12 ? V.band04(wd, r, ink) : th.text;
-        ctx.fillRect(G.x0 + (q + 0.5) * G.cw - w / 2, y - tail, w, G.ch + tail);
+  // Each letter liquefies from its bottom edge, staggered left to right across
+  // the line (54.20 to the 54.381 hat): every cell, lowest first, runs off as a
+  // clean drop, thinning to a streak with a soft head, easing from v1-04's green
+  // to v1-05's rain tone over 0.3 s and reaching the rain's own speed.
+  V.drops04 = () => {
+    const words = V.words04();
+    if (V._drops && V._dropsOf === words) return V._drops;
+    let x0 = 1e9, x1 = -1e9;
+    for (const wd of words) { x0 = Math.min(x0, wd.x); x1 = Math.max(x1, wd.x + wd.w); }
+    const ink = OM.fieldInks('tokyo-night'), out = [];
+    for (const wd of words) {
+      const G = wd.G, A = wd.w / Math.max(1, wd.text.length), foot = {};
+      for (const [q, r] of wd.cells) foot[q] = Math.max(foot[q] ?? -1e9, r);
+      for (const [q, r, li] of wd.cells) {
+        const lx = wd.x + (li + 0.5) * A;
+        const tL = V.RAIN0 + 0.17 * OM.clamp((lx - x0) / Math.max(1, x1 - x0)) + 0.02 * OM.hash(li, wd.k, 405);
+        out.push({ x: G.x0 + (q + 0.5) * G.cw, y: G.y0 + r * G.ch, cw: G.cw, ch: G.ch, q, r, G, col: V.band04(wd, r, ink), t: tL + (foot[q] - r) * 0.024 + 0.03 * OM.hash(q, r, 406), sp: 0.7 + 0.6 * OM.hash(q, r, 407) });
       }
     }
+    V._drops = out;
+    V._dropsOf = words;
+    return out;
+  };
+  V.RAIN_G = 3600; // px/s^2 until the drop reaches the rain's speed
+  V.RAIN_V = 1300;
+  V.letterRain = (ctx, T, dpr) => {
+    const th = OM.theme('tokyo-night');
+    for (const d of V.drops04()) {
+      const a = T - d.t, g = V.RAIN_G * d.sp, vt = V.RAIN_V * d.sp, ta = vt / g; // each drop its own weight, like the rain
+
+      if (a <= 0) {
+        ctx.fillStyle = d.col;
+        OM.cell(ctx, d.G, d.q, d.r, dpr);
+        continue;
+      }
+      const fall = a < ta ? 0.5 * g * a * a : 0.5 * g * ta * ta + vt * (a - ta);
+      const y = d.y + fall;
+      if (y - 140 > 1080) continue;
+      const v = Math.min(vt, g * a), k = OM.smooth(OM.clamp(a / 0.3));
+      const w = OM.lerp(d.cw - 1, 2.5, OM.smooth(OM.clamp(a / 0.15))), tail = d.ch + Math.min(90, v * 0.06);
+      const col = OM.mix(d.col, th.text, k);
+      // The streak, then its soft round head.
+      ctx.globalAlpha = OM.lerp(1, 0.32, k);
+      ctx.fillStyle = col;
+      ctx.fillRect(d.x - w / 2, y + d.ch - tail, w, tail - w / 2);
+      ctx.globalAlpha = OM.lerp(1, 0.75, k);
+      ctx.beginPath();
+      ctx.arc(d.x, y + d.ch - w / 2, w * 0.62, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
   };
   // Lamp to mark (v1-07 > v1-08): the copier's lamp row bends into a ring and
   // squares up into the outline of the square-spiral mark at the print's core.
@@ -214,6 +247,113 @@ OM.ownWords.add('v1-01');
   const DTOP = LID.y + LID.h + 6, DFRONT = DTOP + 150;
   V.LID = LID;
   V.DECK = { top: DTOP, front: DFRONT, half0: 575, half1: 660 };
+
+  // ---------- strings to meter (v1-02 > v1-03) ----------
+  // The hand on the control bar hauls its strings up: the bar and hand lift out
+  // of the top, and what rises from below on the strings is v1-03's fare meter,
+  // arriving on the 46.301 snare. The strings let go on v1-03's 46.602 snare.
+  // Both scenes draw V.rig at the cut, so it is one shared state.
+  V.YANK = 45.836;
+  V.RIG0 = 45.95;
+  V.RIG1 = 46.301;
+  V.RIG_FREE = 46.602;
+  V.MT = { M: { x: 110, y: 230, w: 720, h: 620 }, D: { x: 150, y: 290, w: 640, h: 230 }, SLOT: { x: 470, y: 222 }, HEAD: { x: 920, y: 940, w: 890 } };
+  /** v1-02's bar height on screen, with the yank and the lift. */
+  V.barY = (T) => -720 + 1000 - (T < V.YANK ? 0 : 40 * Math.exp(-(T - V.YANK) / 0.12)) - 560 * OM.ease.inOutCubic(OM.prog(T, V.RIG0, V.RIG1));
+  V.barTip = (T) => Math.sin(OM.clamp((T - V.YANK) / 0.3) * Math.PI) * 0.06;
+  /** The meter's drop below its place: rising on the strings, swinging to rest after the snare. */
+  V.meterY = (T) => {
+    if (T < V.RIG1) return 900 * Math.pow(1 - OM.prog(T, V.RIG0, V.RIG1), 3);
+    return -7 * Math.exp(-(T - V.RIG1) / 0.09) * Math.sin((T - V.RIG1) * 30);
+  };
+  /** The meter's static parts: body, slot, display, the FARE label (and 0.00 if zero), divider; the printer head. */
+  V.meterShell = (ctx, oy, bump = 0, inv = false, zero = false) => {
+    const { M, D, SLOT, HEAD } = V.MT;
+    ctx.save();
+    ctx.translate(0, oy + bump);
+    ctx.fillStyle = W['surface-2'];
+    ctx.strokeStyle = W['border-strong'];
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.roundRect(M.x, M.y, M.w, M.h, 36);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = W.text;
+    ctx.fillRect(SLOT.x - 70, SLOT.y, 140, 16);
+    ctx.fillStyle = inv ? W['border-subtle'] : W.text;
+    ctx.beginPath();
+    ctx.roundRect(D.x, D.y, D.w, D.h, 12);
+    ctx.fill();
+    ctx.fillStyle = WI.lit;
+    ctx.font = "600 30px 'JetBrains Mono'";
+    ctx.textAlign = 'left';
+    ctx.fillText('FARE', D.x, 600);
+    if (zero) {
+      ctx.font = "800 120px 'JetBrains Mono'";
+      ctx.textAlign = 'right';
+      ctx.fillStyle = W.text;
+      ctx.fillText('0.00', D.x + D.w, 735);
+      ctx.textAlign = 'left';
+    }
+    ctx.fillStyle = WI.dim;
+    ctx.fillRect(D.x, 790, D.w, 8);
+    ctx.translate(0, -bump);
+    ctx.fillStyle = W.text;
+    ctx.beginPath();
+    ctx.roundRect(HEAD.x, HEAD.y, HEAD.w, 58, 14);
+    ctx.fill();
+    ctx.restore();
+  };
+  /** The hand on its control bar, bar centre at (960, by). */
+  V.hand = (ctx, by, tip) => {
+    ctx.save();
+    ctx.translate(960, by);
+    ctx.rotate(tip);
+    ctx.fillStyle = WI.lit;
+    ctx.fillRect(-680, -14, 1360, 28);
+    ctx.fillRect(-14, -230, 28, 300);
+    ctx.fillStyle = W.text;
+    ctx.beginPath();
+    ctx.roundRect(-110, -250, 220, 190, 34);
+    ctx.fill();
+    for (let f = 0; f < 4; f++) {
+      ctx.beginPath();
+      ctx.roundRect(-104 + f * 54, -80, 46, 112, 20);
+      ctx.fill();
+    }
+    ctx.beginPath();
+    ctx.roundRect(96, -190, 54, 120, 24);
+    ctx.fill();
+    ctx.fillRect(-90, -520, 180, 280);
+    ctx.restore();
+  };
+  /** Strings, bar and hand from V.RIG0 on: string feet move from the laptop's corners to the meter's, below frame. */
+  V.rigTop = (ctx, T) => {
+    const by = V.barY(T), my = V.meterY(T), { M, HEAD } = V.MT;
+    const lap = [[LID.x + 40, LID.y], [LID.x + LID.w - 40, LID.y], [960 - 660, DFRONT], [960 + 660, DFRONT]];
+    const met = [[M.x + 60, M.y], [M.x + M.w - 60, M.y], [HEAD.x + 60, HEAD.y], [HEAD.x + HEAD.w - 60, HEAD.y]];
+    const sw = OM.smooth(OM.prog(T, V.RIG0, V.RIG0 + 0.1)), dy = 1000 - 40 * Math.exp(-(Math.min(T, V.RIG0) - V.YANK) / 0.12);
+    const free = OM.prog(T, V.RIG_FREE, V.RIG_FREE + 0.22); // let go: the feet whip up out of frame
+    if (free >= 1) return;
+    ctx.strokeStyle = WI.mid;
+    ctx.lineWidth = 1.5;
+    lap.forEach(([x, y], i) => {
+      const fx = OM.lerp(x, met[i][0], sw), fy = OM.lerp(y + dy, met[i][1] + my, sw) - 1400 * OM.ease.inCubic(free);
+      const bx = 960 + (x - 960) * 0.42, sway = 18 * Math.exp(-Math.max(0, T - V.RIG1) / 0.15) * Math.sin((T - V.RIG1) * 34);
+      ctx.beginPath();
+      ctx.moveTo(fx, fy);
+      ctx.quadraticCurveTo((fx + bx) / 2 + (T > V.RIG1 ? sway : 0), (fy + by) / 2, bx, by);
+      ctx.stroke();
+    });
+    if (by > -400) V.hand(ctx, by, V.barTip(T));
+  };
+  /** The whole shared frame from V.RIG0 to the meter's first word. */
+  V.rig = (ctx, T) => {
+    ctx.fillStyle = W.bg;
+    ctx.fillRect(0, 0, 1920, 1080);
+    V.meterShell(ctx, V.meterY(T), 0, false, true);
+    V.rigTop(ctx, T);
+  };
   /** The body: shadow, deck with keyboard and trackpad, hinge, the lid's rim and bezel (display left empty). */
   V.laptop = (ctx, dy = 0, k = 1, alpha = 1) => {
     ctx.save();

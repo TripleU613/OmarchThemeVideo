@@ -1,5 +1,6 @@
 // v1-03 · The meter is running. A fare meter and its receipt printer on the
-// white page. Every word costs a coin: the coin drops into the slot on the
+// white page, hauled up into frame on v1-02's strings (V.rig), which let go
+// on the 46.602 snare. Every word costs a coin: the coin drops into the slot on the
 // word's onset, the meter's dot-matrix display rolls the word in, the fare
 // rolls [line] printer feeds out a fare line with the word and its price.
 // The key word lands on the 47.996 downbeat: the display flashes inverted and
@@ -36,8 +37,7 @@ vec4 effect(vec2 uv) {
       const SN = [49.32, 49.71, 49.81, 50.2, 50.39];
       const STOP = 49.72, DARK = 49.95, FADE0 = 50.2, FADE1 = END - H - 0.02;
       // The meter, its display window and the receipt printer.
-      const M = { x: 110, y: 230, w: 720, h: 620 }, D = { x: 150, y: 290, w: 640, h: 230 };
-      const SLOT = { x: 470, y: 222 }, HEAD = { x: 920, y: 940, w: 890 }, LH = 112;
+      const { D, SLOT, HEAD } = V.MT, LH = 112;
       const G = { x0: D.x, y0: D.y, cw: 7, ch: 7 };
 
       const prices = sung.map((w, k) => 0.49 + 0.25 * ((w.text.length * 7 + k * 3) % 9) + (k === KEY ? 4 : 0));
@@ -62,14 +62,6 @@ vec4 effect(vec2 uv) {
         const on1 = OM.lerp(40, -40, OM.smooth(OM.prog(T, start, END)));
         let punch = 0;
         for (const t0 of on) if (T >= t0) punch += 0.03 * Math.exp(-(T - t0) / 0.09);
-        // Lights on: the white page flickers into the store over the first 0.3s.
-        const lit = OM.prog(T, start + H0, start + 0.32);
-        if (T >= start + H0 && lit < 1) {
-          ctx.fillStyle = W.bg;
-          ctx.globalAlpha = (1 - lit) * (OM.hash(Math.floor(T * 30), 5, 31) > 0.45 ? 1 : 0.5);
-          ctx.fillRect(0, 0, 1920, 1080);
-          ctx.globalAlpha = 1;
-        }
         return { amount: e, cam: { zoom: 1 + (0.045 + punch) * e, x: on1 * e } };
       };
       return {
@@ -80,11 +72,13 @@ vec4 effect(vec2 uv) {
         draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
-          if (T < start + H0) return OM.handoff('white', ctx, T, dpr);
+          if (T < start + H0) return V.rig(ctx, T); // v1-02's hand hauling the meter up
           if (T >= END - H) return OM.handoff('white', ctx, T, dpr);
           const S = get();
           ctx.fillStyle = W.bg;
           ctx.fillRect(0, 0, 1920, 1080);
+          ctx.save();
+          ctx.translate(0, V.meterY(T)); // still swinging on the strings
           const k = OM.hitCount(on, T) - 1; // the word being paid for
           const fade = 1 - OM.smooth(OM.prog(T, FADE0, FADE1));
           ctx.globalAlpha = fade;
@@ -92,24 +86,14 @@ vec4 effect(vec2 uv) {
           // Meter creep: after the last fare the meter keeps ticking a cent on every snare of the pause.
           const creep = OM.hitCount(SN, T);
           const bump = 4 * OM.pulse(SN, T, 0.04) + 5 * OM.pulse(on, T, 0.05) + 14 * keyHit * Math.sin((T - on[KEY]) * 70);
+          // The meter body, slot, display, label and printer head.
+          const inv = keyHit > 0.3;
+          V.meterShell(ctx, 0, bump, inv, false);
           ctx.save();
           ctx.translate(0, bump);
-          // The meter body and its coin slot.
-          ctx.fillStyle = W['surface-2'];
-          ctx.strokeStyle = W['border-strong'];
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.roundRect(M.x, M.y, M.w, M.h, 36);
-          ctx.fill();
-          ctx.stroke();
-          ctx.fillStyle = W.text;
-          ctx.fillRect(SLOT.x - 70, SLOT.y, 140, 16);
           // The display: words roll in from below, the old one rolls up and out.
-          const inv = keyHit > 0.3;
-          ctx.fillStyle = inv ? W['border-subtle'] : W.text;
           ctx.beginPath();
           ctx.roundRect(D.x, D.y, D.w, D.h, 12);
-          ctx.fill();
           ctx.save();
           ctx.clip();
           const dark = OM.prog(T, STOP, DARK);
@@ -127,10 +111,6 @@ vec4 effect(vec2 uv) {
           }
           ctx.restore();
           // The fare, rolling up with every coin.
-          ctx.fillStyle = WI.lit;
-          ctx.font = "600 30px 'JetBrains Mono'";
-          ctx.textAlign = 'left';
-          ctx.fillText('FARE', D.x, 600);
           ctx.save();
           ctx.beginPath();
           ctx.rect(D.x, 610, D.w, 150);
@@ -145,11 +125,10 @@ vec4 effect(vec2 uv) {
             ctx.fillText(j < 0 ? '0.00' : (totals[j] + (j === k ? 0.01 * creep : 0)).toFixed(2), D.x + D.w, 735 + off);
           }
           ctx.restore();
-          ctx.fillStyle = WI.dim;
-          ctx.fillRect(D.x, 790, D.w, 8);
           ctx.restore();
           // The coins: each falls into the slot to land on its word, turning edge-on as it goes in.
           for (let j = 0; j < N; j++) {
+            if (on[j] - 0.3 < start + 0.05) continue; // the first word is paid by the meter's arrival
             const a = OM.prog(T, on[j] - 0.3, on[j]);
             if (a <= 0 || a >= 1) continue;
             const y = OM.lerp(-90, SLOT.y + 8, OM.ease.inCubic(a));
@@ -212,11 +191,9 @@ vec4 effect(vec2 uv) {
             }
             ctx.restore();
           }
-          ctx.fillStyle = W.text;
-          ctx.beginPath();
-          ctx.roundRect(HEAD.x, HEAD.y, HEAD.w, 58, 14);
-          ctx.fill();
           ctx.globalAlpha = 1;
+          ctx.restore();
+          V.rigTop(ctx, T); // the strings, until they let go
         },
         release: () => {
           fx.release();

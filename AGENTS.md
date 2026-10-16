@@ -48,8 +48,10 @@ the pipeline works; this file is what you must not break.
    amount is 0 on the cut frames, the camera is at rest at section boundaries, and
    the words stay readable. The one shared layer is the frame effects
    (`assets/lib/frames.js`). They draw only in the outer border band, one idea per
-   section, and only in scenes whose edges are empty (`assets/lib/frame-need.js`).
-   They're continuous across every cut.
+   section, always all the way round, in scenes that leave an edge empty
+   (`assets/lib/frame-need.js`), and subtler where only some edges are empty.
+   Beneath them, a faint pixelated rim fog is always on: it breathes on the beat and
+   takes the picture's edge colour. All of it is continuous across every cut.
 
 ## Working rules
 

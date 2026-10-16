@@ -41,7 +41,7 @@ OM.scene({
     const FROM = V.grid(6), TO = V.grid(N);
     const KICKS = [119.211, 119.676, 120.279];
     const GAP_SNARE = 121.25, SNARE = 122.95, G0 = 119.119, H16 = 60 / 112.3 / 4; // hats: true 16ths
-    const CL0 = 123.1, CL1 = END - 0.09;
+    const CL0 = 123.0, CL1 = END - 0.08;
     const KEY = N - 1; // the last word: the workspace swipes home
     const at = (k, fb) => (on[k] !== undefined ? on[k] : fb);
 
@@ -56,11 +56,8 @@ OM.scene({
       [at(3, 121.316), 'retro-82', 3],
       [at(4, 121.536), 'osaka-jade', 4],
       [at(5, 121.796), 'hackerman', 5],
-      [122.056, 'catppuccin-latte', -1], // the held note: hats
-      [122.190, 'ristretto', -1],
-      [122.323, 'matte-black', -1],
     ];
-    const KT = at(KEY, 122.597), KS0 = KT - 0.2; // the swipe home lands on the key word
+    const KT = at(KEY, 122.597), KS0 = KT - 0.32; // the held note stays on its theme; the swipe home lands on the key word
     SW.push([KS0, 'tokyo-night', -2]);
     const ST = SW.map((s) => s[0]);
     const SWT = [...ST.slice(0, -1), KT];
@@ -364,13 +361,13 @@ OM.scene({
         if (T < start + V.HOLD_IN) return fx.apply(T), V.still(ctx, 6);
         if (T >= END - V.HOLD_OUT) return fx.apply(T), V.still(ctx, N);
         if (!fits || !V.met().ok) fits = fit();
-        const clear = OM.ease.inOutSine(OM.prog(T, CL0, CL1));
+        const clear = OM.ease.inOutSine(OM.prog(T, CL0, CL1)); // the exit: content dims and slides out
         const e = OM.ease.inOutCubic(OM.prog(T, start + V.HOLD_IN, at(0, start) + 0.5)); // re-tile 6 -> 7
         const iNow = lastIdx(T), iK = ST.length - 1;
         const kick = OM.pulse(KICKS, T, 0.07);
         const keyHit = T >= KT ? Math.exp(-(T - KT) / 0.22) : 0;
         const latest = OM.hitCount(on, T) - 1;
-        const sp = T >= KS0 && T < KT ? OM.ease.inOutCubic(OM.prog(T, KS0, KT)) : null;
+        const sp = T >= KS0 && T < KT ? OM.smooth(OM.smooth(OM.prog(T, KS0, KT))) : null; // eased both ends, settles on the onset
 
         const page = (ox, force) => {
           ctx.save();
@@ -392,7 +389,7 @@ OM.scene({
             }
             ctx.globalAlpha = 1;
           }
-          if (keyHit > 0.01 && force === null) { ctx.globalAlpha = 0.22 * keyHit; ctx.fillStyle = wt.crest; ctx.fillRect(0, 0, 1920, 1080); ctx.globalAlpha = 1; }
+          if (keyHit > 0.01 && force === null) { ctx.globalAlpha = 0.07 * keyHit; ctx.fillStyle = wt.crest; ctx.fillRect(0, 0, 1920, 1080); ctx.globalAlpha = 1; }
           if (clear > 0) { ctx.globalAlpha = clear; ctx.fillStyle = ink.bg; ctx.fillRect(0, 0, 1920, 1080); ctx.globalAlpha = 1; }
           // The windows: glass until their word opens them.
           TO.forEach((r1, k) => {
@@ -424,7 +421,7 @@ OM.scene({
             if (opened && sung[k] && fits) {
               const big = k === KEY ? 0.34 : 0.18;
               const col = OM.mix(th.crest, th.text, OM.clamp(age / 0.35));
-              V.drawWord(ctx, sung[k].text, 0, 10, fits[k], col, { s: 1 + big * Math.exp(-age / 0.09), alpha: 1 - clear });
+              V.drawWord(ctx, sung[k].text, 0, 10 + 70 * clear * clear, fits[k], OM.mix(col, th.bg, clear), { s: 1 + big * Math.exp(-age / 0.09), alpha: 1 - clear });
             }
             ctx.restore();
           });
