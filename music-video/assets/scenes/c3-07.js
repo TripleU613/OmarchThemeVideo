@@ -1,9 +1,12 @@
-// c3-07 · The storm clears. The spark is the sun; a storm deck rolls over it
-// and the rain comes down. On the first onset the rain stops dead in mid-air.
+// c3-07 · The storm clears. The flock has come down as the rain, falling past
+// the sun; a storm deck rolls over it. On the first onset the rain stops dead
+// in mid-air.
 // Then the light breaks through: each word is a break in the cloud the shape
 // of its letters, torn open on its onset with a silver lining round it and rays
 // slanting down out of it through the hanging drops. The key word is the
-// biggest break, under the downbeat. On the kick inside it the whole deck
+// biggest break, and on its onset a nova of words: every letter erupts out of
+// its place as a streak of light flung away from the key word, and snaps back
+// home within a fifth of a second. On the kick inside it the whole deck
 // parts from the sun outward, the drops flash and burn off, and light floods
 // the frame: the glow.
 OM.ownWords.add('c3-07');
@@ -25,11 +28,8 @@ OM.scene({
     const K = n - 1, PART = 270.536, CELL = 6, TEAR = 0.12;
     const CL = [th['bg-deep'] || '#16161e', th.surface || '#1f2335', th['surface-2'] || '#292e42', th['border-strong'] || '#3b4261'].map(C.pack);
     const P = { crest: C.pack(ink.crest), hover: C.pack(ink.hover), lit: C.pack(ink.lit), mid: C.pack(ink.mid) };
-    const rain = [];
-    {
-      const rng = OM.rng(0xc307);
-      for (let i = 0; i < 420; i++) rain.push({ x: rng() * 2100 - 90, y: rng() * 1300, sp: 1500 + rng() * 700, len: 14 + rng() * 16, r: rng() });
-    }
+    const RN = OM.c3cut.rain, rain = RN.drops; // the rain the flock came down as
+    const NOVA = 0.16; // the nova of words: out and back home inside this
 
     const type = C.lazy(() => {
       const place = C.layout(words, [{ ks: [...Array(K).keys()], cap: 96, cy: 300 }, { ks: [K], cap: 190, cy: 690 }]);
@@ -51,7 +51,16 @@ OM.scene({
       // Ray sources: a sparse set of each word's cells.
       const rays = words.map(() => []);
       for (let idx = 0; idx < of.length; idx++) if (of[idx] >= 0 && OM.hash(idx, 7, 3) < 0.09) rays[of[idx]].push([(idx % GW + 0.5) * CELL, (((idx / GW) | 0) + 0.5) * CELL]);
-      return { place, M, near, nk, rays, B: C.buffer(GW, GH) };
+      // Each word's letter cells, for the nova: [x, y, dirX, dirY, reach] flung away from the key word's centre.
+      const kc = place[K] || { cx: 960, cy: 690 };
+      const cells = words.map(() => []);
+      for (let idx = 0; idx < of.length; idx++) {
+        if (of[idx] < 0) continue;
+        const x = (idx % GW + 0.5) * CELL, y = (((idx / GW) | 0) + 0.5) * CELL;
+        const dx = x - kc.cx, dy = (y - kc.cy) * 1.6, l = Math.hypot(dx, dy) || 1;
+        cells[of[idx]].push([x, y, dx / l, dy / (1.6 * l), (of[idx] === K ? 1 : 0.5) * (140 + 0.85 * l + 320 * OM.hash(idx, 6, 0x707))]);
+      }
+      return { place, M, near, nk, rays, cells, B: C.buffer(GW, GH) };
     });
     const tearAt = (place, k, x) => on[k] + TEAR * OM.clamp((x - place[k].x) / place[k].w);
 
@@ -72,15 +81,17 @@ OM.scene({
       const f = flashAt(T);
       return {
         amount: 1, p0: [f, 0, 0, 0],
-        cam: { zoom: 1.06, y: -30 + 60 * OM.ease.inOutCubic(OM.prog(T, start, END)), x: 9 * f * Math.sin(T * 91), rot: 0.004 * f * Math.cos(T * 73) },
+        cam: { zoom: 1.06 + 0.03 * C.decay(T, on[K], 0.07), y: -30 + 60 * OM.ease.inOutCubic(OM.prog(T, start, END)), x: 9 * f * Math.sin(T * 91), rot: 0.004 * f * Math.cos(T * 73) },
       };
     };
     return OM.c3.withFx(el, c, start, END, FX, fxAt)({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (C.seam(ctx, T, dpr, start, END, 'spark', 'glow')) return;
-        const { place, M, near, nk, rays, B } = type();
+        if (T < start + 0.05) return RN.paint(ctx, T, dpr);
+        if (C.seam(ctx, T, dpr, start, END, 'spark', 'glow', start)) return;
+        const { place, M, near, nk, rays, cells, B } = type();
+        const nAge = T - on[K], nova = nAge >= 0 && nAge < NOVA; // the letters are out of their places
         const { GW, GH, of } = M, buf = B.buf;
         const roll = OM.ease.inOutCubic(OM.prog(T, start + 0.03, start + 0.45)); // the deck rolls in over the sun
         const part = OM.ease.inOutCubic(OM.prog(T, PART, END - 0.12)); // and parts from the sun outward
@@ -109,6 +120,7 @@ OM.scene({
             // The deck rolls in cell by cell; the parting opens from the sun.
             const h = OM.hash(i, j, 0x77);
             if (h > roll * 1.1) continue;
+            if (k >= 0 && nova && T >= on[k]) continue; // flung out in the nova: the break shows through
             if (k >= 0 && T >= tearAt(place, k, x) && h < wordsA) {
               const age = T - tearAt(place, k, x);
               const v = (age < 0.08 ? 1.3 : 0.7) + 0.4 * C.decay(T, on[k], 0.16) - 0.5 * (1 - wordsA) + (h > 0.8 ? 0.2 : 0);
@@ -150,6 +162,32 @@ OM.scene({
           ctx.lineWidth = 3;
           ctx.stroke();
         });
+        // The nova of words: each letter cell out along its streak (out in a frame, slamming home by NOVA).
+        if (nova) {
+          const f = (a) => (a <= 0 ? 0 : a < 0.045 ? OM.ease.outExpo(a / 0.045) : 1 - OM.ease.inCubic(OM.clamp((a - 0.045) / (NOVA - 0.045))));
+          const f0 = f(nAge), f1 = f(nAge - 0.03);
+          C.pool(ctx, place[K].cx, place[K].cy, 420, ink.lit, 0.3 * C.decay(T, on[K], 0.04));
+          ctx.save();
+          for (const [col, wd, a] of [[ink.lit, 3, 0.35], [ink.crest, 1, 0.6]]) {
+            ctx.strokeStyle = C.rgba(col, a);
+            ctx.lineWidth = wd;
+            ctx.beginPath();
+            for (let k = 0; k < n; k++) {
+              if (T < on[k]) continue;
+              for (const [x, y, ux, uy, r] of cells[k]) {
+                ctx.moveTo(x + ux * r * f1, y + uy * r * f1);
+                ctx.lineTo(x + ux * r * f0, y + uy * r * f0);
+              }
+            }
+            ctx.stroke();
+          }
+          ctx.fillStyle = nAge < 0.045 ? ink.crest : ink.hover; // the heads: bright going out, letter ink coming home
+          for (let k = 0; k < n; k++) {
+            if (T < on[k]) continue;
+            for (const [x, y, ux, uy, r] of cells[k]) ctx.fillRect(Math.round(x + ux * r * f0 - 3), Math.round(y + uy * r * f0 - 3), CELL, CELL);
+          }
+          ctx.restore();
+        }
         // Rays down out of each break, slanting away from the sun.
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
@@ -172,12 +210,11 @@ OM.scene({
 
         // The rain: falling, then frozen in mid-air on the first onset, glinting in the light and burning off.
         const Tr = Math.min(T, on[0]);
-        const rainA = C.sm(T, start + 0.05, start + 0.45) * (1 - C.sm(T, PART + 0.1, END - 0.15));
+        const rainA = 1 - C.sm(T, PART + 0.1, END - 0.15); // full from the cut: it is the flock come down
         if (rainA > 0.01) {
           ctx.globalAlpha = rainA;
           for (const d of rain) {
-            const y = ((d.y + (Tr - start) * d.sp) % 1300) - 110;
-            const x = d.x - (y + 110) * 0.18;
+            const [x, y] = RN.at(d, Tr);
             const frozen = T > on[0];
             const glint = frozen && Math.hypot(x - SX, y - SY) < 300 + 900 * flood;
             ctx.fillStyle = glint && d.r > 0.4 ? ink.hover : frozen ? ink.mid : th['text-muted'] || ink.mid;

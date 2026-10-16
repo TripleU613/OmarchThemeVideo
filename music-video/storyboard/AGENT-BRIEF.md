@@ -204,3 +204,23 @@ to the music.
   most 2 snapshot rounds per scene through the flock.
 - **Report each sprinkle by name,** with the hits it lands on. Names are unique
   across the film, because nothing repeats.
+
+## Match cuts and explosions pass
+
+The owner loved the b-05 to b-06 melt and the c3-01 explosion and wants more of
+both.
+
+- **Match cuts:** convert your listed cuts so they no longer pass through an
+  empty frame (black, a lone dot, a thin line). The outgoing scene's main object
+  or material visibly becomes the incoming scene's, continuously, landing on the
+  beat. The cut frame is a shared state that both scenes draw identically. No
+  fades, dims, blur crossfades or trips through black. Every word's onset and
+  the read holds stay.
+- **Explosions:** on your section's biggest hit, use your assigned style, which
+  is unique in the film. It starts within one frame of the hit, and the words
+  read again within 0.2 s. Particles are analytic, on palette, within budget.
+  Square shockwaves are taken (i-03, c3-01, c3-09), so don't reuse them.
+- **Timing:** kick and snare events, or grid − 0.046 s.
+- **Checks:** both cut pairs at ±4 ms, frames across each new transition, and at
+  most 3 snapshot rounds.
+- **Report:** the name of each transition and explosion, with its hits.

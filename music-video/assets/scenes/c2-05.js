@@ -72,7 +72,7 @@ OM.ownWords.add('c2-05');
         draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
-          if (T < start + 0.05) return OM.handoff('grid', ctx, T, dpr);
+          if (T < start + 0.05) return OM.c2.wall(ctx, dpr); // the skyline's wall of windows, from the cut
           if (T > END - 0.07) return OM.handoff('field', ctx, T, dpr);
           const { strokes, letters } = get();
           ctx.fillStyle = ink.bg;
@@ -120,7 +120,14 @@ OM.ownWords.add('c2-05');
               }
               if (clean && !ridge) continue;
               const tq = OM.threshold(col, row);
-              if (!clean && tq > cond) { ctx.fillStyle = ink.bg; OM.cell(ctx, HM, col, row, dpr); continue; }
+              if (!clean && tq > cond) {
+                // Not yet fogged: still the city's dark window in its facade.
+                ctx.fillStyle = th.surface;
+                OM.cell(ctx, HM, col, row, dpr);
+                ctx.fillStyle = th['bg-deep'];
+                ctx.fillRect(HM.x0 + col * HM.cw + 2, HM.y0 + row * HM.ch + 2, HM.cw - 4, HM.ch - 4);
+                continue;
+              }
               if (clean && ridge && T > FADE) continue;
               const n = OM.heroNoise(col / 7 + 13, row / 4 + 7);
               ctx.fillStyle = ridge ? th['border-strong'] : GRIME[OM.clamp(Math.floor(n * 2.2 + OM.hash(col, row, 1) * 1.6), 0, 3)];

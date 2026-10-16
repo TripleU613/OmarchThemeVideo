@@ -5,7 +5,9 @@ Ultimate Machine)* by Kevin Koontz / REARRANGED, built entirely in code. There's
 no video editor, stock footage or generated imagery. It's 66 scenes of JavaScript
 drawing on canvas, every sung word timed to the vocal, the whole thing in the
 Tokyo Night look of [omarchy.org](https://omarchy.org), rendered to video with
-[HyperFrames](https://hyperframes.heygen.com).
+[HyperFrames](https://hyperframes.heygen.com). The one image that isn't drawn
+from scratch is the finale's portrait of DHH. It's dot data (220×346 shades,
+packed into `x-end.js`) traced from a photo the owner supplied.
 
 This repo is the full project and a worked example of the method, so you can
 make one for your own song.

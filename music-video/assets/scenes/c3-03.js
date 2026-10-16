@@ -1,5 +1,6 @@
-// c3-03 · Drone show. The spark is the lead drone: it bursts into a swarm of
-// thousands of lights hanging dim over the night, and the swarm flies the line.
+// c3-03 · Drone show. The orbital ring's lights are the drones: the spinning
+// ring bursts into a swarm of thousands of lights hanging dim over the night,
+// and the swarm flies the line.
 // Each word's drones leave the swarm and slam into formation on its onset, in a
 // flash; the name is flown as the wordmark itself, the biggest formation, one
 // drone per bitmap cell, locking on the kick under it. Colour waves run across
@@ -72,10 +73,12 @@ OM.scene({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (C.seam(ctx, T, dpr, start, END, 'spark', 'spot')) return;
+        const RG = OM.c3cut.ring;
+        if (T < start + 0.05) return RG.paint(ctx, T, dpr);
+        if (C.seam(ctx, T, dpr, start, END, 'spark', 'spot', start)) return;
         const { D, cell } = swarm();
         if (XS.length !== D.length) { XS = new Float32Array(D.length); YS = new Float32Array(D.length); }
-        const burst = OM.ease.outExpo(OM.prog(T, start + 0.03, start + 0.45));
+        const burst = OM.ease.outExpo(OM.prog(T, start + 0.05, start + 0.47));
         const pour = OM.ease.inOutCubic(OM.prog(T, POUR, END - 0.25));
         const brk = OM.ease.outCubic(OM.prog(T, BREAK, BREAK + 0.4));
         const spotA = C.sm(T, POUR + 0.2, END - 0.1);
@@ -83,7 +86,7 @@ OM.scene({
 
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
-        C.stars(ctx, T, 0.6 * C.sm(T, start, start + 0.5) * (1 - spotA));
+        C.stars(ctx, T, 0.6 * C.sm(T, start + 0.05, start + 0.55) * (1 - spotA));
         // The spotlight comes up under the pour.
         if (spotA > 0) {
           ctx.globalAlpha = spotA;
@@ -104,12 +107,21 @@ OM.scene({
           }
           return v;
         };
+        // The ring's core burns down as its lights fly out.
+        if (burst < 1) {
+          C.pool(ctx, SX, SY, 72, ink.lit, 0.4 * (1 - burst));
+          ctx.globalAlpha = 1 - burst;
+          ctx.fillStyle = ink.crest;
+          OM.cell(ctx, HL, hc.col, hc.row, dpr);
+          ctx.globalAlpha = 1;
+        }
         for (let i = 0; i < D.length; i++) {
           const d = D[i];
-          // The swarm: out of the spark to its hover, bobbing.
-          const bob = 6 * Math.sin(T * 1.7 + d.r * 40);
-          let x = OM.lerp(SX, d.h[0], burst), y = OM.lerp(SY, d.h[1], burst) + bob;
-          let v = 0.12 + 0.18 * (0.5 + 0.5 * Math.sin(T * 3 + d.r * 60)), sz = 3;
+          // The swarm: out of the spinning ring to its hover, bobbing.
+          const bob = 6 * Math.sin(T * 1.7 + d.r * 40) * burst;
+          const [rx0, ry0] = RG.at(i % RG.N, T);
+          let x = OM.lerp(rx0, d.h[0], burst), y = OM.lerp(ry0, d.h[1], burst) + bob;
+          let v = OM.lerp(0.8, 0.12 + 0.18 * (0.5 + 0.5 * Math.sin(T * 3 + d.r * 60)), burst), sz = 3;
           if (d.k >= 0) {
             const t0 = on[d.k];
             const lead = Math.min(d.big ? 0.4 : 0.32, t0 - (start + 0.08)) * (0.85 + 0.15 * d.r);
@@ -146,6 +158,12 @@ OM.scene({
           const a = 1 - fade;
           if (a <= 0) continue;
           ctx.globalAlpha = a;
+          if (burst < 0.5) {
+            // Still a ring light: the ring's own 5x4 lamp.
+            ctx.fillStyle = v > 1.1 ? ink.crest : ink.hover;
+            ctx.fillRect(Math.round(x - 2), Math.round(y - 2), 5, 4);
+            continue;
+          }
           if (v > 0.5) {
             ctx.fillStyle = C.rgba(ink.lit, 0.16);
             ctx.fillRect(Math.round(x - sz * 1.4), Math.round(y - sz * 1.4), Math.round(sz * 2.8), Math.round(sz * 2.8));

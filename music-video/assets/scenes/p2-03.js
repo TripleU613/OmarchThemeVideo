@@ -84,56 +84,50 @@ OM.scene({
         }
       });
       // Lots: every cell away from the districts and the roads may hold a dim building.
-      const taken = new Set();
-      for (const d of districts) {
-        for (const [col, row] of d.cells) for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) taken.add(`${col + a},${row + b}`);
+      const taken = new Map();
+      districts.forEach((d, k) => {
+        for (const [col, row] of d.cells) for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) taken.set(`${col + a},${row + b}`, k);
         const lo = Math.min(d.edge, AVE), hi = Math.max(d.edge, AVE);
-        for (let row = lo; row <= hi; row++) for (let a = -1; a <= 1; a++) taken.add(`${d.mid + a},${row}`);
-      }
+        for (let row = lo; row <= hi; row++) for (let a = -1; a <= 1; a++) taken.set(`${d.mid + a},${row}`, k);
+      });
       const lots = [];
-      for (let row = L.rMin; row < L.rMin + L.rows; row++) {
-        if (Math.abs(row - AVE) < 1) continue;
+      for (let row = L.rMin; row < L.rMin + L.rows; row++)
         for (let col = L.cMin; col < L.cMin + L.cols; col++) {
-          if (taken.has(`${col},${row}`) || OM.hash(col, row, 7) < 0.74) continue;
-          lots.push([col, row, OM.hash(col, row, 11)]);
+          if (!P.lot(col, row)) continue;
+          const k = taken.get(`${col},${row}`);
+          lots.push([col, row, OM.hash(col, row, 11), k === undefined ? -1 : k]);
         }
-      }
       return { ok: P.ready(), districts, lots };
     };
 
     const block = (ctx, col, row) => ctx.fillRect(cellX(col) + 1.5, cellY(row) + 1.5, L.cw - 3, L.ch - 3);
 
-    return {
-      render(t, T) {
-        const ctx = c.ensure();
-        const dpr = c.dpr;
-        if (P.cut(ctx, T, dpr, start, END, 'grid', 'spark')) return void fx.apply(T, {});
+    // The climb, one law of song time shared with p2-04, which flies on up over this same city.
+    const cityCam = (T) => {
+      const cc = OM.prog(T, CLIMB, 156.55);
+      return { s: (1 + 0.05 * OM.ease.inOutSine(OM.prog(T, start, CLIMB))) * Math.pow(0.006, OM.smooth(cc)), rot: 0.8 * OM.smooth(cc), climb: cc };
+    };
+    /** The whole city at song time T, under its own camera (also drawn by p2-04). */
+    const city = (ctx, dpr, T) => {
         if (!lay || (!lay.ok && P.ready())) lay = layout();
-        ctx.fillStyle = ink.bg;
-        ctx.fillRect(0, 0, 1920, 1080);
         const D = lay.districts, last = D[D.length - 1];
-
-        // The camera: a slow push, then the climb away until the city is one point.
-        const climb = OM.prog(T, CLIMB, GONE);
-        const s = (1 + 0.05 * OM.ease.inOutSine(OM.prog(T, start, CLIMB))) * Math.pow(0.012, OM.ease.inCubic(climb) * 0.6 + climb * 0.4);
-        const rot = 0.5 * OM.ease.inCubic(climb);
+        const { s, rot, climb } = cityCam(T);
+        if (s < 0.012) return;
         const cs = Math.cos(rot) * s, sn = Math.sin(rot) * s;
         ctx.setTransform(dpr * cs, dpr * sn, -dpr * sn, dpr * cs, dpr * (PX - cs * PX + sn * PY), dpr * (PY - sn * PX - cs * PY));
 
         // The street grid: the handoff's lines, fading as we climb.
         const snap = (v) => Math.round(v * dpr) / dpr;
-        ctx.globalAlpha = 1 - OM.prog(climb, 0, 0.5);
+        ctx.globalAlpha = 1 - OM.prog(climb, 0, 0.3);
         ctx.fillStyle = th['border-subtle'];
         for (let col = L.cMin; col <= L.cMin + L.cols; col++) ctx.fillRect(snap(cellX(col)), 0, 1 / s, 1080);
         for (let row = L.rMin; row <= L.rMin + L.rows; row++) ctx.fillRect(0, snap(cellY(row)), 1920, 1 / s);
         ctx.globalAlpha = 1;
 
         // Lots: built out from the avenue, powered in a wave from the key word on the downbeat.
-        const t0 = start + 0.06;
         const kx = last ? last.mid : h.col;
-        for (const [col, row, hs] of lay.lots) {
-          const at = t0 + Math.abs(row - AVE) * 0.018 + hs * 0.35;
-          if (T < at) continue;
+        for (const [col, row, hs, dk] of lay.lots) {
+          if (dk >= 0 && D[dk] && T >= D[dk].t0 - 0.05) continue; // cleared as the district's road arrives
           const dist = Math.hypot(col - kx, (row - AVE) * 1.2);
           let colr = ink.dim;
           if (T >= DB) {
@@ -145,6 +139,10 @@ OM.scene({
           ctx.fillStyle = colr;
           block(ctx, col, row);
         }
+
+        // The rail from the plan is the avenue's bed, cooling from crest to mid.
+        ctx.fillStyle = OM.mix(ink.crest, ink.mid, OM.smooth(OM.prog(T, start + 0.05, start + 0.35)));
+        ctx.fillRect(cellX(L.cMin), cellY(AVE), L.cols * L.cw, L.ch);
 
         // Roads: the avenue lights from the left to each district as it is sung, then end to end.
         const ya = cellY(AVE) + L.ch / 2;
@@ -202,16 +200,37 @@ OM.scene({
           }
         }
 
-        // The city as one spark: the halo comes up as the city collapses into it.
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        const sp = OM.prog(climb, 0.55, 1);
-        if (sp > 0) {
-          P.pool(ctx, PX, PY, 72, ink.lit, 0.4 * sp);
-          ctx.globalAlpha = sp;
-          ctx.fillStyle = ink.crest;
-          OM.cell(ctx, L, h.col, h.row, dpr);
-          ctx.globalAlpha = 1;
-        }
+    };
+    const spark = (ctx, a) => {
+      if (a <= 0) return;
+      P.pool(ctx, PX, PY, 72, ink.lit, 0.4 * a);
+      ctx.globalAlpha = a;
+      ctx.fillStyle = ink.crest;
+      ctx.fillRect(PX - L.cw / 2, PY - L.ch / 2, L.cw, L.ch);
+      ctx.globalAlpha = 1;
+    };
+    /** The p2-03 > p2-04 cut, "city under the wing": the climbing city and the nav light over it. */
+    const cityCut = (ctx, T, dpr) => {
+      ctx.fillStyle = ink.bg;
+      ctx.fillRect(0, 0, 1920, 1080);
+      city(ctx, dpr, T);
+      spark(ctx, 1);
+    };
+    P.city = city;
+    P.cityCut = cityCut;
+
+    return {
+      render(t, T) {
+        const ctx = c.ensure();
+        const dpr = c.dpr;
+        if (P.cut(ctx, T, dpr, start, END, P.planMap, cityCut)) return void fx.apply(T, {});
+        ctx.fillStyle = ink.bg;
+        ctx.fillRect(0, 0, 1920, 1080);
+        city(ctx, dpr, T);
+        const climb = cityCam(T).climb;
+        // The nav light of the jet we're riding comes up over the city as we climb.
+        spark(ctx, OM.smooth(OM.prog(T, CLIMB, END - 0.1)));
 
         // Camera: an aerial climb, pulling back and turning as the city powers on.
         const env = OM.post.envelope(T, start, END, { ramp: 0.35 });

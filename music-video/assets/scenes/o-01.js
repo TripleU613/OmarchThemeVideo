@@ -1,137 +1,288 @@
-// o-01 · Home, built from the field. Over the homepage (the word handoff), the
-// sung line becomes the hero's headline in half lattice cells: each word's cells
-// fly in from the field and slam into place on its onset, crest on impact, and
-// the impact lights the field and the wordmark around it. The key word comes in
-// from every side with the biggest blast and flashes the whole line; on the hard
-// stop the two buttons build in, dither order, and the page settles to the
-// shared resting homepage x-end drains.
+// o-01 · Drain to the last pixel. Home: the field and the wordmark, as x-o1
+// leaves them. The wordmark fires each sung word out of itself in lattice type,
+// the cells slamming into a line beneath it on the word's onset and lighting the
+// field where they land; the key word storms in from every edge and flashes the
+// whole line. On the hard stop a vortex grabs everything, field cells, wordmark
+// and words, spiralling them clockwise into the frame centre, accelerating, the
+// three snares kicking the spin, until all of it is one lit pixel on the night:
+// the shared cut frame x-end explodes from.
 OM.ownWords.add('o-01');
-// One clean glint: a narrow diagonal highlight crossing the frame once (uP0.x its position),
-// catching only what is lit, so the words brighten and never hide.
-const O01_FX = `
+(() => {
+  const TYPE = "800 100px 'JetBrains Mono'";
+  window.__hf = window.__hf || {};
+  window.__hf.buildReady = window.__hf.buildReady || {};
+  window.__hf.buildReady['o-01-type'] = document.fonts.load(TYPE);
+
+  const CX = 960, CY = 540;
+  /** The finale, shared with x-end: the cut frame and the vortex's turning sense. */
+  OM.finale = {
+    /** Night, and one lit device pixel at the frame centre. */
+    pixel(ctx, dpr) {
+      const ink = OM.fieldInks('tokyo-night');
+      ctx.fillStyle = ink.bg;
+      ctx.fillRect(0, 0, 1920, 1080);
+      ctx.fillStyle = ink.lit;
+      ctx.fillRect(Math.round(CX * dpr) / dpr, Math.round(CY * dpr) / dpr, 1 / dpr, 1 / dpr);
+    },
+    /** +1: the vortex turns clockwise on screen (x-end unwinds it the other way). */
+    SPIN: 1,
+  };
+
+  // The drain's smear: each pixel gathers light from further round its orbit and further out
+  // along its radius, so the spiral reads as motion (uP0.x arc length, uP0.y inward pull).
+  const FX = `
 vec4 effect(vec2 uv) {
-  vec3 c = src(cam(uv)).rgb;
+  vec2 p = cam(uv);
+  vec3 c = src(p).rgb;
   if (uAmount <= 0.0) return vec4(c, 1.0);
   float a = uRes.x / uRes.y;
-  float s = uv.x * a + uv.y * 0.55;
-  float pos = mix(-0.5, a + 1.0, uP0.x);
-  float band = exp(-pow((s - pos) / 0.03, 2.0)) + 0.3 * exp(-pow((s - pos) / 0.11, 2.0));
-  float l = dot(c, vec3(0.3, 0.55, 0.15));
-  c += uAmount * band * vec3(0.855, 0.925, 0.776) * (0.06 + 0.9 * smoothstep(0.12, 0.6, l));
-  return vec4(c, 1.0);
+  vec2 d = (p - 0.5) * vec2(a, 1.0);
+  float r = length(d) + 1e-4;
+  float th = atan(d.y, d.x);
+  vec3 acc = c;
+  float wsum = 1.0;
+  for (int i = 1; i <= 10; i++) {
+    float f = float(i) / 10.0;
+    float t2 = th + uP0.x * f * uAmount / (0.12 + r);
+    float r2 = r * (1.0 + uP0.y * f * uAmount);
+    vec2 q = vec2(cos(t2), sin(t2)) * r2 / vec2(a, 1.0) + 0.5;
+    float w = 1.0 - 0.7 * f;
+    acc += src(q).rgb * w;
+    wsum += w;
+  }
+  vec3 s = acc / wsum;
+  return vec4(max(c, mix(c, s * 1.15, uAmount)), 1.0);
 }`;
-OM.scene({
-  id: 'o-01',
-  build(el, { start, duration }) {
-    const cv = document.createElement('canvas');
-    cv.className = 'om-fill';
-    el.appendChild(cv);
-    const c = OM.canvas(cv, { alpha: false });
-    const fx = OM.post(el, c, { effect: O01_FX });
-    const ink = OM.fieldInks('tokyo-night');
-    const th = OM.theme('tokyo-night');
-    const O = OM.outro;
-    const end = start + duration;
-    const on = OM.words('o-01');
-    const last = on.length - 1;
-    const STOP = 292.107; // the hard stop after the key word: the buttons
-    const DUR = (w) => (w === last ? 0.16 : 0.1);
-    const REST = 293.4; // every light has decayed to nothing by here
 
-    /** Where a headline cell flies in from: above for most words, out of every side for the key word. */
-    const from = (k, lay) => {
-      const h1 = OM.hash(k.q, k.r, 31), h2 = OM.hash(k.q, k.r, 32);
-      if (k.w !== last) return { x: (h1 - 0.5) * 180, y: -(60 + 160 * h2) };
-      const ctr = lay.centre[k.w];
-      const x = O.H.x0 + (k.q + 0.5) * O.H.cw - ctr.x, y = O.H.y0 + (k.r + 0.5) * O.H.ch - ctr.y;
-      const d = Math.hypot(x, y) || 1, f = 260 + 420 * h1;
-      return { x: (x / d) * f + (h2 - 0.5) * 120, y: (y / d) * f * 0.8 - 80 * h2 };
-    };
+  OM.scene({
+    id: 'o-01',
+    build(el, { start, duration }) {
+      const cv = document.createElement('canvas');
+      cv.className = 'om-fill';
+      el.appendChild(cv);
+      const c = OM.canvas(cv, { alpha: false });
+      const fx = OM.post(el, c, { effect: FX });
+      const ink = OM.fieldInks('tokyo-night');
+      const L = OM.HOME;
+      const end = start + duration;
+      const on = OM.words('o-01');
+      const last = on.length - 1;
+      const STOP = 292.107; // the hard stop: the line has read, the vortex grabs
+      const COLL = 293.5; // the last snare snaps it shut: one pixel from here to the cut
+      const SNARES = [293.2, 293.38, 293.5];
+      const DUR = (w) => (w === last ? 0.16 : 0.1);
+      const P = 9; // lattice type pitch
 
-    const GLINT0 = 292.42, GLINT1 = 293.05; // after the key word, as the whole line reads
-    const api = {
-      render(t, T) {
-        const ctx = c.ensure();
-        const dpr = c.dpr;
-        ctx.globalAlpha = 1;
-        draw(ctx, T, dpr);
-        if (T >= 292.7 && T < end - 0.07) roll(ctx, T, dpr);
-        // The hero floats: a faint scale breath and a few px of lift, at rest at both cuts.
-        const env = OM.post.envelope(T, start, end, { ramp: 0.5 });
-        const br = Math.sin(((T - start) / duration) * Math.PI * 2);
-        const g = OM.prog(T, GLINT0, GLINT1);
-        fx.apply(T, {
-          amount: g > 0 && g < 1 ? Math.sin(Math.PI * g) : 0,
-          cam: { zoom: 1 + env * (0.016 + 0.005 * br), y: -5 * env * br },
-          p0: [g, 0, 0, 0],
-        });
-      },
-      release: () => {
-        fx.release();
-        c.release();
-      },
-    };
-    // Band roll: in the pause, the wordmark's own ink bands roll crest through its rows on the
-    // snares, down on the first, up on the second, softer each time; with the second the cursor cell
-    // (the one x-end keeps) stirs, and all of it is at rest well before the cut.
-    const ROLLS = [[293.2, 1, 1, 0.003, 0.04], [293.38, -1, 0.45, 0.002, 0.025]]; // the second is soft and quick: at rest by ~293.44
-    function roll(ctx, T, dpr) {
-      const word = (row) => {
-        let e = 0;
-        for (const [t0, dir, amp, step, decay] of ROLLS) {
-          const a = T - (t0 + step * (dir > 0 ? row : 18 - row));
-          if (a >= 0) e = Math.max(e, amp * Math.exp(-a / decay));
+      // ---- the line in lattice type, laid out once the face is in ----
+      let LAY = null;
+      const layout = () => {
+        if (LAY && (LAY.ok || !document.fonts.check(TYPE))) return LAY;
+        const ok = document.fonts.check(TYPE);
+        const sung = OM.sung('o-01');
+        const words = sung.map((w) => w.text || '###');
+        const m = document.createElement('canvas').getContext('2d');
+        m.font = TYPE;
+        const capR = m.measureText('H').actualBoundingBoxAscent / 100 || 0.73;
+        const widths = (cap, a, b) => {
+          m.font = `800 ${(cap / capR).toFixed(2)}px 'JetBrains Mono'`;
+          const sp = m.measureText(' ').width;
+          const xs = [];
+          let w = 0;
+          for (let i = a; i < b; i++) {
+            if (i > a && sung[i].space !== false) w += sp;
+            xs.push(w);
+            w += m.measureText(words[i]).width;
+          }
+          return { xs, w };
+        };
+        const MAXW = 1720;
+        let lines;
+        let cap = 72;
+        const one = widths(72, 0, words.length);
+        if (one.w <= MAXW || (72 * MAXW) / one.w >= 60) {
+          cap = Math.min(72, Math.floor((72 * MAXW) / one.w));
+          lines = [[0, words.length]];
+        } else {
+          let best = null;
+          for (let s = 1; s < words.length; s++) {
+            const w = Math.max(widths(72, 0, s).w, widths(72, s, words.length).w);
+            if (!best || w < best.w) best = { w, s };
+          }
+          cap = Math.min(72, Math.floor((72 * MAXW) / best.w));
+          lines = [[0, best.s], [best.s, words.length]];
         }
-        return e > 0.5 ? ink.crest : e > 0.2 ? ink.hover : null;
+        const cells = [];
+        const centre = words.map(() => ({ x: CX, y: 800 }));
+        lines.forEach(([a, b], li) => {
+          const base = lines.length === 1 ? 818 : 740 + cap + li * (cap + 34);
+          const lw = widths(cap, a, b);
+          const x0 = CX - lw.w / 2;
+          for (let i = a; i < b; i++) {
+            const t = OM.c1.type(words[i], x0 + lw.xs[i - a], base, cap);
+            let sx = 0, sy = 0;
+            for (const [x, y, f] of t.cells) {
+              cells.push({ x, y, f, w: i, k: cells.length });
+              sx += x;
+              sy += y;
+            }
+            const n = t.cells.length || 1;
+            centre[i] = { x: sx / n + 4, y: sy / n + 4 };
+          }
+        });
+        LAY = { ok, cells, centre };
+        VX = null;
+        return LAY;
       };
-      if (ROLLS.some(([t0]) => T >= t0 && T < t0 + 0.2)) OM.paintWord(ctx, OM.HOME, dpr, ink, { wordInk: (row) => word(row) });
-      // The cursor cell stirs with the second roll and is back to its band ink by 293.45.
-      if (T >= 293.38 && T < 293.45) {
-        ctx.fillStyle = T < 293.41 ? ink.crest : ink.hover;
-        OM.cell(ctx, OM.HOME, O.cursor.col, O.cursor.row, dpr);
-      }
-    }
-    function draw(ctx, T, dpr) {
-        if (T < Math.min(on[0], start + 0.07)) return OM.handoff('word', ctx, T, dpr);
-        const lay = O.layout();
-        if (T >= REST || T >= end - 0.07) return O.page(ctx, T, dpr);
-        // Impacts: each word lights the field and wordmark where it lands; the key word lights the page.
+
+      // ---- the vortex material: field (frozen at the stop), wordmark and words ----
+      const INKS = [ink.dim, ink.mid, ink.lit, ink.hover, ink.crest, ink.bg];
+      const inkIx = (hex) => Math.max(0, INKS.indexOf(hex));
+      let VX = null;
+      const vortexItems = () => {
+        const lay = layout();
+        if (VX) return VX;
+        const list = [];
+        for (const { col, row } of OM.heroLit(STOP, L, { gain: 0.8 })) list.push([L.x0 + col * L.cw, L.y0 + row * L.ch, L.cw, L.ch, 0]);
+        for (const [col, row] of OM.cells(OM.WORDMARK)) list.push([L.x0 + col * L.cw, L.y0 + row * L.ch, L.cw, L.ch, inkIx(ink[OM.BANDS[row]])]);
+        for (const k of lay.cells) list.push([k.x, k.y, 8, 8, inkIx(OM.c1.typeInk(k.f, ink))]);
+        const n = list.length;
+        const R = new Float32Array(n), TH = new Float32Array(n), W = new Float32Array(n), H = new Float32Array(n), PW = new Float32Array(n), I = new Uint8Array(n);
+        let rMax = 1;
+        list.forEach(([x, y, w, h], i) => (rMax = Math.max(rMax, Math.hypot(x + w / 2 - CX, y + h / 2 - CY))));
+        list.forEach(([x, y, w, h, ix], i) => {
+          const dx = x + w / 2 - CX, dy = y + h / 2 - CY;
+          R[i] = Math.hypot(dx, dy);
+          TH[i] = Math.atan2(dy, dx);
+          W[i] = w;
+          H[i] = h;
+          // Inner material falls first; the edges hang on and then rush in.
+          PW[i] = 1.5 + 1.8 * (R[i] / rMax) + 0.5 * OM.hash(i, 3, 91);
+          I[i] = ix;
+        });
+        VX = { n, RMAX: rMax, R, TH, W, H, PW, I, X: new Float32Array(n), Y: new Float32Array(n), S: new Float32Array(n), O: new Uint8Array(n) };
+        return VX;
+      };
+      /** Total turn of the vortex at T: a slow grab, a steep acceleration, a kick on each snare. */
+      const spin = (T) => {
+        const u = OM.prog(T, STOP, COLL);
+        let s = 2 * Math.PI * 1.3 * Math.pow(u, 2.4);
+        for (const h of SNARES) if (T > h) s += 0.9 * (1 - Math.exp(-(T - h) / 0.05));
+        return s;
+      };
+      /** Radius left (0..1) for an object with fall power pw. */
+      const left = (T, pw) => {
+        const u = OM.prog(T, STOP, COLL);
+        let k = 1 - Math.pow(u, pw);
+        for (const h of SNARES) if (T > h) k *= 1 - 0.2 * (1 - Math.exp(-(T - h) / 0.03));
+        return k;
+      };
+
+      const vortex = (ctx, T, dpr) => {
+        const v = vortexItems();
+        ctx.fillStyle = ink.bg;
+        ctx.fillRect(0, 0, 1920, 1080);
+        const S = spin(T) * OM.finale.SPIN;
+        const px = 1 / dpr;
+        for (let i = 0; i < v.n; i++) {
+          const k = left(T, v.PW[i]);
+          // Differential turn: the nearer the drain, the faster the orbit, so the frame winds into arms.
+          const r = v.R[i] * k;
+          const th = v.TH[i] + S / (0.22 + 1.6 * (r / v.RMAX));
+          v.X[i] = CX + r * Math.cos(th);
+          v.Y[i] = CY + r * Math.sin(th);
+          v.S[i] = Math.max(px, Math.pow(k, 0.6));
+          // Heating as it nears the drain: everything burns down to lit green.
+          v.O[i] = k < 0.14 ? 2 : k < 0.3 ? Math.max(v.I[i], 2) : k < 0.55 && v.I[i] === 0 ? 1 : v.I[i];
+        }
+        for (let ix = 0; ix < 5; ix++) {
+          ctx.fillStyle = INKS[ix];
+          for (let i = 0; i < v.n; i++) {
+            if (v.O[i] !== ix) continue;
+            const w = Math.max(px, v.W[i] * v.S[i]), h = Math.max(px, v.H[i] * v.S[i]);
+            const x = Math.round((v.X[i] - w / 2) * dpr) / dpr, y = Math.round((v.Y[i] - h / 2) * dpr) / dpr;
+            ctx.fillRect(x, y, Math.max(px, Math.round(w * dpr) / dpr), Math.max(px, Math.round(h * dpr) / dpr));
+          }
+        }
+      };
+
+      const home = (ctx, T, dpr) => {
+        const lay = layout();
+        // Impacts: each word lights the field and wordmark where it lands, the wordmark kicks as it fires.
+        const fade = 1 - OM.smooth(OM.prog(T, STOP - 0.3, STOP));
         const glows = [];
         on.forEach((t0, i) => {
-          const a = T - (t0 + DUR(i));
-          if (a < 0 || a > 1.6) return;
           const big = i === last;
-          glows.push({ x: lay.centre[i].x, y: lay.centre[i].y, strength: (big ? 1.35 : 0.95) * Math.exp(-a / (big ? 0.3 : 0.16)), reach: big ? 780 : 300 });
+          const a = T - (t0 + DUR(i)), f = T - t0;
+          if (f >= 0 && f < 0.4 && !big) glows.push({ x: CX, y: CY, strength: 0.55 * Math.exp(-f / 0.07) * fade, reach: 420 });
+          if (a < 0 || a > 1.6) return;
+          glows.push({ x: lay.centre[i].x, y: lay.centre[i].y, strength: (big ? 1.35 : 0.95) * Math.exp(-a / (big ? 0.26 : 0.16)) * fade, reach: big ? 820 : 320 });
         });
-        const flash = T - (on[last] + DUR(last)); // the whole line flashes when the key word lands
-        const head = (k) => {
+        ctx.fillStyle = ink.bg;
+        ctx.fillRect(0, 0, 1920, 1080);
+        OM.hero(ctx, T, dpr, { inks: ink, L, word: false, gain: 0.8, bg: false, glows });
+        OM.paintWord(ctx, L, dpr, ink, { glows });
+        // The line: each word's cells fired out of the wordmark (the key word storms in from every edge).
+        const flash = T - (on[last] + DUR(last));
+        const vis = [];
+        for (const k of lay.cells) {
           const t0 = on[k.w];
-          if (T < t0) return null;
-          const a = T - t0, dur = DUR(k.w);
+          if (T < t0) continue;
+          const a = T - t0, dur = DUR(k.w), big = k.w === last;
           const e = OM.ease.outExpo(OM.clamp(a / dur));
-          const f = from(k, lay);
-          let col = a < dur + 0.05 ? ink.crest : a < dur + 0.3 ? ink.hover : th.text;
-          if (flash >= 0 && flash < 0.5) col = flash < 0.08 ? ink.crest : flash < 0.3 ? ink.hover : col;
-          return { ink: col, dx: f.x * (1 - e), dy: f.y * (1 - e) };
-        };
-        O.page(ctx, T, dpr, { glows, head, buttons: OM.prog(T, STOP, STOP + 0.24) });
-        // Sparkles off the buttons as they build: seeded four-point stars, each a short life.
-        if (T >= STOP && T < STOP + 0.8) {
-          const b = lay.btnBox;
-          for (let i = 0; i < 26; i++) {
-            const h1 = OM.hash(i, 1, 129), h2 = OM.hash(i, 2, 129), h3 = OM.hash(i, 3, 129);
-            const a = (T - STOP - 0.3 * h3) / 0.35;
-            if (a < 0 || a >= 1) continue;
-            const x = b.x0 - 20 + (b.x1 - b.x0 + 40) * h1, y = b.y0 - 18 + (b.y1 - b.y0 + 36) * h2 - 16 * a;
-            const r = 3 + 9 * Math.sin(Math.PI * a) * (0.6 + 0.4 * h2);
-            ctx.globalAlpha = 1 - a * a;
-            ctx.fillStyle = h3 < 0.5 ? ink.crest : ink.hover;
-            ctx.fillRect(x - r, y - 1, 2 * r, 2);
-            ctx.fillRect(x - 1, y - r, 2, 2 * r);
+          const h1 = OM.hash(k.k, 1, 211), h2 = OM.hash(k.k, 2, 211);
+          let fx0, fy0;
+          if (big) {
+            const ctr = lay.centre[k.w];
+            const ang = Math.atan2(k.y - ctr.y, k.x - ctr.x) + (h1 - 0.5) * 0.9, d = 1100 + 500 * h2;
+            fx0 = ctr.x + Math.cos(ang) * d;
+            fy0 = ctr.y + Math.sin(ang) * d;
+          } else {
+            const [col, row] = WM[Math.floor(h1 * WM.length)];
+            fx0 = L.x0 + (col + 0.5) * L.cw - 4;
+            fy0 = L.y0 + (row + 0.5) * L.ch - 4;
           }
-          ctx.globalAlpha = 1;
+          let col = a < dur + 0.05 ? ink.crest : a < dur + 0.3 ? ink.hover : OM.c1.typeInk(k.f, ink);
+          if (flash >= 0 && flash < 0.5) col = flash < 0.08 ? ink.crest : flash < 0.3 ? ink.hover : col;
+          vis.push([fx0 + (k.x - fx0) * e, fy0 + (k.y - fy0) * e, col, e >= 1]);
         }
-    }
-    return api;
-  },
-});
+        const sn = (v) => Math.round(v * dpr) / dpr;
+        ctx.fillStyle = ink.bg;
+        for (const [x, y, , landed] of vis) if (landed) ctx.fillRect(sn(x - 3), sn(y - 3), 14, 14);
+        for (const [x, y, col] of vis) {
+          ctx.fillStyle = col;
+          ctx.fillRect(sn(x), sn(y), sn(x + 8) - sn(x), sn(y + 8) - sn(y));
+        }
+      };
+      const WM = OM.cells(OM.WORDMARK);
+
+      return {
+        render(t, T) {
+          const ctx = c.ensure();
+          const dpr = c.dpr;
+          ctx.globalAlpha = 1;
+          if (T < Math.min(on[0], start + 0.07)) OM.handoff('word', ctx, T, dpr);
+          else if (T >= COLL) OM.finale.pixel(ctx, dpr);
+          else if (T >= STOP) vortex(ctx, T, dpr);
+          else home(ctx, T, dpr);
+          // Camera: a slow push home with a kick on the key word, then a roll that follows the spin; at rest on both cuts.
+          const env = OM.post.envelope(T, start, end, { ramp: 0.4 });
+          const kick = T >= on[last] ? 0.025 * Math.exp(-(T - on[last]) / 0.12) : 0;
+          const rot = 0.045 * Math.sin(Math.PI * OM.prog(T, STOP, end - 0.07));
+          const z = 1 + 0.02 * OM.smooth(OM.prog(T, on[0], STOP)) + kick + 1.25 * rot;
+          // The smear rides the spin's speed: building through the drain, peaking on the snares, gone before the cut.
+          const amt = OM.smooth(OM.prog(T, STOP + 0.15, 293.1)) * (1 - OM.smooth(OM.prog(T, 293.4, end - 0.07)));
+          const w = (spin(Math.min(T + 0.02, COLL)) - spin(T)) / 0.02;
+          fx.apply(T, {
+            amount: env > 0 ? amt : 0,
+            cam: { zoom: 1 + env * (z - 1), rot: env * rot },
+            p0: [OM.finale.SPIN * Math.min(0.3, 0.012 * w), 0.25, 0, 0],
+          });
+        },
+        release: () => {
+          fx.release();
+          c.release();
+        },
+      };
+    },
+  });
+})();

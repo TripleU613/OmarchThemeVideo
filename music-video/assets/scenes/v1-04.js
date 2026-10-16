@@ -6,7 +6,8 @@
 // and fall, and underneath, in exactly the same cells, the same words were
 // already there in Tokyo Night's green. The last words are new: they build
 // cell by cell in the gap's world, the key word on the snare fill. Then the
-// letters drain to the night v1-05 opens on.
+// letters let go cell by cell and fall as v1-05's rain (V.letterRain, the
+// shared cut frame).
 OM.ownWords.add('v1-04');
 (() => {
   const V = OM.v1;
@@ -134,14 +135,20 @@ vec4 effect(vec2 uv) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + H) return OM.handoff('white', ctx, T, dpr);
-          if (T >= END - H) return OM.handoff('night', ctx, T, dpr);
+          if (T >= END - H) {
+            ctx.fillStyle = ink.bg;
+            ctx.fillRect(0, 0, 1920, 1080);
+            return V.letterRain(ctx, T, dpr); // the cut frame v1-05 opens on
+          }
           const words = get();
           // Beneath: Tokyo Night's field, quiet, and the line in green in the same cells.
           if (T >= RIP - 0.02) {
             const drain = OM.prog(T, DRAIN0, DRAIN1);
             const flood = OM.ease.outCubic(OM.prog(T, PEEL, GONE + 0.3));
             OM.hero(ctx, T, dpr, { inks: ink, L: HM, mode: 'flat', word: false, gain: (0.9 + 0.6 * flood) * (1 - OM.smooth(drain)) });
+            if (T >= V.RAIN0) V.letterRain(ctx, T, dpr); // letter rain: the line lets go, cell by cell
             for (const wd of words) {
+              if (T >= V.RAIN0) break;
               const age = T - on[wd.k];
               if (wd.k >= PRINTED && age < 0) continue;
               const built = wd.k < PRINTED ? 9 : OM.ease.outExpo(OM.clamp(age / 0.18));

@@ -40,6 +40,46 @@ OM.ownWords.add('p1-01');
       ctx.fillStyle = ink.crest;
       ctx.fillRect(snap(PEN.x - s / 2), snap(PEN.y - s / 2), snap(s), snap(s));
     },
+    DISC: { x: 960, y: 560, r: 330 },
+    /** Where the glint on the record's outer groove is at T (it becomes p1-02's pen). */
+    glintAt: (T) => [960 + Math.cos(T * 3.7) * 297, 560 + Math.sin(T * 3.7) * 297],
+    /** A record at (x, y), radius r: e=0 the dark vinyl from a sleeve, e=1 its grooves lit, with the glint. */
+    discBody: (ctx, T, dpr, x, y, r, e, glint = true) => {
+      const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
+      ctx.fillStyle = '#08080c';
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = OM.mix(th['border-strong'], OM.mix(ink.bg, ink.lit, 0.5), e);
+      ctx.lineWidth = 1.5;
+      for (let f = 0.34; f < 0.99; f += 0.075) {
+        ctx.beginPath();
+        ctx.arc(x, y, r * f, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.fillStyle = OM.mix(ink.crest, ink.mid, e);
+      ctx.beginPath();
+      ctx.arc(x, y, r * OM.lerp(0.3, 0.17, e), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = ink.bg;
+      ctx.beginPath();
+      ctx.arc(x, y, r * 0.02, 0, Math.PI * 2);
+      ctx.fill();
+      if (e > 0 && glint) {
+        const gx = x + Math.cos(T * 3.7) * r * 0.9, gy = y + Math.sin(T * 3.7) * r * 0.9;
+        pool(ctx, gx, gy, 64, 64, ink.lit, 0.45 * e);
+        const sz = PEN.s * e, snap = (v) => Math.round(v * dpr) / dpr;
+        ctx.fillStyle = ink.crest;
+        ctx.fillRect(snap(gx - sz / 2), snap(gy - sz / 2), snap(sz), snap(sz));
+      }
+    },
+    /** The p1-01 -> p1-02 seam: the key record, centred, its grooves lit and a glint riding the rim. */
+    disc: (ctx, T, dpr) => {
+      ctx.fillStyle = OM.fieldInks('tokyo-night').bg;
+      ctx.fillRect(0, 0, 1920, 1080);
+      const D = OM.p1.DISC;
+      OM.p1.discBody(ctx, T, dpr, D.x, D.y, D.r, 1);
+    },
     /** Widest font px (<= max) at which words idx fit in maxW, set as one run. */
     fit: (ctx, words, idx, weight, maxW, max, min = 40) => {
       let px = max;
@@ -113,6 +153,8 @@ OM.ownWords.add('p1-01');
         ctx.translate(x, y);
         // The record peeking out of the top: a dark disc with a lit label.
         const vr = h * 0.42, vy = -h / 2 + vr * 0.35 - vinyl * h * 0.42;
+        const disc = [x + w * 0.18, y + vy, vr];
+        if (key) return drawFace();
         ctx.fillStyle = '#08080c';
         ctx.beginPath();
         ctx.arc(w * 0.18, vy, vr, 0, Math.PI * 2);
@@ -128,7 +170,8 @@ OM.ownWords.add('p1-01');
         ctx.beginPath();
         ctx.arc(w * 0.18, vy, vr * 0.3, 0, Math.PI * 2);
         ctx.fill();
-        const disc = [x + w * 0.18, y + vy, vr];
+        return drawFace();
+        function drawFace() {
         // The sleeve face.
         ctx.fillStyle = key ? OM.mix(ink.lit, ink.crest, glow) : OM.mix(th['surface-2'], th['border-strong'], glow * 0.6);
         ctx.fillRect(-w / 2, -h / 2, w, h);
@@ -151,6 +194,7 @@ OM.ownWords.add('p1-01');
         }
         ctx.restore();
         return disc;
+        }
       };
       // Groove sheen: a radial highlight sweeping round the key record's vinyl (dark grooves only, never the label or type).
       const fx = OM.post(el, c, {
@@ -176,11 +220,7 @@ OM.ownWords.add('p1-01');
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < Math.max(start + 0.045, on[0])) return fx.apply(T), OM.handoff('spot', ctx, T, dpr);
-          if (T > END - 0.07) {
-            ctx.fillStyle = ink.bg;
-            ctx.fillRect(0, 0, 1920, 1080);
-            return fx.apply(T), OM.p1.pen(ctx, dpr);
-          }
+          if (T > END - 0.07) return fx.apply(T), OM.p1.disc(ctx, T, dpr);
           ctx.fillStyle = ink.bg;
           ctx.fillRect(0, 0, 1920, 1080);
           const S = layout(ctx);
@@ -202,7 +242,7 @@ OM.ownWords.add('p1-01');
             ctx.closePath();
             ctx.fill();
           }
-          pool(ctx, 960, 880, OM.lerp(440, 64, cl), OM.lerp(110, 64, cl), ink.lit, OM.lerp(0.42 + 0.25 * flare, 0.45, cl));
+          pool(ctx, 960, 880, OM.lerp(440, 120, cl), OM.lerp(110, 40, cl), ink.lit, (0.42 + 0.25 * flare) * (1 - cl));
 
           const crateA = 1 - sm(T, DROP, DROP + 0.2);
           const rise = OM.ease.outExpo(OM.prog(T, on[0], on[0] + 0.12)); // the crate is pushed into the light on w0
@@ -235,22 +275,36 @@ OM.ownWords.add('p1-01');
               ctx.fillRect(x, y, sz, sz);
             }
           }
-          let keyDisc = null;
-          // Pulled sleeves: up out of the crate on the onset, into the row.
-          for (let k = 0; k <= K; k++) {
-            if (T < on[k] || !S[k]) continue;
+          const D = OM.p1.DISC;
+          // Each sleeve's pose: pulled into the row, then shrinking into the record's label.
+          const poseOf = (k) => {
             const s = S[k];
             const up = OM.prog(T, on[k], on[k] + (k === K ? 0.16 : 0.13));
             const back = OM.ease.inOutCubic(OM.prog(T, DROP + (K - k) * 0.035, SINK));
             const p = OM.ease.outBack(up, 1.4);
-            const x = OM.lerp(OM.lerp(960, s.x, OM.ease.outExpo(up)), OM.p1.PEN.x, back);
-            const y = OM.lerp(OM.lerp(CY0 + 120, ROW_Y - 10 * kick, p), OM.p1.PEN.y, back);
+            const x = OM.lerp(OM.lerp(960, s.x, OM.ease.outExpo(up)), D.x, back);
+            const y = OM.lerp(OM.lerp(CY0 + 120, ROW_Y - 10 * kick, p), D.y, back);
             const sc = OM.lerp(OM.lerp(0.6, 1, OM.ease.outExpo(up)) * (k === K ? 1 + 0.08 * flare : 1), 0.03, back);
-            const glow = decay(T, on[k], 0.12) + (k === K ? 0 : 0.5 * flare) + back;
-            ctx.globalAlpha = 1 - sm(back, 0.85, 1);
-            const vinyl = k === K ? 0.5 * OM.ease.outBack(OM.prog(T, DOWN + 0.05, DOWN + 0.3), 1.6) : 0;
-            const disc = sleeve(ctx, s, k, x, y, sc, Math.min(1, glow), vinyl);
-            if (k === K) keyDisc = disc;
+            // The key record, where it sits in its sleeve before the exit.
+            const s0 = OM.lerp(0.6, 1, OM.ease.outExpo(up)) * (k === K ? 1 + 0.08 * flare : 1);
+            const h0 = s.h * s0, vr = h0 * 0.42, vin = k === K ? 0.5 * OM.ease.outBack(OM.prog(T, DOWN + 0.05, DOWN + 0.3), 1.6) : 0;
+            const x0 = OM.lerp(960, s.x, OM.ease.outExpo(up)), y0 = OM.lerp(CY0 + 120, ROW_Y - 10 * kick, p);
+            return { s, x, y, sc, back, vin, rec: [x0 + s.w * s0 * 0.18, y0 - h0 / 2 + vr * 0.35 - vin * h0 * 0.42, vr] };
+          };
+          // The key record slides out, swings to centre and grows, its grooves lighting: the record p1-02 plays.
+          let keyDisc = null;
+          if (T >= on[K] && S[K]) {
+            const P = poseOf(K), e = OM.ease.inOutCubic(OM.prog(T, DROP, SINK));
+            keyDisc = [OM.lerp(P.rec[0], D.x, e), OM.lerp(P.rec[1], D.y, e), OM.lerp(P.rec[2], D.r, e)];
+            OM.p1.discBody(ctx, T, dpr, keyDisc[0], keyDisc[1], keyDisc[2], e);
+          }
+          // Pulled sleeves: up out of the crate on the onset, into the row.
+          for (let k = 0; k <= K; k++) {
+            if (T < on[k] || !S[k]) continue;
+            const P = poseOf(k);
+            const glow = decay(T, on[k], 0.12) + (k === K ? 0 : 0.5 * flare) + P.back;
+            ctx.globalAlpha = 1 - sm(P.back, 0.85, 1);
+            sleeve(ctx, P.s, k, P.x, P.y, P.sc, Math.min(1, glow), P.vin);
             ctx.globalAlpha = 1;
           }
           // The crate front, over everything that is still inside it.
@@ -268,7 +322,6 @@ OM.ownWords.add('p1-01');
             ctx.fillRect(900, CY0 + 30, 120, 22); // hand hole
             ctx.restore();
           }
-          if (cl > 0) OM.p1.pen(ctx, dpr, OM.ease.outBack(OM.prog(T, CLOSE[1] - 0.06, CLOSE[1]), 2));
           // Camera: a flip-through pan stepping right on each pull, home again as the spot closes.
           const home = 1 - OM.ease.inOutCubic(OM.prog(T, 74.42, 74.76));
           let x = 0;

@@ -1,6 +1,7 @@
 // v1-08 · Ownership (keep): enrolling a fingerprint, the way Omarchy sets one
-// up with fprintd. The spark v1-07 left is the reader waking: the
-// square-spiral mark grows out of it as the print's core. Every sung word is
+// up with fprintd. The lamp ring v1-07 left squares up into the
+// square-spiral mark at the print's core. The last word lands with a pressure
+// burst: the print is sucked in, then blown out through its ridges. Every sung word is
 // one more press: the print's contact sweeps a step further down each time,
 // fresh ridges crest then cool, and the ridge the press reaches carries the
 // word, written along it in place of the ridge: the first half of the line
@@ -50,6 +51,20 @@ vec4 effect(vec2 uv) {
       const ring = (k) => (k < TOPS ? TOPS - 1 - k : k - TOPS);
       const ringR = (k) => 172 + ring(k) * Math.min(92, 276 / Math.max(1, RINGS - 1));
       const RMAX = 172 + (RINGS - 1) * Math.min(92, 276 / Math.max(1, RINGS - 1)) + CAPMAX / 2 + 24;
+      // Pressure burst on the last word (onset on the 71.053 snare): for 60 ms the print is sucked in to its
+      // core, then it snaps back and a round pressure front runs out through the ridges, tearing ridge cells off.
+      const BURST = on[N - 1], VAC = 0.06;
+      const burstR = (rr, T) => {
+        const a = T - BURST;
+        if (a < 0 || a > 0.7) return rr;
+        if (a < VAC) return rr * (1 - 0.14 * Math.sin((a / VAC) * Math.PI / 2));
+        const b = a - VAC, F = 4200 * b, q = (rr - F) / 46;
+        return rr * (1 - 0.14 * Math.exp(-b / 0.03)) + 30 * Math.exp(-q * q) * Math.exp(-b / 0.3);
+      };
+      const atFront = (rr, T) => {
+        const b = T - BURST - VAC;
+        return b >= 0 && b < 0.25 && Math.abs(rr - 4200 * b) < 22;
+      };
 
       const get = V.lazy(PROBE, () => {
         const mt = V.metrics(WEIGHT);
@@ -70,7 +85,7 @@ vec4 effect(vec2 uv) {
             if (rr > RMAX) continue;
             const lc = q + 7, lr = r + 7;
             if (lc >= 0 && lc < 15 && lr >= 0 && lr < 15) {
-              if (OM.LOGO.rows[lr][lc] === '1') cells.push({ q, r, y, e: rr / RMAX, logo: true });
+              if (OM.LOGO.rows[lr][lc] === '1') cells.push({ q, r, y, rr, e: rr / RMAX, logo: true });
               continue;
             }
             if (rr < 96) continue;
@@ -86,7 +101,7 @@ vec4 effect(vec2 uv) {
               d = Math.atan2(Math.sin(d), Math.cos(d));
               if (Math.abs(d) < g.span / 2 + 0.06) { cut = true; break; }
             }
-            if (!cut) cells.push({ q, r, y, e: rr / RMAX, logo: false });
+            if (!cut) cells.push({ q, r, y, rr, e: rr / RMAX, logo: false });
           }
         for (const cl of cells) {
           let k = 0;
@@ -143,8 +158,10 @@ vec4 effect(vec2 uv) {
           }
           ctx.globalAlpha = 1;
         }
-        const glow = T >= DONE ? Math.exp(-(T - DONE) / 0.5) : 0;
-        return { amount: e * (1 - OM.prog(T, LIE0, LIE1)), cam: { zoom: 1 + 0.07 * push * e, rot: 0.0035 * Math.sin(T * 9) * push * e }, p0: [glow, 0, 0, 0] };
+        const ba = T - BURST;
+        const glow = Math.max(T >= DONE ? Math.exp(-(T - DONE) / 0.5) : 0, ba >= VAC ? Math.exp(-(ba - VAC) / 0.15) : 0);
+        const vac = ba >= 0 && ba < VAC ? Math.sin((ba / VAC) * Math.PI / 2) : 0, blast = ba >= VAC ? Math.exp(-(ba - VAC) / 0.12) : 0;
+        return { amount: e * (1 - OM.prog(T, LIE0, LIE1)), cam: { zoom: 1 + (0.07 * push - 0.025 * vac + 0.045 * blast) * e, rot: 0.0035 * Math.sin(T * 9) * push * e }, p0: [glow, 0, 0, 0] };
       };
       return {
         render(t, T) {
@@ -154,7 +171,11 @@ vec4 effect(vec2 uv) {
         draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
-          if (T < start + H) return OM.handoff('spark', ctx, T, dpr);
+          if (T < start + H) {
+            ctx.fillStyle = ink.bg;
+            ctx.fillRect(0, 0, 1920, 1080);
+            return V.lampRing(ctx, T, T >= 66.9 ? 0.3 * Math.exp(-(T - 66.9) / 0.12) : 0);
+          }
           if (T >= END - H) return OM.handoff('spot', ctx, T, dpr);
           const P = get();
           ctx.fillStyle = ink.bg;
@@ -162,11 +183,8 @@ vec4 effect(vec2 uv) {
           const lie = OM.smooth(OM.prog(T, LIE0, LIE1));
           if (lie > 0) spot(ctx, lie);
           const wake = OM.smooth(OM.prog(T, start + H, on[0] + 0.1));
-          pool(ctx, PX, PY, 72, 72, ink.lit, 0.4 * (1 - wake)); // the spark's halo, fading as the core grows
-          ctx.globalAlpha = 1 - wake;
-          ctx.fillStyle = ink.crest;
-          OM.cell(ctx, HM, hc.col, hc.row, dpr); // the spark itself, until the core has grown round it
-          ctx.globalAlpha = 1;
+          if (T < V.SQ1 + 0.05) V.lampRing(ctx, T, T >= 66.9 ? 0.3 * Math.exp(-(T - 66.9) / 0.12) : 0); // the copier's lamp, squaring up into the mark
+          const mark = OM.prog(T, V.SQ1 - 0.06, V.SQ1 + 0.05);
           ctx.save();
           ctx.globalAlpha = 1 - lie;
           ctx.translate(960, OM.lerp(PY, 880, lie));
@@ -174,7 +192,7 @@ vec4 effect(vec2 uv) {
           ctx.translate(-PX, -PY);
           // The reader pad's corner brackets, lit when enrollment completes, blinking on the snares.
           const done = T >= DONE;
-          const B = RMAX + 26, arm = 120;
+          const B0 = (RMAX + 26) * Math.SQRT2, B = burstR(B0, T) / Math.SQRT2, arm = 120;
           ctx.globalAlpha = (1 - lie) * OM.smooth(wake);
           ctx.fillStyle = done || OM.pulse(SNARES, T, 0.06) > 0.5 ? ink.crest : ink.mid;
           for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
@@ -188,7 +206,7 @@ vec4 effect(vec2 uv) {
           for (const k of P.cells) {
             const th2 = OM.threshold(k.q + 64, k.r + 64);
             if (k.logo) {
-              if (k.e > wake * 0.2) continue; // the core grows out of the spark
+              if (th2 > mark) continue; // the mark fills in where the lamp's square landed
             } else if (k.y > front || OM.clamp((k.y - front + 40) / 40) > th2) continue; // dithered front
             const age = T - k.at;
             let fill = k.logo ? (done ? ink.crest : ink.lit) : k.e < 0.4 ? ink.lit : ink.mid;
@@ -196,8 +214,10 @@ vec4 effect(vec2 uv) {
             if (wave >= 0 && Math.abs(k.e - wave) < 0.05) fill = ink.crest;
             // Inward echo: on the 71.94 snare a ring runs back from the rim to the core along the ridges.
             if (T >= 71.94 && T < 72.24 && Math.abs(k.e - (1 - (T - 71.94) / 0.3)) < 0.03) fill = ink.hover;
+            if (atFront(k.rr, T)) fill = ink.crest; // the pressure front bunching the ridges as it passes
+            const f = k.rr > 0 ? burstR(k.rr, T) / k.rr : 1;
             ctx.fillStyle = fill;
-            ctx.fillRect(Gp.x0 + k.q * S, Gp.y0 + k.r * S, S, S);
+            ctx.fillRect(PX + k.q * S * f - S / 2, PY + k.r * S * f - S / 2, S, S);
           }
           // The words, written along their rings, pressed in on their onsets.
           ctx.textBaseline = 'alphabetic';
@@ -212,7 +232,7 @@ vec4 effect(vec2 uv) {
             for (let i = 0; i < n; i++) {
               const off = ((i + 0.5 - n / 2) * g.A) / g.R;
               const ang = g.top ? -Math.PI / 2 + off : Math.PI / 2 - off;
-              const rb = (g.top ? g.R - g.cap / 2 : g.R + g.cap / 2) * kick;
+              const rb = burstR((g.top ? g.R - g.cap / 2 : g.R + g.cap / 2) * kick, T);
               ctx.save();
               ctx.translate(PX + Math.cos(ang) * rb, PY + Math.sin(ang) * rb);
               ctx.rotate(g.top ? ang + Math.PI / 2 : ang - Math.PI / 2);
@@ -220,6 +240,19 @@ vec4 effect(vec2 uv) {
               ctx.restore();
             }
           });
+          // Ridge cells torn off the print's rim by the blast, flung out and dragged to a stop.
+          const bb = T - BURST - VAC;
+          if (bb >= 0 && bb < 0.9) {
+            for (let i = 0; i < 140; i++) {
+              const h1 = OM.hash(i, 1, 88), h2 = OM.hash(i, 2, 88), h3 = OM.hash(i, 3, 88), life = 0.45 + 0.45 * h3;
+              if (bb > life || 4200 * bb < RMAX * (0.55 + 0.45 * h2)) continue; // leaves its ridge as the front reaches it
+              const ang = h1 * Math.PI * 2, r0 = RMAX * (0.55 + 0.45 * h2), b2 = bb - r0 / 4200;
+              const r = r0 + (500 + 900 * h3) * 0.25 * (1 - Math.exp(-b2 / 0.25));
+              const fz = b2 / life;
+              ctx.fillStyle = fz < 0.2 ? ink.crest : fz < 0.5 ? ink.hover : fz < 0.8 ? ink.lit : ink.mid;
+              ctx.fillRect(PX + Math.cos(ang) * r - S / 2, PY + Math.sin(ang) * r - S / 2, S, S);
+            }
+          }
           ctx.restore();
         },
         release: () => {

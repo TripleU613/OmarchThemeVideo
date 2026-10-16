@@ -134,21 +134,12 @@ OM.scene({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (T < start + 0.05) return fx.apply(T), OM.handoff('grid', ctx, T, dpr);
+        if (T < start + 0.05) return fx.apply(T), OM.p1.tilesState(ctx, dpr);
         if (T > END - 0.07) return fx.apply(T), OM.handoff('line', ctx, T, dpr);
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
-        // The grid it cut in on, fading as the parts arrive.
-        const gA = 1 - sm(T, start + 0.05, on[1]);
-        if (gA > 0) {
-          const snap = (v) => Math.round(v * dpr) / dpr;
-          ctx.globalAlpha = gA;
-          ctx.fillStyle = th['border-subtle'];
-          for (let col = L.cMin; col <= L.cMin + L.cols; col++) ctx.fillRect(snap(L.x0 + col * L.cw), 0, 1, 1080);
-          for (let row = L.rMin; row <= L.rMin + L.rows; row++) ctx.fillRect(0, snap(L.y0 + row * L.ch), 1920, 1);
-          ctx.globalAlpha = 1;
-        }
         const G = layout(ctx);
+        const TL = OM.p1.tileLayout(ctx); // the layout it cut in on: each tile becomes a gear
         const s = drive(T);
         const drop = decay(T, on[K], 0.16), down = decay(T, DOWN, 0.12);
         const tick = TICKS.reduce((m, x) => Math.max(m, decay(T, x, 0.05)), 0);
@@ -161,11 +152,29 @@ OM.scene({
         ctx.scale(1 + 0.12 * crush, Math.max(0.002, 1 - crush));
         ctx.translate(-960, -YC);
         // Back light behind the train, pumping on the ticks.
-        pool(ctx, 960, YC, 900, 420, ink.lit, (0.05 + 0.1 * sm(T, on[K], DOWN) + 0.12 * drop + 0.06 * tick) * (1 - crush));
+        pool(ctx, 960, YC, 900, 420, ink.lit, (0.05 + 0.1 * sm(T, on[K], DOWN) + 0.12 * drop + 0.06 * tick) * (1 - crush) * sm(T, start + 0.05, on[0] + 0.1));
+        // The layout's tiles, each rounding off and rolling into its gear's place, landing on that word's onset.
+        TL.forEach((t, j) => {
+          const k = Math.min(j, K), g = G[k];
+          if (T >= on[k]) return;
+          const r0 = OM.p1.tileRect(t);
+          const e = OM.ease.inCubic(OM.prog(T, Math.max(start + 0.05, on[k] - 0.32), on[k]));
+          const ro = g.r + 0.3 * P;
+          const cx = OM.lerp((r0.x0 + r0.x1) / 2, g.x, e), cy = OM.lerp((r0.y0 + r0.y1) / 2, g.y, e);
+          const hw = OM.lerp((r0.x1 - r0.x0) / 2, ro, e), hh = OM.lerp((r0.y1 - r0.y0) / 2, ro, e);
+          if (e <= 0) return OM.p1.drawTiles(ctx, dpr, [t], 1, th.brand); // still exactly the layout's tile
+          ctx.beginPath();
+          ctx.roundRect(cx - hw, cy - hh, 2 * hw, 2 * hh, Math.min(hw, hh) * e);
+          ctx.fillStyle = rgba(th.surface, OM.lerp(0.55, 1, e));
+          ctx.fill();
+          ctx.strokeStyle = OM.mix(th.brand, ink.mid, e);
+          ctx.lineWidth = 3;
+          ctx.stroke();
+        });
         G.forEach((g, k) => {
-          // Flying in: the part accelerates into its mesh and hits on the onset.
-          const inbound = k === 0 ? Math.max(0.06, on[0] - start - 0.06) : 0.3;
-          const q = OM.prog(T, on[k] - inbound, on[k]);
+          // Gears without a tile fly in; the rest appear where their tile rolled to.
+          const inbound = k < TL.length ? 0 : 0.3;
+          const q = inbound ? OM.prog(T, on[k] - inbound, on[k]) : T >= on[k] ? 1 : 0;
           if (q <= 0) return;
           const inq = OM.ease.inCubic(q);
           const from = k % 2 ? 1 : -1;
@@ -223,6 +232,48 @@ OM.scene({
           }
         }
         ctx.restore();
+        // Gear-teeth burst: on the key word the big gear sheds teeth and small cogs, flung out of its rim.
+        const ageB = T - on[K];
+        if (ageB >= 0 && ageB < 0.9) {
+          const g = G[K], LIFE = 0.9;
+          for (let i = 0; i < 44; i++) {
+            const cog = i % 6 === 0;
+            const an = -2.2 + 4.4 * OM.hash(i, 1, 51); // away from the gear on its left
+            const v = (cog ? 700 : 1100) + 1300 * OM.hash(i, 2, 51), drag = 3.2;
+            const d = (v / drag) * (1 - Math.exp(-drag * ageB));
+            const x = g.x + Math.cos(an) * (g.r + d), y = g.y + Math.sin(an) * (g.r + d) + 700 * ageB * ageB;
+            const a = 1 - ageB / LIFE, spin = an + (OM.hash(i, 3, 51) - 0.5) * 30 * ageB;
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(spin);
+            ctx.globalAlpha = a;
+            if (cog) {
+              const cr = 12 + 12 * OM.hash(i, 4, 51);
+              ctx.beginPath();
+              for (let n = 0; n < 16; n++) {
+                const rr = n % 2 ? cr : cr * 0.72, aa = (n * Math.PI) / 8;
+                n ? ctx.lineTo(Math.cos(aa) * rr, Math.sin(aa) * rr) : ctx.moveTo(rr, 0);
+              }
+              ctx.closePath();
+              ctx.fillStyle = th['surface-2'];
+              ctx.fill();
+              ctx.strokeStyle = ink.hover;
+              ctx.lineWidth = 2;
+              ctx.stroke();
+            } else {
+              const tw = 0.3 * P, tl = 0.62 * P;
+              ctx.beginPath();
+              ctx.moveTo(-tl / 2, -tw);
+              ctx.lineTo(tl / 2, -tw * 0.55);
+              ctx.lineTo(tl / 2, tw * 0.55);
+              ctx.lineTo(-tl / 2, tw);
+              ctx.closePath();
+              ctx.fillStyle = i % 3 ? ink.lit : ink.crest;
+              ctx.fill();
+            }
+            ctx.restore();
+          }
+        }
         // The crushed train becomes the crest line.
         const lineA = sm(T, OFF[1] - 0.11, OFF[1]);
         if (lineA > 0) {

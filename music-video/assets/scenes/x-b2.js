@@ -60,8 +60,13 @@
       const END = start + duration;
       const SNARES = [233.895, 235.357, 236.402, 237.610, 238.097, 239.746, 240.094, 240.234, 240.628, 240.768, 242.091];
       // The squeeze: nothing until the last downbeat, then a step on each snare of the roll.
-      const SQ = [[242.323, 0], [242.486, 0.3], [242.881, 0.55], [243.020, 0.74], [243.159, 0.9], [END - 0.1, 1]];
+      // Tunnel collapse: steps in on the 242.486 snare, then from the 242.881 snare
+      // the whole tunnel implodes, accelerating, onto the point by the 243.020
+      // snare (the strongest hit before the drop), where it bursts out once.
+      const HIT = 243.020;
+      const SQ = [[242.323, 0], [242.486, 0.3], [242.881, 0.55]];
       const squeeze = (T) => {
+        if (T >= 242.881) return OM.lerp(0.55, 1, OM.ease.inCubic(OM.prog(T, 242.881, HIT)));
         for (let i = SQ.length - 1; i >= 0; i--) if (T >= SQ[i][0]) {
           const n = SQ[i + 1];
           return n ? OM.lerp(SQ[i][1], n[1], OM.ease.outExpo(OM.prog(T, SQ[i][0], SQ[i][0] + Math.min(0.12, n[0] - SQ[i][0])))) : 1;
@@ -92,11 +97,43 @@
         };
       };
 
+      // The burst: the spark already sits at the centre while the tunnel's ring
+      // fragments blow back out past the frame, tumbling, gone before the cut.
+      const FRAGS = Array.from({ length: 260 }, (_, n) => {
+        const ring = n % 6, u = OM.hash(n, 1, 21), side = Math.floor(u * 4), v = (u * 4) % 1;
+        const ex = side < 2 ? v * 2 - 1 : side === 2 ? 1 : -1, ey = side < 2 ? (side ? 1 : -1) : v * 2 - 1;
+        return { x: ex * 1.06, y: ey * 0.6, sp: (0.55 + 0.9 * OM.hash(n, 2, 21)) * (1 + 0.35 * ring), len: 0.04 + 0.08 * OM.hash(n, 3, 21), spin: (OM.hash(n, 4, 21) - 0.5) * 9, horiz: side < 2 };
+      });
+      const burst = (ctx, T, dpr) => {
+        OM.handoff('spark', ctx, T, dpr);
+        const age = T - HIT, u = OM.prog(age, 0, END - 0.1 - HIT);
+        const [r, g, b] = OM.rgb(ink.lit);
+        const fl = ctx.createRadialGradient(C.x, C.y, 0, C.x, C.y, 900);
+        fl.addColorStop(0, `rgba(${r},${g},${b},${0.55 * (1 - u)})`);
+        fl.addColorStop(1, `rgba(${r},${g},${b},0)`);
+        ctx.fillStyle = fl;
+        ctx.fillRect(0, 0, 1920, 1080);
+        const R = 1500 * OM.ease.outExpo(OM.prog(age, 0, 0.12)) + 600 * age;
+        ctx.globalAlpha = Math.pow(1 - u, 1.5);
+        ctx.lineCap = 'square';
+        for (const f of FRAGS) {
+          const x = C.x + f.x * R * f.sp * 0.6, y = C.y + f.y * R * f.sp * 0.6;
+          const a = f.spin * age + (f.horiz ? 0 : Math.PI / 2), l = f.len * 900 * (1 - 0.5 * u);
+          ctx.strokeStyle = f.sp > 1.3 ? ink.crest : f.sp > 0.9 ? ink.hover : ink.lit;
+          ctx.lineWidth = L.ch * (f.sp > 1.3 ? 1 : 0.6);
+          ctx.beginPath();
+          ctx.moveTo(x - (Math.cos(a) * l) / 2, y - (Math.sin(a) * l) / 2);
+          ctx.lineTo(x + (Math.cos(a) * l) / 2, y + (Math.sin(a) * l) / 2);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      };
       const draw = (t, T) => {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + 0.1) return frame(ctx, T, dpr);
           if (T >= END - 0.1) return OM.handoff('spark', ctx, T, dpr);
+          if (T >= HIT) return burst(ctx, T, dpr);
           if (!texts || (!texts.ok && document.fonts.check(FONT))) texts = measure();
           const sq = squeeze(T), k = 1 - sq;
           const drop = OM.pulse(DOWN.filter((d) => d <= T), T, 0.18) * (T >= DOWN[4] ? 1.6 : 0.6);

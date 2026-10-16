@@ -4,32 +4,18 @@
 // leaving a glowing arc. Each word is written where a tile will be. On the key
 // word (the downbeat) the exposure's arcs become the borders of a tiling
 // layout: three tiles over one wide master, every border on the home
-// lattice. On the snare the words drain, the borders cool and the rest of
+// lattice. On the snare the words drain and the empty layout holds: p1-03 turns its tiles into gears.
 // the lattice comes up, so the layout is exactly the grid p1-03 cuts in on.
 OM.ownWords.add('p1-02');
-OM.scene({
-  id: 'p1-02',
-  build(el, { start, duration }) {
-    const cv = document.createElement('canvas');
-    cv.className = 'om-fill';
-    el.appendChild(cv);
-    const c = OM.canvas(cv, { alpha: false });
-    const END = start + duration;
-    const ink = OM.fieldInks('tokyo-night');
-    const th = OM.theme('tokyo-night');
-    const { rgba, pool, font, sm, decay, PEN } = OM.p1;
-    const words = OM.sung('p1-02');
-    const on = words.map((w) => w.t0);
-    const K = words.length - 1;
-    const DOWN = 75.929, SNARE = 76.278;
-    const L = OM.HOME;
-    const ci = (x) => Math.round((x - L.x0) / L.cw), ri = (y) => Math.round((y - L.y0) / L.ch);
-    const gx = (col) => L.x0 + col * L.cw, gy = (row) => L.y0 + row * L.ch;
-    const cL = ci(70), cR = ci(1850), rT = ri(64), rM = ri(440), rB = ri(1016);
-    // Write windows: the nib crosses word k from its onset.
-    const wEnd = on.map((t0, k) => t0 + Math.min(0.3, k < K ? on[k + 1] - t0 - 0.04 : 0.17));
-
-    const layout = (ctx) => {
+// Shared with p1-03: the tiling layout and the seam frame (the empty tiles, borders lit).
+(() => {
+  const L = OM.HOME;
+  const ci = (x) => Math.round((x - L.x0) / L.cw), ri = (y) => Math.round((y - L.y0) / L.ch);
+  const gx = (col) => L.x0 + col * L.cw, gy = (row) => L.y0 + row * L.ch;
+  const cL = ci(70), cR = ci(1850), rT = ri(64), rM = ri(440), rB = ri(1016);
+  const font = OM.p1.font;
+  OM.p1.tileLayout = (ctx) => {
+    const words = OM.sung('p1-02'), K = words.length - 1;
       const top = words.map((_, k) => k).filter((k) => k !== K);
       const pad = 50;
       const avail = (cR - cL - top.length + 1) * L.cw;
@@ -55,6 +41,51 @@ OM.scene({
       });
       return tiles;
     };
+  /** Tile k's rectangle in px. */
+  OM.p1.tileRect = (t) => ({ x0: gx(t.c0), x1: gx(t.c1), y0: gy(t.r0), y1: gy(t.r1) });
+  /** The tiles drawn as a layout: faces at `form`, borders in `col`, grown from each edge's midpoint. */
+  OM.p1.drawTiles = (ctx, dpr, S, form, col) => {
+    const th = OM.theme('tokyo-night'), snap = (v) => Math.round(v * dpr) / dpr;
+    S.forEach((s) => {
+      const { x0, x1, y0, y1 } = OM.p1.tileRect(s);
+      ctx.fillStyle = OM.p1.rgba(th.surface, 0.55 * form);
+      ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
+      ctx.fillStyle = col;
+      const hw = ((x1 - x0) / 2) * form, hh = ((y1 - y0) / 2) * form, mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
+      for (const y of [y0, y1]) ctx.fillRect(snap(mx - hw), snap(y) - 1, 2 * hw + 1, 3);
+      for (const x of [x0, x1]) ctx.fillRect(snap(x) - 1, snap(my - hh), 3, 2 * hh + 1);
+    });
+  };
+  /** The p1-02 -> p1-03 seam: the finished layout, empty, borders in brand. */
+  OM.p1.tilesState = (ctx, dpr) => {
+    ctx.fillStyle = OM.fieldInks('tokyo-night').bg;
+    ctx.fillRect(0, 0, 1920, 1080);
+    OM.p1.drawTiles(ctx, dpr, OM.p1.tileLayout(ctx), 1, OM.theme('tokyo-night').brand);
+  };
+})();
+OM.scene({
+  id: 'p1-02',
+  build(el, { start, duration }) {
+    const cv = document.createElement('canvas');
+    cv.className = 'om-fill';
+    el.appendChild(cv);
+    const c = OM.canvas(cv, { alpha: false });
+    const END = start + duration;
+    const ink = OM.fieldInks('tokyo-night');
+    const th = OM.theme('tokyo-night');
+    const { rgba, pool, font, sm, decay, PEN } = OM.p1;
+    const words = OM.sung('p1-02');
+    const on = words.map((w) => w.t0);
+    const K = words.length - 1;
+    const DOWN = 75.929, SNARE = 76.278;
+    const L = OM.HOME;
+    const ci = (x) => Math.round((x - L.x0) / L.cw), ri = (y) => Math.round((y - L.y0) / L.ch);
+    const gx = (col) => L.x0 + col * L.cw, gy = (row) => L.y0 + row * L.ch;
+    const cL = ci(70), cR = ci(1850), rT = ri(64), rM = ri(440), rB = ri(1016);
+    // Write windows: the nib crosses word k from its onset.
+    const wEnd = on.map((t0, k) => t0 + Math.min(0.3, k < K ? on[k + 1] - t0 - 0.04 : 0.17));
+
+    const layout = OM.p1.tileLayout;
 
     // The nib: from the pen dot to the first word, across each word, a whip arc between.
     const arc = (a, b, u, lift) => {
@@ -64,7 +95,7 @@ OM.scene({
     };
     const flights = (S) => {
       const f = [];
-      let from = [PEN.x, PEN.y], t = start + 0.05;
+      let from = OM.p1.glintAt(start + 0.05), t = start + 0.05;
       S.forEach((s, k) => {
         f.push({ a: from, b: [s.x, s.base - s.cap / 2], t0: t, t1: on[k] });
         from = [s.x + s.tw, s.base - s.cap / 2];
@@ -105,42 +136,26 @@ OM.scene({
         const ctx = c.ensure();
         const dpr = c.dpr;
         if (T < start + 0.05) {
-          ctx.fillStyle = ink.bg;
-          ctx.fillRect(0, 0, 1920, 1080);
-          return fx.apply(T), OM.p1.pen(ctx, dpr);
+          return fx.apply(T), OM.p1.disc(ctx, T, dpr);
         }
-        if (T > END - 0.07) return fx.apply(T), OM.handoff('grid', ctx, T, dpr);
+        if (T > END - 0.07) return fx.apply(T), OM.p1.tilesState(ctx, dpr);
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
         const S = layout(ctx);
         const F = flights(S);
         const snap = (v) => Math.round(v * dpr) / dpr;
         const form = OM.ease.outExpo(OM.prog(T, on[K], on[K] + 0.2)); // arcs -> tiles
-        const cool = sm(T, SNARE, END - 0.075); // tiles -> grid
-        const flash = decay(T, DOWN, 0.1), sn = decay(T, SNARE, 0.06);
+                const flash = decay(T, DOWN, 0.1), sn = decay(T, SNARE, 0.06) * (1 - sm(T, END - 0.16, END - 0.075));
 
-        // The rest of the lattice comes up under the cooling layout.
-        if (cool > 0) {
-          ctx.globalAlpha = cool;
-          ctx.fillStyle = th['border-subtle'];
-          for (let col = L.cMin; col <= L.cMin + L.cols; col++) ctx.fillRect(snap(gx(col)), 0, 1, 1080);
-          for (let row = L.rMin; row <= L.rMin + L.rows; row++) ctx.fillRect(0, snap(gy(row)), 1920, 1);
+        // The record keeps turning under the exposure, its grooves the first light trails, until the tiles take over.
+        if (form < 1) {
+          const D = OM.p1.DISC;
+          ctx.globalAlpha = 1 - form;
+          OM.p1.discBody(ctx, T, dpr, D.x, D.y, D.r, 1, false);
           ctx.globalAlpha = 1;
         }
         // Tiles: faint window faces, borders growing out of each edge's midpoint on the key word.
-        if (form > 0) {
-          const bw = OM.lerp(3, 1, cool), col = OM.mix(OM.mix(th.brand, ink.crest, Math.max(flash, sn)), th['border-subtle'], cool);
-          S.forEach((s) => {
-            const x0 = gx(s.c0), x1 = gx(s.c1), y0 = gy(s.r0), y1 = gy(s.r1);
-            ctx.fillStyle = rgba(th.surface, 0.55 * form * (1 - cool));
-            ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
-            ctx.fillStyle = col;
-            const hw = ((x1 - x0) / 2) * form, hh = ((y1 - y0) / 2) * form, mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
-            const o = (bw - 1) / 2;
-            for (const y of [y0, y1]) ctx.fillRect(snap(mx - hw), snap(y) - o, 2 * hw + 1, bw);
-            for (const x of [x0, x1]) ctx.fillRect(snap(x) - o, snap(my - hh), bw, 2 * hh + 1);
-          });
-        }
+        if (form > 0) OM.p1.drawTiles(ctx, dpr, S, form, OM.mix(th.brand, ink.crest, Math.max(flash, sn)));
         // The exposure: every whip arc the nib has made stays lit until the tiles take over.
         const trailA = 1 - form;
         if (trailA > 0.01) {

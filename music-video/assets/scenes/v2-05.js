@@ -6,6 +6,45 @@
 // whole line is pulled down into one point of light, the board goes dark, and
 // the spark is the cut into v2-06.
 OM.ownWords.add('v2-05');
+// The paper plane, shared with v2-06: the v2-05 > v2-06 match cut folds the typed line into it,
+// beside the spark that becomes the agent light.
+OM.v2plane = (() => {
+  const PLEN = 210, P0 = { x: 560, y: 330, rot: 0.22 };
+  const draw = (ctx, x, y, rot, s = 1) => {
+    if (s <= 0) return;
+    const th = OM.theme('tokyo-night'), ink = OM.fieldInks('tokyo-night');
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(rot);
+    if (s !== 1) { ctx.translate(-PLEN / 2, 0); ctx.scale(s, s); ctx.translate(PLEN / 2, 0); }
+    ctx.fillStyle = th['text-secondary'];
+    ctx.beginPath(); // the keel fold, underneath
+    ctx.moveTo(0, 0); ctx.lineTo(-PLEN * 0.8, 2); ctx.lineTo(-PLEN * 0.96, 46); ctx.lineTo(-PLEN * 0.62, 12); ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = th.text;
+    ctx.beginPath(); // the near wing
+    ctx.moveTo(0, 0); ctx.lineTo(-PLEN, -70); ctx.lineTo(-PLEN * 0.86, -8); ctx.lineTo(-PLEN * 0.8, 2); ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = ink.crest;
+    ctx.beginPath(); // the crease catching light
+    ctx.moveTo(0, 0); ctx.lineTo(-PLEN * 0.9, -20); ctx.lineTo(-PLEN * 0.86, -8); ctx.lineTo(-PLEN * 0.8, 2); ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+  };
+  /** A point inside the folded plane at P0, from two 0..1 numbers. */
+  const inside = (a, b) => {
+    if (a + b > 1) { a = 1 - a; b = 1 - b; }
+    const lx = -PLEN * a - PLEN * 0.8 * b, ly = -70 * a + 2 * b;
+    const c = Math.cos(P0.rot), s = Math.sin(P0.rot);
+    return [P0.x + lx * c - ly * s, P0.y + lx * s + ly * c];
+  };
+  /** The shared cut frame at 137.011: the spark and the plane beside it. */
+  const cut = (ctx, T, dpr) => {
+    OM.handoff('spark', ctx, T, dpr);
+    draw(ctx, P0.x, P0.y, P0.rot);
+  };
+  return { PLEN, P0, draw, inside, cut };
+})();
 OM.scene({
   id: 'v2-05',
   build(el, { start, duration }) {
@@ -123,8 +162,8 @@ OM.scene({
       render(t, T) {
         const o = oc.ensure();
         o.clearRect(0, 0, 1920, 1080);
-        if (T < start + V.HOLD_IN) return fx.apply(T), OM.handoff('night', o, T, oc.dpr);
-        if (T >= END - V.HOLD_OUT) return fx.apply(T), OM.handoff('spark', o, T, oc.dpr);
+        if (T < start + V.HOLD_IN) return fx.apply(T), OM.v2keys.cut(o);
+        if (T >= END - V.HOLD_OUT) return fx.apply(T), OM.v2plane.cut(o, T, oc.dpr);
         if (!P || !V.met().ok) plan();
         // Keys: down for 0.11 s from each press; the space bar on every word after the first.
         const down = new Set();
@@ -145,8 +184,15 @@ OM.scene({
 
         const suck = OM.ease.inOutCubic(OM.prog(T, SUCK, GONE));
         const kb = OM.ease.inOutSine(OM.prog(T, KB0, GONE));
-        // Dark over the board: fading up from the night, and back down into the spark.
-        const dark = Math.max(1 - OM.ease.outCubic(OM.prog(T, start + V.HOLD_IN, start + 0.3)), kb);
+        // Match cut in: v2-04's flat key tops gain their depth as the 3D board rises under them.
+        const flat = 1 - OM.ease.inOutCubic(OM.prog(T, start + V.HOLD_IN, start + 0.4));
+        if (flat > 0) {
+          o.globalAlpha = flat;
+          OM.v2keys.cut(o);
+          o.globalAlpha = 1;
+        }
+        // The board giving itself up into the spark as motes, at the end.
+        const dark = kb;
         if (dark > 0) {
           o.fillStyle = V.rgba(ink.bg, dark);
           o.fillRect(0, 0, 1920, 1080);
@@ -177,10 +223,14 @@ OM.scene({
           const age = T - q.at;
           if (age < 0) continue;
           const s = 1 + 0.3 * Math.exp(-age / 0.06);
-          const x = OM.lerp(q.x, SPK.x, suck), y = OM.lerp(q.cy, SPK.y, suck);
+          // Match cut out: each letter folds into the paper plane beside the spark.
+          const [tx, ty] = OM.v2plane.inside(OM.hash(q.k, q.j, 51), OM.hash(q.k, q.j, 52));
+          const u = OM.ease.inOutCubic(OM.clamp((suck - OM.hash(q.k, q.j, 53) * 0.3) / 0.7));
+          if (u >= 1) continue;
+          const x = OM.lerp(q.x, tx, u), y = OM.lerp(q.cy, ty, u);
           o.save();
           o.translate(x, y);
-          o.scale(s * (1 - suck), s * (1 - suck));
+          o.scale(s * (1 - 0.8 * u), s * (1 - 0.8 * u));
           o.fillStyle = OM.mix(ink.crest, th.text, OM.clamp(age / 0.3));
           o.fillText(q.ch, 0, F.capPx / 2);
           o.restore();
@@ -202,6 +252,7 @@ OM.scene({
           o.fillStyle = V.rgba(ink.crest, kb);
           OM.cell(o, OM.HOME, OM.cellAt(OM.HOME, 960, 540).col, OM.cellAt(OM.HOME, 960, 540).row, oc.dpr);
         }
+        if (suck > 0) OM.v2plane.draw(o, OM.v2plane.P0.x, OM.v2plane.P0.y, OM.v2plane.P0.rot, OM.ease.inOutCubic(suck)); // the plane folding together
         // Backlight bloom under every pressed cap, and dust hanging in the light over the board.
         if (suck === 0) {
           for (const k of down) {

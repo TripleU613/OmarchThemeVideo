@@ -46,13 +46,21 @@ vec4 effect(vec2 uv) {
     const at = new Float32Array(CW * RH).fill(Infinity); // when each lattice cell's domino falls
     const kind = new Uint8Array(CW * RH); // 0 field, 1 trail, 2 letter, 3 key letter
     const dir = new Int8Array(CW * RH); // which way it falls: 0 right, 1 down, 2 left, 3 up
+    const rowCell = new Uint8Array(CW * RH); // the desk's row of dominoes, standing from the cut
     const I = (col, row) => (row - R0) * CW + (col - C0);
 
     const lay = B.lazy(() => {
-      at.fill(Infinity); kind.fill(0); dir.fill(0);
+      at.fill(Infinity); kind.fill(0); dir.fill(0); rowCell.fill(0);
       const set = B.set(sung, { weight: 800, cap: 100, minCap: 72, maxW: 1640, cy: 530, lead: 1.42 });
-      let prev = [B.SPARK.col, B.SPARK.row], prevT = start + 0.05;
-      at[I(...prev)] = prevT; kind[I(...prev)] = 1;
+      // The first domino is the desk row's left end; the whole row goes down left to right from it.
+      const DR = B.DROW, DT = 0.16 / Math.max(1, DR.c1 - DR.c0);
+      for (const q of DR.cells) {
+        const j = I(q.col, q.row);
+        // Along the plank left to right; down each leg from where it meets the plank.
+        at[j] = start + 0.05 + (q.col - DR.c0) * DT + (q.leg ? (q.row - DR.r1) * 0.012 : (DR.r1 - q.row) * 0.01);
+        kind[j] = 1; dir[j] = q.leg ? 1 : 0; rowCell[j] = 1;
+      }
+      let prev = null, prevT = start + 0.05;
       const letters = [];
       set.words.forEach((w) => {
         const cells = B.cells(w, set, L);
@@ -64,6 +72,7 @@ vec4 effect(vec2 uv) {
         // The trail from the last domino to the entry, an L across the lattice.
         const path = [];
         const [ex, ey] = entry;
+        if (!prev) { prev = [OM.clamp(ex, DR.c0, DR.c1), DR.row]; prevT = at[I(...prev)]; }
         let [x, y] = prev;
         while (y !== ey) { y += Math.sign(ey - y); path.push([x, y, Math.sign(ey - y) >= 0 ? 1 : 3]); }
         while (x !== ex) { x += Math.sign(ex - x); path.push([x, y, ex > x || ex === x ? 0 : 2]); }
@@ -117,7 +126,7 @@ vec4 effect(vec2 uv) {
     const domino = (ctx, col, row, f, d, dpr) => {
       const x = L.x0 + col * L.cw, y = L.y0 + row * L.ch;
       if (f >= 1) return OM.cell(ctx, L, col, row, dpr);
-      const k = 0.22 + 0.78 * f;
+      const k = B.STAND_W + (1 - B.STAND_W) * f;
       if (d === 0) ctx.fillRect(x, y, L.cw * k, L.ch);
       else if (d === 2) ctx.fillRect(x + L.cw * (1 - k), y, L.cw * k, L.ch);
       else if (d === 1) ctx.fillRect(x, y, L.cw, L.ch * k);
@@ -128,12 +137,11 @@ vec4 effect(vec2 uv) {
       draw(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (T < start + 0.05 || T >= END - 0.1) return OM.handoff(T < start + 0.05 ? 'spark' : 'field', ctx, T, dpr);
+        if (T >= END - 0.1) return OM.handoff('field', ctx, T, dpr);
+        if (T < start + 0.05) return B.dominoCut(ctx);
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
         const { set, flood } = lay();
-        // The spark's halo fades as the first domino goes.
-        B.pool(ctx, B.SPARK.x, B.SPARK.y, 72, ink.lit, 0.4 * (1 - OM.prog(T, start + 0.05, start + 0.4)));
         // The field, landing behind the cascade's front.
         if (T >= FLOOD) OM.hero(ctx, T, dpr, { inks: ink, L, word: false, gain: 0.8, bg: false, mask: (col, row) => (T >= flood[I(col, row)] + 0.05 ? 1 : 0) });
         const snare = OM.pulse(SNARES, T, 0.1);
@@ -141,7 +149,7 @@ vec4 effect(vec2 uv) {
         const STAND = 0.1, FALL = 0.06;
         for (let j = 0; j < at.length; j++) {
           const a = at[j];
-          if (T < a - STAND) continue;
+          if (T < a - STAND && !rowCell[j]) continue;
           const col = (j % CW) + C0, row = Math.floor(j / CW) + R0;
           const kd = kind[j];
           if (!kd) {
@@ -155,7 +163,7 @@ vec4 effect(vec2 uv) {
           const age = T - a;
           const f = age < 0 ? 0 : OM.clamp(age / FALL);
           let fill;
-          if (age < 0) fill = ink.mid;
+          if (age < 0) fill = rowCell[j] && col === B.DROW.c0 && row === B.DROW.r1 ? ink.crest : ink.mid;
           else if (kd === 1) {
             // Trail dominoes are only the fuse: they burn out behind the run.
             if (age > 0.45) continue;

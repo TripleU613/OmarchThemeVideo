@@ -88,7 +88,7 @@ OM.scene({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (T < start + V.HOLD_IN) return fx.apply(T), OM.handoff('spark', ctx, T, dpr);
+        if (T < start + V.HOLD_IN) return fx.apply(T), OM.v2plane.cut(ctx, T, dpr); // match cut: v2-05's line folded into this plane
         if (T >= D1) return fx.apply(T), OM.handoff('line', ctx, T, dpr);
         if (!F || !V.met().ok) plan();
         ctx.fillStyle = ink.bg;
@@ -112,10 +112,12 @@ OM.scene({
         }
 
         // The plane: swooping in from below left, then holding the line's left end.
-        const inE = OM.ease.outCubic(OM.prog(T, start + V.HOLD_IN, start + 0.6));
+        // From where it was folded (beside the spark) it glides down into the formation.
+        const P0 = OM.v2plane.P0;
+        const inE = OM.ease.inOutCubic(OM.prog(T, start + V.HOLD_IN, start + 0.6));
         const bob = (1 - dash) * Math.min(1, inE);
-        let px = sx(G.plane) - 900 * (1 - inE), py = ROWY + 320 * (1 - inE) + 9 * Math.sin(d * 3.1) * bob;
-        let prot = -0.32 * (1 - inE) + 0.04 * Math.cos(d * 3.1) * bob;
+        let px = OM.lerp(P0.x, sx(G.plane), inE), py = OM.lerp(P0.y, ROWY, inE) + 9 * Math.sin(d * 3.1) * bob;
+        let prot = OM.lerp(P0.rot, 0, inE) + 0.04 * Math.cos(d * 3.1) * bob;
         const dashX = OM.lerp(px, 1920 + PLEN + 40, dash);
         if (dash > 0) { px = dashX; py = OM.lerp(py, ROWY, OM.clamp(dash * 4)); prot *= 1 - OM.clamp(dash * 4); }
 
@@ -170,7 +172,7 @@ OM.scene({
           ctx.lineTo(lx, ly);
           ctx.stroke();
         }
-        paperPlane(ctx, px, py, prot);
+        OM.v2plane.draw(ctx, px, py, prot);
         // The agent: a crest cell in its halo, a short sparkle wake.
         const hit = OM.wordAt('v2-06', T).hit;
         V.pool(ctx, lx, ly, 72 + 40 * hit, 72 + 40 * hit, ink.lit, 0.4 + 0.3 * hit);

@@ -5,8 +5,40 @@
 // flash of its rails and two bolts at its seams. The back arc carries the first
 // half of the line, the front arc the rest. The downbeat word locks hardest;
 // the last segment closes the ring and power runs round it on the kicks. On the
-// next downbeat the whole ring is drawn into its core, which is the spark.
+// next downbeat the ring is drawn in round its core and its two rails fuse into
+// one spinning ring of lights, which snaps tight on the beat before the cut and
+// flares: that ring is the drone swarm c3-03 bursts out of.
 OM.ownWords.add('c3-02');
+// The c3-02 > c3-03 match cut: the orbital ring tightened into a ring of drone lights round the core.
+OM.c3cut = OM.c3cut || {};
+(() => {
+  const HL = OM.HOME, hc = OM.cellAt(HL, 960, 540);
+  const CX = HL.x0 + (hc.col + 0.5) * HL.cw, CY = HL.y0 + (hc.row + 0.5) * HL.ch;
+  const COLLAPSE = 250.845, BEAT = 251.333, N = 520, SC = 0.42;
+  const R = { COLLAPSE, LAND: 251.3, BEAT, N, SC, CX, CY, RX: 910 * SC, RY: 300 * SC };
+  R.spin = (T) => (T <= COLLAPSE ? 0 : 1.6 * (T - COLLAPSE) * (T - COLLAPSE));
+  /** Light j of the ring at time T. */
+  R.at = (j, T) => {
+    const a = -Math.PI + (j * Math.PI) / 260 + R.spin(T);
+    return [CX + R.RX * Math.cos(a), CY + R.RY * Math.sin(a)];
+  };
+  /** The shared cut frame: core pool and cell, and the ring's lights flaring on the beat. */
+  R.paint = (ctx, T, dpr) => {
+    const C = OM.c3, ink = C.ink;
+    ctx.fillStyle = ink.bg;
+    ctx.fillRect(0, 0, 1920, 1080);
+    const fl = T >= BEAT && T < BEAT + 0.06;
+    C.pool(ctx, CX, CY, 72, ink.lit, fl ? 0.7 : 0.4);
+    ctx.fillStyle = ink.crest;
+    OM.cell(ctx, HL, hc.col, hc.row, dpr);
+    ctx.fillStyle = fl ? ink.crest : ink.hover;
+    for (let j = 0; j < N; j++) {
+      const [x, y] = R.at(j, T);
+      ctx.fillRect(Math.round(x - 2), Math.round(y - 2), 5, 4);
+    }
+  };
+  OM.c3cut.ring = R;
+})();
 OM.scene({
   id: 'c3-02',
   build(el, { start, duration }) {
@@ -73,14 +105,18 @@ OM.scene({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (C.seam(ctx, T, dpr, start, END, 'line', 'spark')) return;
+        const RG = OM.c3cut.ring;
+        if (T > END - 0.07) return RG.paint(ctx, T, dpr);
+        if (C.seam(ctx, T, dpr, start, END, 'line', 'spark')) return; // out-side never reached: the ring paints the last frames
         const { segs } = type();
         const open = OM.ease.outCubic(OM.prog(T, start + 0.02, start + 0.3)); // the line tilts open into the ring
-        const shrink = 1 - OM.ease.inCubic(OM.prog(T, COLLAPSE, END - 0.12)); // drawn into the core
-        const s = shrink, ry = RY * open * s, rx = RX * s;
+        const shrink = 1 - OM.ease.inCubic(OM.prog(T, COLLAPSE, RG.LAND)); // drawn in round the core, slamming tight
+        const gone = 1 - shrink; // the rails fuse into one ring of lights
+        const s = OM.lerp(RG.SC, 1, shrink), ry = RY * open * s, rx = RX * s;
+        const spin = RG.spin(T);
         const wordsA = 1 - C.sm(T, COLLAPSE, COLLAPSE + 0.22);
         const power = C.sm(T, on[LAST], on[LAST] + 0.25);
-        const P = (a, dy = 0) => [CX + rx * Math.cos(a), CY + ry * Math.sin(a) + dy * open * s];
+        const P = (a, dy = 0) => [CX + rx * Math.cos(a + spin), CY + ry * Math.sin(a + spin) + dy * open * s * (1 - gone)];
 
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
@@ -162,6 +198,7 @@ OM.scene({
               const aa = a - q.off;
               if (aa >= sg.a0 && aa <= sg.a1) v = Math.max(v, (q.locked ? 0.55 : 0.3 * q.a) + q.hit);
             }
+            v = OM.lerp(v, 0.8, gone);
             const col = v > 1 ? ink.crest : v > 0.6 ? ink.hover : v > 0.35 ? ink.lit : v > 0.16 ? ink.mid : ink.dim;
             ctx.fillStyle = col;
             for (const dy of [-BAND, BAND]) {

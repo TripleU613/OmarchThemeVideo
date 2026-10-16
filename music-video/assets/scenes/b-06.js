@@ -130,7 +130,9 @@ OM.scene({
           }
           const age = T - cd.at;
           const catchF = lit ? Math.exp(-age / 0.18) : 0;
-          const s = lit ? (1 + 0.8 * catchF) * flick(i, T) * (1 - 0.35 * duck) + 0.5 * duck * (T > 214.5 ? 1 : 0) : 0;
+          // Ember Bloom: the key word's first flame bursts to three times its size as it catches.
+          const bloom = cd.k === K && cd.j === 0 && lit ? 2.2 * Math.exp(-age / 0.09) : 0;
+          const s = lit ? (1 + 0.8 * catchF + bloom) * flick(i, T) * (1 - 0.35 * duck) + 0.5 * duck * (T > 214.5 ? 1 : 0) : 0;
           // The candle body, lit by its own flame.
           ctx.globalAlpha = keep;
           const bw = Math.max(14, set.adv * 0.34), bh = set.cap * 0.95;
@@ -157,6 +159,29 @@ OM.scene({
           const ctx = c.ensure();
           ctx.globalAlpha = 1;
           if (e > 0) {
+            // Ember Bloom: the burst flame throws a spray of embers that drift up on the heat and wink out one by one.
+            {
+              const cd0 = lay().candles.find((q) => q.k === K && q.j === 0);
+              const a = cd0 ? T - cd0.at : -1;
+              if (a >= 0 && a < 1.3) {
+                const ik = OM.fieldInks('tokyo-night');
+                const ox = cd0.x, oy = cd0.top - 30;
+                for (let i = 0; i < 150; i++) {
+                  const life = 0.35 + 0.9 * OM.hash(i, 1, 616);
+                  if (a > life) continue;
+                  const ang = -Math.PI / 2 + (OM.hash(i, 2, 616) - 0.5) * 3.4, v = 380 + 900 * OM.hash(i, 3, 616), kd = 3.2;
+                  const sp = (1 - Math.exp(-kd * a)) / kd;
+                  const x = ox + Math.cos(ang) * v * sp + 18 * Math.sin(a * 7 + i);
+                  const y = oy + Math.sin(ang) * v * sp * 0.8 - 90 * a * a;
+                  const f = a / life;
+                  ctx.globalAlpha = (0.55 + 0.45 * Math.sin(T * 40 + i * 1.7)) * (f > 0.85 ? 0.5 : 1);
+                  ctx.fillStyle = f < 0.2 ? ik.crest : f < 0.5 ? ik.hover : f < 0.8 ? ik.lit : ik.mid;
+                  const z = f < 0.3 ? 5 : f < 0.7 ? 4 : 3;
+                  ctx.fillRect(x - z / 2, y - z / 2, z, z);
+                }
+                ctx.globalAlpha = 1;
+              }
+            }
 
             const { candles } = lay();
             const ik = OM.fieldInks('tokyo-night'), tk = OM.theme('tokyo-night');

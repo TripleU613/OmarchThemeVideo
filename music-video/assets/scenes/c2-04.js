@@ -26,6 +26,45 @@ OM.ownWords.add('c2-04');
     return c;
   }`;
 
+  /**
+   * The wall: every home-lattice cell a dark window in its facade, under the lattice
+   * lines. The skyline grows into it at the end of c2-04 and c2-05's grimy window
+   * is the same wall, so the cut between them is this exact frame.
+   */
+  let wallC = null;
+  OM.c2.wallCanvas = (dpr) => {
+    if (wallC && wallC.dpr === dpr) return wallC.cv;
+    const HM = OM.HOME, th = OM.theme('tokyo-night');
+    const cvs = document.createElement('canvas');
+    cvs.width = 1920 * dpr;
+    cvs.height = 1080 * dpr;
+    const x = cvs.getContext('2d');
+    x.setTransform(dpr, 0, 0, dpr, 0, 0);
+    for (let row = HM.rMin; row < HM.rMin + HM.rows; row++)
+      for (let col = HM.cMin; col < HM.cMin + HM.cols; col++) {
+        x.fillStyle = th.surface;
+        OM.cell(x, HM, col, row, dpr);
+        x.fillStyle = th['bg-deep'];
+        x.fillRect(HM.x0 + col * HM.cw + 2, HM.y0 + row * HM.ch + 2, HM.cw - 4, HM.ch - 4);
+      }
+    wallC = { dpr, cv: cvs };
+    return cvs;
+  };
+  /** The lattice lines exactly as the grid handoff draws them, at alpha a. */
+  OM.c2.leading = (ctx, dpr, a = 1) => {
+    const HM = OM.HOME, snap = (v) => Math.round(v * dpr) / dpr;
+    ctx.fillStyle = OM.c2.rgba(OM.theme('tokyo-night')['border-subtle'], a);
+    for (let cc = HM.cMin; cc <= HM.cMin + HM.cols; cc++) ctx.fillRect(snap(HM.x0 + cc * HM.cw), 0, 1, 1080);
+    for (let r = HM.rMin; r <= HM.rMin + HM.rows; r++) ctx.fillRect(0, snap(HM.y0 + r * HM.ch), 1920, 1);
+  };
+  /** The shared cut frame of c2-04 > c2-05. */
+  OM.c2.wall = (ctx, dpr) => {
+    ctx.fillStyle = OM.fieldInks('tokyo-night').bg;
+    ctx.fillRect(0, 0, 1920, 1080);
+    ctx.drawImage(OM.c2.wallCanvas(dpr), 0, 0, 1920, 1080);
+    OM.c2.leading(ctx, dpr, 1);
+  };
+
   OM.scene({
     id: 'c2-04',
     build(el, { start, duration }) {
@@ -94,33 +133,12 @@ OM.ownWords.add('c2-04');
         };
         return wins;
       };
-      // The towers' facades and dark windows, cached per dpr.
-      let city = null;
-      const cityCanvas = (dpr) => {
-        const g = get();
-        if (city && city.dpr === dpr && city.src === g) return city.cv;
-        const cvs = document.createElement('canvas');
-        cvs.width = 1920 * dpr;
-        cvs.height = 1080 * dpr;
-        const x = cvs.getContext('2d');
-        x.setTransform(dpr, 0, 0, dpr, 0, 0);
-        for (const [col, t0] of g.top)
-          for (let row = t0; row < g.bottom; row++) {
-            x.fillStyle = th.surface;
-            OM.cell(x, HM, col, row, dpr);
-            x.fillStyle = th['bg-deep'];
-            x.fillRect(HM.x0 + col * HM.cw + 2, HM.y0 + row * HM.ch + 2, HM.cw - 4, HM.ch - 4);
-          }
-        city = { dpr, src: g, cv: cvs };
-        return cvs;
-      };
-
       return {
         draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + 0.05) return OM.handoff('glow', ctx, T, dpr);
-          if (T > END - 0.07) return OM.handoff('grid', ctx, T, dpr);
+          if (T > END - 0.07) return OM.c2.wall(ctx, dpr);
           const { lit, top, bottom } = get();
           ctx.fillStyle = ink.bg;
           ctx.fillRect(0, 0, 1920, 1080);
@@ -129,7 +147,9 @@ OM.ownWords.add('c2-04');
           const out = sm(T, OUT, GONE);
           pool(ctx, 960, OM.lerp(540, 980, sink), 620 + 500 * sink, OM.lerp(620, 300, sink), ink.lit, OM.lerp(0.5, 0.2, sink) * (1 - out));
 
-          const facade = sm(T, start, start + 0.35) * (1 - out);
+          const facade = sm(T, start, start + 0.35);
+          // Wall rise: after the line, every tower climbs to the top of the frame and the alleys fill, landing on k174.36: the city becomes one wall of windows.
+          const rise = OM.ease.inOutCubic(OM.prog(T, OUT, 174.359));
           const nSn = OM.hitCount(SNARES, T);
           const sn = SNARES.reduce((a, s) => Math.max(a, decay(T, s, 0.1)), 0);
           const dbA = T - DB1;
@@ -137,9 +157,18 @@ OM.ownWords.add('c2-04');
           const sweep = 2100 - 2400 * OM.prog(T, OUT, OUT + 0.3);
           // The towers and their dark windows are static: one cached layer, faded as a whole.
           if (facade > 0) {
+            ctx.save();
             ctx.globalAlpha = facade;
-            ctx.drawImage(cityCanvas(dpr), 0, 0, 1920, 1080);
-            ctx.globalAlpha = 1;
+            ctx.beginPath();
+            for (let col = HM.cMin; col < HM.cMin + HM.cols; col++) {
+              const t0 = top.has(col) ? top.get(col) : bottom;
+              const r = Math.round(OM.lerp(t0, HM.rMin, rise));
+              const x0 = Math.round((HM.x0 + col * HM.cw) * dpr) / dpr, y0 = Math.round((HM.y0 + r * HM.ch) * dpr) / dpr;
+              ctx.rect(x0, y0, Math.round((HM.x0 + (col + 1) * HM.cw) * dpr) / dpr - x0, 1080 - y0);
+            }
+            ctx.clip();
+            ctx.drawImage(OM.c2.wallCanvas(dpr), 0, 0, 1920, 1080);
+            ctx.restore();
           }
           // Only lit windows are drawn per frame, batched by ink.
           const W2 = win();
@@ -158,10 +187,10 @@ OM.ownWords.add('c2-04');
               continue;
             }
             if (W2.h4[n] < 0.02 + 0.006 * nSn) p = W2.h5[n] < 0.5 ? ink.dim : ink.mid;
-            // The city-wide wave on the key word's downbeat, out from the centre.
-            if (dbA >= 0 && dbA < 0.7) {
-              const front = dbA * 2600 - W2.r[n];
-              if (front > 0 && front < 90) p = front < 30 ? ink.lit : ink.mid;
+            // Power surge on the key word's downbeat: every window in the city pops on as the racing front reaches it, then browns out back to the night.
+            if (dbA >= 0 && dbA < 1.2) {
+              const a = (dbA * 3000 - W2.r[n]) / 3000;
+              if (a > 0) p = a < 0.025 ? ink.crest : a < 0.06 ? ink.lit : a < 0.14 ? ink.mid : a < 0.3 && W2.h5[n] < 0.45 ? ink.dim : p;
             }
             if (p) inset[CI[p]].push(n);
           }
@@ -176,13 +205,29 @@ OM.ownWords.add('c2-04');
             for (const n of inset[i]) ctx.rect(W2.x[n] + 2, W2.y[n] + 2, HM.cw - 4, HM.ch - 4);
             ctx.fill();
           });
-          // The lattice the city stood on comes through as it goes.
+          // The wall's leading comes through as it closes.
           const g = sm(T, OUT + 0.1, GONE);
-          if (g > 0) {
-            const snap = (v) => Math.round(v * dpr) / dpr;
-            ctx.fillStyle = OM.c2.rgba(th['border-subtle'], g);
-            for (let cc = HM.cMin; cc <= HM.cMin + HM.cols; cc++) ctx.fillRect(snap(HM.x0 + cc * HM.cw), 0, 1, 1080);
-            for (let r = HM.rMin; r <= HM.rMin + HM.rows; r++) ctx.fillRect(0, snap(HM.y0 + r * HM.ch), 1920, 1);
+          if (g > 0) OM.c2.leading(ctx, dpr, g);
+          // The surge's crackle: arcs jumping between windows along the racing front, kept off the words.
+          if (dbA >= 0 && dbA < 0.55) {
+            const R = dbA * 3000, slot = Math.floor(T * 30);
+            ctx.strokeStyle = ink.crest;
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            for (let i = 0; i < 26; i++) {
+              const ang = OM.hash(i, slot, 131) * 6.283, rr = R + 40 * (OM.hash(slot, i, 132) - 0.5);
+              let x = 960 + Math.cos(ang) * rr, y = 560 + (Math.sin(ang) * rr) / 1.4;
+              if (x < -20 || x > 1940 || y < -20 || y > 1100) continue;
+              const cc = OM.cellAt(HM, x, y);
+              if (lit.has(cc.col + ',' + cc.row)) continue;
+              ctx.moveTo(x, y);
+              for (let s = 0; s < 5; s++) {
+                x += (OM.hash(i, s + slot, 133) - 0.5) * 60 + Math.cos(ang + 1.57) * 18;
+                y += (OM.hash(s + slot, i, 134) - 0.5) * 60 + Math.sin(ang + 1.57) * 18;
+                ctx.lineTo(x, y);
+              }
+            }
+            ctx.stroke();
           }
         },
         render(t, T) {
@@ -226,7 +271,6 @@ OM.ownWords.add('c2-04');
           OM.c2.apply(fx, T, start, END, { amount: 1, x: 40 - 80 * OM.prog(T, start, END), y: 10 * Math.sin(T * 1.6), rot: 0.008 * Math.sin(T * 0.5) });
         },
         release: () => {
-          city = null;
           wins = null;
           fx.release();
           c.release();

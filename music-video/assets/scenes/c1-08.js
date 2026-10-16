@@ -345,6 +345,34 @@ OM.ownWords.add('c1-08');
         ctx.globalAlpha = 1;
       };
 
+      // ---- explosion, starfall (c1-01's supernova turned inside out): on the key word the frame's edges shed
+      // lattice debris that rains inward onto the base band, each cell landing on one of the word's own cells
+      // and flashing it, all in by 0.35 s; the word itself is lit from its onset, never covered for long. ----
+      const starfall = (ctx, T, X, Y, s) => {
+        const a = T - w2, base = G.base;
+        if (!base.length) return;
+        for (let i = 0; i < 64; i++) {
+          const h1 = OM.hash(i, 1, 0x5f), h2 = OM.hash(i, 2, 0x5f), h3 = OM.hash(i, 3, 0x5f);
+          const land = 0.18 + 0.17 * h3, u = a / land;
+          if (u >= 1.25) continue;
+          const tg = base[Math.floor(h2 * base.length)], tx = X(tg.x + CELL / 2), ty = Y(tg.y + CELL / 2);
+          const th = 2 * Math.PI * h1, sx = 960 + 1150 * Math.cos(th), sy = 540 + 700 * Math.sin(th);
+          if (u < 1) {
+            const e = OM.ease.inCubic(u), x = sx + (tx - sx) * e, y = sy + (ty - sy) * e;
+            ctx.globalAlpha = 0.4 + 0.6 * u;
+            ctx.fillStyle = u > 0.7 ? ink.crest : ink.hover;
+            const sz = Math.max(3, CELL * s * (1.6 - 0.6 * u));
+            ctx.fillRect(x - sz / 2, y - sz / 2, sz, sz);
+          } else {
+            ctx.globalAlpha = 1 - (u - 1) / 0.25;
+            ctx.fillStyle = ink.crest;
+            const sz = CELL * s * 1.8;
+            ctx.fillRect(tx - sz / 2, ty - sz / 2, sz, sz);
+          }
+        }
+        ctx.globalAlpha = 1;
+      };
+
       return OM.c1.post({
         render(t, T) {
           const ctx = c.ensure();
@@ -503,6 +531,8 @@ OM.ownWords.add('c1-08');
             ctx.fillRect(x0, y0, x1 - x0, 2);
             ctx.globalAlpha = 1;
           }
+
+          if (T >= w2 && T < w2 + 0.45 && G) starfall(ctx, T, X, Y, s);
 
           if (T < w1 + 0.9) {
             ctx.setTransform(dpr * s, 0, 0, dpr * s, dpr * 960 * (1 - s), dpr * 540 * (1 - s));

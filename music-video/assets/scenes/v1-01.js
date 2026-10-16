@@ -128,6 +128,70 @@ OM.ownWords.add('v1-01');
   /** A CSS-px box as a uv rect (origin bottom-left) for uP1. */
   V.rect = (x0, y0, x1, y1) => [x0 / 1920, 1 - y1 / 1080, x1 / 1920, 1 - y0 / 1080];
 
+  // ---------- match cuts ----------
+  // Letter rain (v1-04 > v1-05): v1-04's green letters let go cell by cell and
+  // fall as rain down v1-05's glass, turning from green to the rain's own ink.
+  // Both scenes draw it, so the cut frame is one shared state.
+  V.RAIN0 = 54.28;
+  V.words04 = V.lazy(V.font(800, 100), () => {
+    const HM = OM.HOME, G = { x0: HM.x0, y0: HM.y0, cw: HM.cw / 2, ch: HM.ch / 2 };
+    const L = V.layout('v1-04', { weight: 800, cap: 124, maxW: 1760 });
+    const lh = L.cap * 1.6;
+    return L.words.map((wd) => {
+      const base = 540 + (wd.row - (L.rows - 1) / 2) * lh + L.cap / 2;
+      return { ...wd, base, cap: L.cap, G, cells: V.raster(wd.text, L.font, L.size, wd.x, base, G, L.A), cx: wd.x + wd.w / 2, cy: base - L.cap / 2 };
+    });
+  });
+  V.band04 = (wd, r, ink) => {
+    const f = (wd.G.y0 + (r + 0.5) * wd.G.ch - (wd.base - wd.cap)) / wd.cap;
+    return f < 0.34 ? ink.crest : f < 0.67 ? ink.hover : ink.lit;
+  };
+  V.letterRain = (ctx, T, dpr) => {
+    const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
+    for (const wd of V.words04()) {
+      const G = wd.G;
+      for (const [q, r] of wd.cells) {
+        const a = T - (V.RAIN0 + 0.14 * OM.hash(q, 7, 404));
+        if (a <= 0) {
+          ctx.fillStyle = V.band04(wd, r, ink);
+          OM.cell(ctx, G, q, r, dpr);
+          continue;
+        }
+        const y = G.y0 + r * G.ch + 2100 * a * a;
+        if (y > 1110) continue;
+        const tail = Math.min(80, 4200 * a * 0.02), w = OM.lerp(G.cw, 2.5, OM.clamp(a / 0.22));
+        ctx.fillStyle = a < 0.12 ? V.band04(wd, r, ink) : th.text;
+        ctx.fillRect(G.x0 + (q + 0.5) * G.cw - w / 2, y - tail, w, G.ch + tail);
+      }
+    }
+  };
+  // Lamp to mark (v1-07 > v1-08): the copier's lamp row bends into a ring and
+  // squares up into the outline of the square-spiral mark at the print's core.
+  V.BEND0 = 66.82;
+  V.BEND1 = 67.3;
+  V.SQ1 = 67.5;
+  V.lampRing = (ctx, T, surge = 0) => {
+    const ink = OM.fieldInks('tokyo-night'), HM = OM.HOME, hc = OM.cellAt(HM, 960, 540);
+    const LX = HM.x0 + (hc.col + 0.5) * HM.cw, LY = HM.y0 + (hc.row + 0.5) * HM.ch;
+    const f = OM.ease.inOutCubic(OM.prog(T, V.BEND0, V.BEND1)), g = OM.smooth(OM.prog(T, V.BEND1, V.SQ1));
+    const halo = 0.18 * f * (1 - g) + surge;
+    if (halo > 0.003) {
+      const gr = ctx.createRadialGradient(LX, LY, 40, LX, LY, 220);
+      gr.addColorStop(0, V.rgba(ink.lit, halo));
+      gr.addColorStop(1, V.rgba(ink.lit, 0));
+      ctx.fillStyle = gr;
+      ctx.fillRect(LX - 220, LY - 220, 440, 440);
+    }
+    const N = 140, R = 112, SQ = 60, sz = OM.lerp(HM.cw, 8, f);
+    ctx.fillStyle = ink.crest;
+    for (let i = 0; i < N; i++) {
+      const th = Math.PI + (2 * Math.PI * i) / N, c = Math.cos(th), s = Math.sin(th), m = Math.max(Math.abs(c), Math.abs(s));
+      const lx = LX + (i / (N - 1) - 0.5) * 2000, cx = LX + R * c, cy = LY + R * s;
+      const x = OM.lerp(OM.lerp(lx, cx, f), LX + (SQ * c) / m, g), y = OM.lerp(OM.lerp(LY, cy, f), LY + (SQ * s) / m, g);
+      ctx.fillRect(x - sz / 2, y - sz / 2, sz, sz);
+    }
+  };
+
   // ---------- the laptop: v1-01's last frame and v1-02's first ----------
   // A thin silver unibody laptop: black bezel with a notch, rounded lid, hinge,
   // black keys, a wide trackpad. Blank lid side never shown, no marks, no names.

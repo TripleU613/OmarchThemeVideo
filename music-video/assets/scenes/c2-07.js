@@ -78,7 +78,9 @@ OM.ownWords.add('c2-07');
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + 0.05) return OM.handoff('line', ctx, T, dpr);
-          if (T > END - 0.07) return OM.handoff('spark', ctx, T, dpr);
+          if (T > END - 0.07) return OM.c2.chip(ctx, 1);
+          // Deck to circuit: once the deck has drawn into the centre on the downbeat, its light runs on out of that cell as the traces of a chip, the board c2-08 opens on.
+          if (T >= DB2) return OM.c2.chip(ctx, OM.smooth(OM.prog(T, DB2 - 0.15, 187.15)));
           const { letters, spans, gx0, gx1 } = get();
           ctx.fillStyle = ink.bg;
           ctx.fillRect(0, 0, 1920, 1080);
@@ -163,6 +165,8 @@ OM.ownWords.add('c2-07');
             ctx.restore();
           }
 
+          // The traces start running out of the centre as the deck's last length draws in.
+          if (T > DB2 - 0.15) OM.c2.chip(ctx, OM.smooth(OM.prog(T, DB2 - 0.15, 187.15)), { bg: false, core: false });
           // The spark the deck draws into.
           const halo = sm(T, PULL + 0.2, DB2 + 0.1);
           if (halo > 0) {

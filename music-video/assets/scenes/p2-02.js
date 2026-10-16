@@ -97,7 +97,7 @@ OM.scene({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (P.cut(ctx, T, dpr, start, END, 'line', 'grid')) return void fx.apply(T, {});
+        if (P.cut(ctx, T, dpr, start, END, 'line', P.planMap)) return void fx.apply(T, {});
         if (!lay || (!lay.ok && P.ready())) lay = layout();
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
@@ -121,6 +121,21 @@ OM.scene({
         for (let col = L.cMin - 40; col <= L.cMin + L.cols + 40; col++) ctx.fillRect(snap(L.x0 + col * L.cw), yTop, 1, yBot - yTop);
         for (let row = Math.floor(h.row - spread); row <= h.row + 1 + spread; row++) ctx.fillRect(-900, snap(L.y0 + row * L.ch), 3720, 1);
 
+        // Plan to map: as the walls sink, they spread out over the plan as the city's lots, row by row from the rail.
+        if (T >= 153.68) {
+          for (let row = L.rMin; row < L.rMin + L.rows; row++) {
+            const ar = 153.68 + (Math.abs(row - h.row) / 40) * 0.24;
+            if (T < ar) continue;
+            for (let col = L.cMin; col < L.cMin + L.cols; col++) {
+              if (!P.lot(col, row)) continue;
+              const age = T - ar - OM.hash(col, row, 13) * 0.05;
+              if (age < 0) continue;
+              ctx.fillStyle = age < 0.05 ? ink.mid : ink.dim;
+              P.block(ctx, col, row);
+            }
+          }
+        }
+
         // The walls: every line stacked up in layers, dim at the floor, mid up the face, crest on top.
         const step = 1.5;
         const n = Math.ceil(Hw / step);
@@ -134,10 +149,11 @@ OM.scene({
           const hh = Math.min(Hw, i * step), top = i === n;
           const key = top ? 'crest' : hh < Hw * 0.45 ? 'dim' : 'mid';
           at(hh);
-          ctx.globalAlpha = fade;
+          ctx.globalAlpha = 1; // the rail stays: it becomes the city's avenue
           ctx.fillStyle = top ? ink.crest : snapHit > 0.3 && key === 'mid' ? ink.lit : ink[key]; // the rail flashes on the snare
           // The rail line rises with the words.
           ctx.fillRect(-900, YL, 3720, L.ch);
+          ctx.globalAlpha = fade;
           for (const it of lay.items) {
             const age = T - it.t0;
             if (age < 0) continue;

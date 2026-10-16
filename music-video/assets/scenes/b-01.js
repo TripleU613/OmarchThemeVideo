@@ -135,6 +135,64 @@ OM.ownWords.add('b-01');
     };
   };
 
+  // ---------------- the b-01 -> b-02 cut: the counter's drums become the first screens ----------------
+  /** b-01's drum windows (year wheels and letter drums) and the lattice cell each one lands on as a screen. */
+  B.bootList = B.lazy(() => {
+    const set = B.set(OM.sung('b-01'), { weight: 700, cap: 66, maxW: 1560, cy: 700, lead: 2.15 });
+    const L = OM.HOME, dh = set.cap * 1.75;
+    const out = [];
+    for (let i = 0; i < 4; i++) out.push({ x: 960 - 330 + i * 170, y: 210, w: 150, h: 210 });
+    let keyFirst = -1;
+    set.words.forEach((w) => {
+      for (let j = 0; j < w.text.length; j++) {
+        if (w.k === 5 && j === 0) keyFirst = out.length;
+        out.push({ x: w.x + j * set.adv + 3, y: w.y - set.cap / 2 - dh / 2, w: set.adv - 6, h: dh });
+      }
+    });
+    const used = new Set();
+    out.forEach((d, i) => {
+      let col, row;
+      if (i === keyFirst || (keyFirst < 0 && i === 0)) { col = B.SPARK.col; row = B.SPARK.row; }
+      else {
+        // Scattered across the dark, as the first strangers' screens.
+        for (let tries = 0; ; tries++) {
+          col = L.cMin + 3 + Math.floor(OM.hash(i, tries, 77) * (L.cols - 6));
+          row = L.rMin + 3 + Math.floor(OM.hash(i, tries, 78) * (L.rows - 6));
+          if (!used.has(col + ',' + row) || tries > 8) break;
+        }
+      }
+      used.add(col + ',' + row);
+      Object.assign(d, { col, row, go: 196.74 + 0.12 * OM.hash(i, 3, 79) });
+    });
+    return out;
+  }, 700);
+  B.BOOT_LAND = 197.068; // the beat at the cut, less 0.046
+  /** A screen as b-02 draws it: frame, then glass inset. */
+  B.screen = (ctx, x, y, w, h, frame, glass, inset = 3) => {
+    ctx.fillStyle = frame;
+    ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
+    ctx.fillStyle = glass;
+    ctx.fillRect(x + inset, y + inset, w - 2 * inset, h - 2 * inset);
+  };
+  B.bootGlass = (col, row) => (OM.hash(col, row, 3) < 0.5 ? OM.fieldInks('tokyo-night').lit : OM.fieldInks('tokyo-night').hover);
+  /** Every drum at song time T: flying from its window to its cell, a settled screen once landed. */
+  B.drawBoot = (ctx, T, dpr) => {
+    const L = OM.HOME, th = OM.theme('tokyo-night');
+    const snap = (v) => Math.round(v * dpr) / dpr;
+    for (const d of B.bootList()) {
+      const u = OM.ease.inOutCubic(OM.prog(T, d.go, B.BOOT_LAND));
+      const tx = snap(L.x0 + d.col * L.cw), ty = snap(L.y0 + d.row * L.ch);
+      if (u >= 1) { B.screen(ctx, tx, ty, L.cw, L.ch, th.surface, B.bootGlass(d.col, d.row)); continue; }
+      const x = OM.lerp(d.x, tx, u), y = OM.lerp(d.y, ty, u), w = OM.lerp(d.w, L.cw, u), h = OM.lerp(d.h, L.ch, u);
+      B.screen(ctx, x, y, w, h, th.surface, OM.mix(th.surface, B.bootGlass(d.col, d.row), OM.prog(u, 0.5, 1)), OM.lerp(0, 3, u));
+    }
+  };
+  B.bootCut = (ctx, T, dpr) => {
+    ctx.fillStyle = OM.fieldInks('tokyo-night').bg;
+    ctx.fillRect(0, 0, 1920, 1080);
+    B.drawBoot(ctx, B.BOOT_LAND, dpr);
+  };
+
   // ---------------- the scene ----------------
   OM.scene({
     id: 'b-01',
@@ -215,20 +273,22 @@ OM.ownWords.add('b-01');
         draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
-          if (T < on[0] || T >= END - 0.1) return OM.handoff(T < on[0] ? 'night' : 'spark', ctx, T, dpr);
+          if (T < on[0]) return OM.handoff('night', ctx, T, dpr);
+          if (T >= B.BOOT_LAND) return B.bootCut(ctx, T, dpr);
           ctx.fillStyle = ink.bg;
           ctx.fillRect(0, 0, 1920, 1080);
           const { set, drums } = lay();
 
           // The whole counter: slams in on the first word, folds into the spark at the end.
           const slam = 1 - OM.ease.inOutCubic(OM.prog(T, on[0], start + 0.45));
-          const fold = OM.ease.inCubic(OM.prog(T, FOLD, END - 0.12));
-          const k = (1 + 0.04 * slam) * (1 - fold) + 0.004;
+          const shut = OM.ease.inOutCubic(OM.prog(T, 196.62, 196.88)); // the housings close like shutters behind the drums
+          const flying = T >= 196.74;
+          const k = 1 + 0.04 * slam;
           ctx.save();
           ctx.translate(B.SPARK.x, B.SPARK.y);
           ctx.scale(k, k);
           ctx.translate(-B.SPARK.x, -B.SPARK.y);
-          ctx.globalAlpha = OM.smooth(OM.prog(T, on[0] - 0.02, start + 0.38)) * (1 - OM.prog(T, FOLD + 0.05, END - 0.14));
+          ctx.globalAlpha = OM.smooth(OM.prog(T, on[0] - 0.02, start + 0.38));
 
           // The key word's downbeat shakes the housing.
           const jolt = (tt, a) => (T < tt ? 0 : a * Math.exp(-(T - tt) / 0.07) * Math.sin((T - tt) * 70));
@@ -247,27 +307,29 @@ OM.ownWords.add('b-01');
           const ycap = 128;
           const yfont = B.font(700, ycap / B.metrics(700).cap);
           ctx.fillStyle = th['surface-2'];
-          ctx.fillRect(YX - 24, YY - 24, 4 * YW + 3 * 20 + 48, YH + 48);
-          pos.forEach((p, i) => {
+          ctx.fillRect(YX - 24, YY - 24 + (YH + 48) * shut / 2, 4 * YW + 3 * 20 + 48, (YH + 48) * (1 - shut));
+          if (!flying) pos.forEach((p, i) => {
             const flash = i >= 2 ? OM.pulse(on, T, 0.1) : 0;
-            drum(ctx, YX + i * (YW + 20), YY, YW, YH, p, -1, (n) => DIG[((n % 10) + 10) % 10], th.text, yfont, ycap);
+            // The year rolls on to blank with the letters before the drums fly.
+            const ys = OM.ease.inCubic(OM.prog(T, SNARE, 196.72)) * 4, rest = Math.floor(p + 0.5);
+            drum(ctx, YX + i * (YW + 20), YY, YW, YH, p + ys, -1, (n) => (ys > 0 && n > rest ? '' : DIG[((n % 10) + 10) % 10]), th.text, yfont, ycap);
             if (flash > 0.05) {
               ctx.fillStyle = B.rgba(ink.crest, 0.25 * flash);
               ctx.fillRect(YX + i * (YW + 20), YY, YW, YH);
             }
           });
           ctx.fillStyle = ink.lit;
-          ctx.fillRect(YX - 24, YY + YH + 24 - 3, 4 * YW + 3 * 20 + 48, 3);
+          ctx.fillRect(YX - 24 + (4 * YW + 108) * shut / 2, YY + YH + 24 - 3, (4 * YW + 3 * 20 + 48) * (1 - shut), 3);
 
           // The letter bank: one housing per row, a drum per letter.
           const dh = set.cap * 1.75, top = (y) => y - set.cap / 2 - dh / 2 - 0;
           ctx.fillStyle = th['surface-2'];
           set.rows.forEach((ks) => {
             const a = set.words[ks[0]], b = set.words[ks[ks.length - 1]];
-            ctx.fillRect(a.x - 22, top(a.y) - 14, b.x + b.w - a.x + 44, dh + 28);
+            ctx.fillRect(a.x - 22, top(a.y) - 14 + (dh + 28) * shut / 2, b.x + b.w - a.x + 44, (dh + 28) * (1 - shut));
           });
-          const spin = OM.ease.inCubic(OM.prog(T, SNARE, FOLD + 0.1)) * 7;
-          for (const d of drums) {
+          const spin = OM.ease.inCubic(OM.prog(T, SNARE, 196.72)) * 7;
+          for (const d of flying ? [] : drums) {
             const o = on[d.k];
             // Rolls through the digits into its letter, locking on the onset with a rebound.
             let p = o <= on[0] + 1e-6 ? (T >= o ? d.n : 0) : d.n * OM.ease.inOutCubic(OM.prog(T, o - 0.24, o));
@@ -283,22 +345,15 @@ OM.ownWords.add('b-01');
           const kw = set.words[K];
           if (kw && kw.text && T >= on[K]) {
             const a = Math.exp(-(T - on[K]) / 0.5);
-            B.pool(ctx, kw.x + kw.w / 2, kw.y - set.cap / 2, Math.max(200, kw.w * 0.8), ink.lit, 0.22 * a + 0.06);
+            B.pool(ctx, kw.x + kw.w / 2, kw.y - set.cap / 2, Math.max(200, kw.w * 0.8) * (1 - shut), ink.lit, 0.22 * a + 0.06);
             ctx.fillStyle = ink.crest;
-            ctx.fillRect(kw.x, top(kw.y) + dh + 6, kw.w * OM.ease.outExpo(OM.prog(T, on[K], on[K] + 0.2)), 4);
+            ctx.fillRect(kw.x, top(kw.y) + dh + 6, kw.w * OM.ease.outExpo(OM.prog(T, on[K], on[K] + 0.2)) * (1 - shut), 4);
           }
           ctx.restore();
           ctx.globalAlpha = 1;
 
-          // The spark the counter folds into.
-          const s = OM.prog(T, FOLD, END - 0.1);
-          if (s > 0) {
-            B.pool(ctx, B.SPARK.x, B.SPARK.y, 72, ink.lit, 0.4 * s);
-            ctx.globalAlpha = s;
-            ctx.fillStyle = ink.crest;
-            OM.cell(ctx, OM.HOME, B.SPARK.col, B.SPARK.row, dpr);
-            ctx.globalAlpha = 1;
-          }
+          // The drums leave the counter and fly out across the dark, landing as the first screens on the beat.
+          if (flying) B.drawBoot(ctx, T, dpr);
         },
         render(t, T) {
           this.draw(t, T);

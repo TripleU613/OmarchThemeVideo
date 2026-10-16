@@ -80,10 +80,12 @@ OM.scene({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (P.cut(ctx, T, dpr, start, end, 'spark', 'glow')) return void fx.apply(T, {});
+        if (P.cut(ctx, T, dpr, start, end, P.cityCut || 'spark', 'glow')) return void fx.apply(T, {});
         if (!lay || (!lay.ok && P.ready())) lay = layout();
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
+        // The city from p2-03 keeps falling away below us, under the cloud.
+        if (P.city) P.city(ctx, dpr, T);
 
         // The frame banks into the climb as the spark becomes the wingtip.
         const set = OM.ease.inOutCubic(OM.prog(T, start + 0.05, SETTLE));
@@ -208,6 +210,35 @@ OM.scene({
         }
 
         // The nav light: the spark itself, strobing on the kicks.
+        // Launch blast on the key word: an exhaust plume roars back from the engine under the wing,
+        // and a round pressure wave rolls out through the cloud. Kept below the trail so the words read.
+        const HIT = on[on.length - 1], bAge = T - HIT;
+        if (bAge >= 0 && bAge < 0.9) {
+          const ex = tip.x + 240, ey = tip.y + 128 + fall;
+          const u = bAge / 0.9;
+          for (const [rr, col, wd] of [[1, ink.hover, 9], [0.82, ink.lit, 4]]) {
+            const r = rr * 2300 * OM.ease.outExpo(OM.prog(bAge, 0, 0.75));
+            ctx.globalAlpha = (1 - u) * 0.85;
+            ctx.strokeStyle = col;
+            ctx.lineWidth = wd * (1 - u) + 1;
+            ctx.beginPath();
+            ctx.ellipse(ex, ey, r, r * 0.82, 0, 0, 2 * Math.PI);
+            ctx.stroke();
+          }
+          for (let i = 0; i < 150; i++) {
+            const age = bAge - i * 0.0018, life = 0.5 + 0.35 * OM.hash(i, 1, 8);
+            if (age < 0 || age > life) continue;
+            const a = 0.16 + (OM.hash(i, 2, 8) - 0.5) * 0.36, v0 = 1800 + 1700 * OM.hash(i, 3, 8);
+            const d = (v0 * (1 - Math.exp(-4 * age))) / 4;
+            const x = ex - 40 - Math.cos(a) * d, y = ey + Math.sin(a) * d + 40 * age * age;
+            const q = age / life, sz = 6 + 24 * q;
+            ctx.globalAlpha = 1 - q * q;
+            ctx.fillStyle = q < 0.12 ? ink.crest : q < 0.3 ? ink.hover : q < 0.55 ? ink.lit : q < 0.8 ? ink.mid : ink.dim;
+            ctx.fillRect(x - sz / 2, y - sz / 2, sz, sz);
+          }
+          ctx.globalAlpha = 1;
+        }
+
         const lightA = 1 - OM.prog(T, WHIP + 0.1, end - 0.3);
         if (lightA > 0) {
           const k = OM.pulse(KICKS, T, 0.06);
@@ -244,7 +275,7 @@ OM.scene({
         // Camera: a steep climb with turbulence, bumped on the kicks, calm again at the glow.
         const env = OM.post.envelope(T, start, end, { ramp: 0.35 });
         const k = OM.pulse(KICKS, T, 0.07);
-        const tb = env * (1 + 1.6 * k);
+        const tb = env * (1 + 1.6 * k + 2.4 * OM.pulse([on[on.length - 1]], T, 0.09));
         fx.apply(T, {
           amount: env * (0.4 + 0.6 * OM.prog(T, DB - 0.2, WHIP + 0.4)),
           cam: {

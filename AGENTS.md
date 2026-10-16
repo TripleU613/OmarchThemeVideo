@@ -30,8 +30,11 @@ the pipeline works; this file is what you must not break.
    `OM.rng(seed)` or `OM.hash()`.
 5. **Cuts are invisible.** Every scene starts exactly on its incoming handoff and
    ends exactly on its outgoing one (`OM.handoff`, see `assets/lib/handoff.js`).
-   A cut must measure SSIM 0.99 or better a frame either side, unless it is
-   deliberately designed as a hit.
+   Compare the frames 4 ms either side of the cut. On a still frame they must
+   measure SSIM 0.99 or better. Through fast motion, such as a match cut in
+   rain or flight, the pair across the cut must be no less similar than the
+   8 ms pairs on either side. The only exception is a cut deliberately designed
+   as a hit.
 6. **Tokyo Night only**, from `OM.fieldInks('tokyo-night')` and `OM.theme(...)`.
    The White theme belongs only to the rented-world verse (v1-01 to v1-03).
    Everything is drawn as lattice light and clean silhouettes: never photoreal,

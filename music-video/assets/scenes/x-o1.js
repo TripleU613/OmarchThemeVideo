@@ -249,18 +249,18 @@ vec4 effect(vec2 uv) {
   window.__hf.buildReady['x-o1-type'] = Promise.all([F_TERM, F_BOLD, F_MADE, F_BAR, F_CODE].map((f) => document.fonts.load(f)));
   /** fastfetch's output: the credits as system info, a line per hit. */
   const INFO = [
-    { t: 282.006, kind: 'head' },
-    { t: 282.285, kind: 'sep' },
-    { t: 282.819, k: 'OS', v: 'Omarchy' },
-    { t: 283.376, k: 'WM', v: 'Hyprland' },
-    { t: 283.91, k: 'Song', v: 'We Can Fix Everything (The Ultimate Machine)' },
-    { t: 284.537, k: 'Music', v: 'Kevin Koontz / REARRANGED' },
-    { t: 284.979, k: 'Made by', v: 'TripleU613', made: true },
-    { t: 285.698, k: 'Built with', v: 'HyperFrames, Three.js, GSAP' },
-    { t: 285.954, k: 'Theme', v: 'Tokyo Night' },
-    { t: 286.418, k: 'Font', v: 'JetBrains Mono' },
-    { t: 286.952, k: 'Inspired by', v: 'omarchy.org, by DHH' },
-    { t: 287.115, kind: 'swatch' },
+    { t: 282.006, kind: 'head', row: 0 },
+    { t: 282.285, kind: 'sep', row: 1 },
+    { t: 282.819, k: 'OS', v: 'Omarchy', row: 3 },
+    { t: 283.376, k: 'WM', v: 'Hyprland', row: 4 },
+    { t: 283.91, k: 'Song', v: 'We Can Fix Everything (The Ultimate Machine)', row: 6 },
+    { t: 284.537, k: 'Music', v: 'Kevin Koontz / REARRANGED', row: 7 },
+    { t: 284.979, k: 'Made by', v: 'TripleU613', made: true, row: 8 },
+    { t: 285.698, k: 'Built with', v: 'HyperFrames, Three.js, GSAP', row: 10 },
+    { t: 285.954, k: 'Theme', v: 'Tokyo Night', row: 11 },
+    { t: 286.418, k: 'Font', v: 'JetBrains Mono', row: 12 },
+    { t: 286.952, k: 'Inspired by', v: 'omarchy.org, by DHH', row: 13 },
+    { t: 287.115, kind: 'swatch', row: 15 },
   ];
   const KEYINK = [TN.blue, TN.magenta, TN.cyan, TN.green, TN.yellow, TN.red];
   const CODE = [
@@ -286,10 +286,10 @@ vec4 effect(vec2 uv) {
 
   // Desktop geometry (1080p px).
   const BAR = 44, TX0 = 14, TY0 = 56, TX1 = 1528, TY1 = 1066, RX0 = 1540, RX1 = 1906, RMID = 540;
-  const LH = 44, TOP = TY0 + 34, PX = TX0 + 40;
+  const LH = 50, TOP = TY0 + 34, PX = TX0 + 40; // 1.56x the 32 px type: room to breathe
   const rowBase = (r) => TOP + r * LH + 32;
   const LX = PX + 4, LY = TOP + 2 * LH + 6, LCELL = 24, LSUB = 8; // the mark, 15x15 cells of 3x3 sub-cells
-  const IX = LX + 15 * LCELL + 64; // info column
+  const IX = LX + 15 * LCELL + 84; // info column, a clear gap from the mark
 
   OM.scene({
     id: 'x-o1',
@@ -403,8 +403,15 @@ vec4 effect(vec2 uv) {
         ctx.lineWidth = 3;
         ctx.strokeRect(TX0 + 1.5, TY0 + 1.5, TX1 - TX0 - 3, TY1 - TY0 - 3);
 
-        // nvim: a little scene code, line numbers, a statusline.
+        // nvim: a little scene code, line numbers, a statusline. Lines truncate a whole glyph inside
+        // the 14 px padding, as a real editor without wrap does, and the pane clips its inner area.
+        const PAD = 14;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(RX0 + PAD, TY0 + PAD, RX1 - RX0 - 2 * PAD, RMID - TY0 - 2 * PAD + 10);
+        ctx.clip();
         ctx.font = F_CODE;
+        const CADV = ctx.measureText('M').width, CMAX = RX1 - PAD;
         ctx.textBaseline = 'alphabetic';
         CODE.forEach((line, i) => {
           const y = TY0 + 40 + i * 32;
@@ -414,21 +421,30 @@ vec4 effect(vec2 uv) {
           ctx.textAlign = 'left';
           let x = RX0 + 54;
           for (const [kind, text] of line) {
+            const room = Math.floor((CMAX - x) / CADV + 1e-6);
+            if (room <= 0) break;
+            const shown = text.slice(0, room);
             ctx.fillStyle = CODEINK[kind];
-            ctx.fillText(text, x, y);
-            x += ctx.measureText(text).width;
+            ctx.fillText(shown, x, y);
+            x += shown.length * CADV;
           }
         });
+        ctx.restore();
         ctx.fillStyle = TN.green;
-        ctx.fillRect(RX0 + 2, RMID - 36, 104, 34);
+        ctx.fillRect(RX0 + 14, RMID - 50, 104, 34); // the statusline sits inside the padding too
         ctx.fillStyle = th['brand-ink'];
-        ctx.fillText('NORMAL', RX0 + 14, RMID - 12);
+        ctx.fillText('NORMAL', RX0 + 26, RMID - 26);
         ctx.fillStyle = th.surface;
-        ctx.fillRect(RX0 + 106, RMID - 36, RX1 - RX0 - 108, 34);
+        ctx.fillRect(RX0 + 118, RMID - 50, RX1 - RX0 - 132, 34);
+        ctx.font = F_CODE;
         ctx.fillStyle = th['text-secondary'];
-        ctx.fillText('x-o1.js', RX0 + 122, RMID - 12);
+        ctx.fillText('x-o1.js', RX0 + 134, RMID - 26);
 
-        // The cpu meter: lattice bars that jump on the kicks.
+        // The cpu meter: lattice bars that jump on the kicks, inside the pane's padding.
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(RX0 + 14, RMID + 24, RX1 - RX0 - 28, TY1 - RMID - 38);
+        ctx.clip();
         ctx.fillStyle = th['text-secondary'];
         ctx.fillText('cpu', RX0 + 24, RMID + 50);
         ctx.fillStyle = TN.green;
@@ -443,10 +459,14 @@ vec4 effect(vec2 uv) {
             ctx.fillRect(RX0 + 24 + i * 32, TY1 - 30 - k * 16, 26, 13);
           }
         }
+        ctx.restore();
 
-        // The terminal.
+        // The terminal, its output clipped to the inner area inside a 14 px padding.
         if (textA > 0) {
           ctx.save();
+          ctx.beginPath();
+          ctx.rect(TX0 + 14, TY0 + 14, TX1 - TX0 - 28, TY1 - TY0 - 28);
+          ctx.clip();
           ctx.globalAlpha = textA;
           ctx.font = F_TERM;
           const ADV = ctx.measureText('M').width;
@@ -475,7 +495,7 @@ vec4 effect(vec2 uv) {
           let ki = 0;
           INFO.forEach((ln, i) => {
             if (T < ln.t) return;
-            const y = rowBase(2 + i);
+            const y = rowBase(2 + ln.row); // blank rows part the header, system, credits, build and swatches
             const fresh = T - ln.t < 0.08;
             if (ln.kind === 'head') {
               ctx.font = F_BOLD;
@@ -502,9 +522,9 @@ vec4 effect(vec2 uv) {
               ctx.font = F_MADE;
               const w = ctx.measureText(ln.k + ': ' + ln.v).width;
               ctx.fillStyle = rgba(ink.lit, 0.16);
-              ctx.fillRect(IX - 14, y - 34, w + 28, LH);
+              ctx.fillRect(IX - 14, y - 36, w + 28, 46);
               ctx.fillStyle = ink.lit;
-              ctx.fillRect(IX - 14, y - 34, 5, LH);
+              ctx.fillRect(IX - 14, y - 36, 5, 46);
               ctx.fillStyle = ink.crest;
               ctx.fillText(ln.k + ': ' + ln.v, IX, y);
               ctx.font = F_TERM;
@@ -521,7 +541,7 @@ vec4 effect(vec2 uv) {
           });
           // A fresh prompt; on each hard stop its cursor jumps to a new column and strikes crest.
           if (T >= PROMPT2) {
-            const y = rowBase(2 + INFO.length + 1);
+            const y = rowBase(2 + INFO[INFO.length - 1].row + 1);
             const px = prompt(y);
             const col = sk ? Math.floor(OM.hash(sk, 3, 4) * 8) : 0;
             block(px + col * ADV, y + (jolt ? (OM.hash(sk, 5, 4) - 0.5) * 12 : 0), jolt ? ink.crest : th.text);

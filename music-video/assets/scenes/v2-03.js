@@ -60,7 +60,35 @@ OM.ownWords.add('v2-03');
     }
     ctx.globalAlpha = 1;
   };
-  OM.v2lat = { P, CELL, raster, band, draw };
+  /** The bare lattice: faint lines every 6th cell of the 9 px pitch. */
+  const grid = (x, a) => {
+    if (a <= 0) return;
+    const [r, g, b] = OM.rgb(OM.theme('tokyo-night')['border-subtle']);
+    x.fillStyle = `rgba(${r},${g},${b},${a})`;
+    for (let gx = 0; gx <= 1920; gx += P * 6) x.fillRect(gx, 0, 1, 1080);
+    for (let gy = 0; gy <= 1080; gy += P * 6) x.fillRect(0, gy, 1920, 1);
+  };
+  OM.v2lat = { P, CELL, raster, band, draw, grid };
+  // The two boot panes the v2-03 > v2-04 match cut lands on: v2-03's words become their frames.
+  const PANES = [{ x: 60, y: 100, w: 820, h: 880 }, { x: 1040, y: 100, w: 820, h: 880 }];
+  const paneFrame = (x, r, alpha = 1) => {
+    if (r.w < 4 || r.h < 4) return;
+    const th = OM.theme('tokyo-night');
+    x.globalAlpha = alpha;
+    x.fillStyle = th['border-strong'];
+    x.fillRect(r.x, r.y, r.w, r.h);
+    x.fillStyle = th['bg-deep'];
+    x.fillRect(r.x + 2, r.y + 2, r.w - 4, r.h - 4);
+    x.globalAlpha = 1;
+  };
+  /** The shared cut frame at 127.562: night, the full lattice, two empty boot panes. */
+  const bootCut = (x) => {
+    x.fillStyle = OM.fieldInks('tokyo-night').bg;
+    x.fillRect(0, 0, 1920, 1080);
+    grid(x, 1);
+    PANES.forEach((r) => paneFrame(x, r));
+  };
+  OM.v2boot = { PANES, paneFrame, bootCut };
 })();
 
 OM.scene({
@@ -105,7 +133,8 @@ OM.scene({
     const LOCK = on[N - 1];
     const ARR = RW.slice(1); // each scrub step lands on a hit
     const STEP = ARR.map((_, i) => 1 - (i + 1) / ARR.length);
-    const CL0 = END - 0.44, CL1 = END - 0.1;
+    const MC0 = END - 0.47, MC1 = END - 0.09; // the match cut: the line's cells build the two boot panes
+    let groups = null;
     const TM = 1.1;
 
     let F = null, mesh = null, printed = false, pat = null;
@@ -160,12 +189,7 @@ OM.scene({
     const pose = (s, ta) => ({ x: s.vx * ta, y: s.vy * ta + 260 * ta * ta, r: s.w * ta });
 
     /** The lattice behind the words: faint lines on the 9 px pitch, every 6th, so the glass has something to break. */
-    const lattice = (x, a) => {
-      if (a <= 0) return;
-      x.fillStyle = V.rgba(th['border-subtle'], a);
-      for (let gx = 0; gx <= 1920; gx += LT.P * 6) x.fillRect(gx, 0, 1, 1080);
-      for (let gy = 0; gy <= 1080; gy += LT.P * 6) x.fillRect(0, gy, 1920, 1);
-    };
+    const lattice = LT.grid;
     /** The picture as it is just before the burst: lattice and the first words. */
     const picture = (x, T, { desk = 0 } = {}) => {
       if (desk > 0) {
@@ -185,24 +209,53 @@ OM.scene({
         const ctx = c.ensure();
         const dpr = c.dpr;
         if (T < start + V.HOLD_IN) return fx.apply(T), V.still(ctx, 7);
-        if (T >= END - V.HOLD_OUT) return fx.apply(T), OM.handoff('night', ctx, T, dpr);
+        if (T >= END - V.HOLD_OUT) return fx.apply(T), OM.v2boot.bootCut(ctx);
         if (!F || !V.met().ok) plan();
         const desk = 1 - OM.ease.inOutCubic(OM.prog(T, start + V.HOLD_IN, on[0] + 0.3));
         const ta = tau(T);
         const lockA = T >= LOCK ? Math.exp(-(T - LOCK) / 0.22) : 0;
-        const clear = OM.ease.inOutSine(OM.prog(T, CL0, CL1));
+        const mc = OM.ease.inOutCubic(OM.prog(T, MC0, MC1));
 
         if (T < SH || (T >= LOCK && ta === 0)) {
           // Whole: before the burst, and again once restored.
           if (T < SH) picture(ctx, T, { desk });
           if (T >= LOCK) {
-            // Restored: the clear dissolves cells in dither order, the lattice fades out.
+            // Restored. Then the match cut: two frames grow out of the line's left and right halves into
+            // the boot panes, every cell of the words flying out to the frame edge it becomes.
             ctx.fillStyle = ink.bg;
             ctx.fillRect(0, 0, 1920, 1080);
-            lattice(ctx, 1 - clear);
-            const keep = (x, y) => OM.threshold(x / LT.P, y / LT.P) > clear;
-            for (let k = 0; k < N; k++) LT.draw(ctx, ink, F.R[k], k >= NB ? T - on[k] : 9, { keep, alpha: 1 });
-            if (lockA > 0.02) for (let k = 0; k < N; k++) LT.draw(ctx, { crest: ink.crest, hover: ink.crest, lit: ink.crest }, F.R[k], 9, { alpha: lockA * 0.8, keep });
+            lattice(ctx, 1);
+            if (!groups) {
+              groups = [0, 1].map((side) => {
+                const cs = [];
+                F.R.forEach((R, k) => { if ((F.L.at[k].cx >= 960 ? 1 : 0) === side) cs.push(...R.cells); });
+                const xs = cs.map((q) => q[0]), ys = cs.map((q) => q[1]);
+                const box = cs.length ? { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs) + LT.CELL, h: Math.max(...ys) - Math.min(...ys) + LT.CELL } : { x: 960, y: 540, w: 0, h: 0 };
+                return { box, side };
+              });
+            }
+            const rects = groups.map((g) => V.lerpRect(g.box, OM.v2boot.PANES[g.side], mc));
+            if (mc > 0) rects.forEach((r) => OM.v2boot.paneFrame(ctx, r, 1));
+            if (mc <= 0) {
+              for (let k = 0; k < N; k++) LT.draw(ctx, ink, F.R[k], k >= NB ? T - on[k] : 9);
+              if (lockA > 0.02) for (let k = 0; k < N; k++) LT.draw(ctx, { crest: ink.crest, hover: ink.crest, lit: ink.crest }, F.R[k], 9, { alpha: lockA * 0.8 });
+            } else {
+              F.R.forEach((R, k) => {
+                const side = F.L.at[k].cx >= 960 ? 1 : 0, r = rects[side];
+                R.cells.forEach(([x, y], i) => {
+                  const h = OM.hash(i, k, 77), d = OM.hash(i, k, 78);
+                  const u = OM.ease.inOutCubic(OM.clamp((mc - d * 0.45) / 0.55));
+                  if (u >= 1) return;
+                  // A point on the growing frame's perimeter.
+                  const per = 2 * (r.w + r.h), q = h * per;
+                  const px = q < r.w ? r.x + q : q < r.w + r.h ? r.x + r.w : q < 2 * r.w + r.h ? r.x + r.w - (q - r.w - r.h) : r.x;
+                  const py = q < r.w ? r.y : q < r.w + r.h ? r.y + (q - r.w) : q < 2 * r.w + r.h ? r.y + r.h : r.y + r.h - (q - 2 * r.w - r.h);
+                  ctx.fillStyle = u > 0 ? ink.crest : LT.band(ink, y, R.top, R.bot);
+                  const sz = LT.CELL * (1 - u * 0.7);
+                  ctx.fillRect(OM.lerp(x, px, u) - sz / 2 + LT.CELL / 2, OM.lerp(y, py, u) - sz / 2 + LT.CELL / 2, sz, sz);
+                });
+              });
+            }
           }
           // The crack: hairlines running out from the breaking word, all the way at the burst.
           if (T >= on[KB] && T < SH) {

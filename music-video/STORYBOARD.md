@@ -74,8 +74,8 @@ Generated from `storyboard/scenes.json` by `scripts/assemble.mjs`. Lines are ref
 | 62 | c3-08 | 4:31.38 - 4:35.90 (4.52s) | tokyo-night | overflowing progress bar, growing window | cut | yes |
 | 63 | c3-09 | 4:35.90 - 4:40.80 (4.90s) | tokyo-night | implosion to the mark, hero rebirth | cut | yes |
 | 64 | x-o1 | 4:40.80 - 4:49.79 (8.99s) | tokyo-night | credits in footer style | cut | yes |
-| 65 | o-01 | 4:49.79 - 4:53.55 (3.76s) | tokyo-night | the site's hero-intro stagger | cut | yes |
-| 66 | x-end | 4:53.55 - 4:59.95 (6.40s) | tokyo-night | dither-order drain to a single cursor | cut | yes |
+| 65 | o-01 | 4:49.79 - 4:53.55 (3.76s) | tokyo-night | clockwise drain into the last pixel | cut | yes |
+| 66 | x-end | 4:53.55 - 4:59.95 (6.40s) | tokyo-night | unwinding spiral burst into the DHH portrait | cut | yes |
 
 ## i-01 · 0:00.00
 
@@ -591,16 +591,16 @@ Credits in the site's footer voice: song, artist, made with (HyperFrames, Three.
 
 ## o-01 · 4:49.79 · line o-01
 
-**Device:** the site's hero-intro stagger  
+**Device:** clockwise drain into the last pixel  
 **World / theme / tech:** home / tokyo-night / canvas+dom  
 **Sync:** headline on word 1, buttons on word 4
 
-Back home. The real homepage hero assembles: the field, the wordmark, then the headline and the two buttons rise in with the site's own hero-intro stagger.
+Back home. The wordmark fires each sung word out of itself in lattice type onto a line beneath it, the key word storming in from every edge; on the hard stop a vortex spirals field, wordmark and words into the frame centre, kicked by the snares, until one lit pixel is left.
 
 ## x-end · 4:53.55
 
-**Device:** dither-order drain to a single cursor  
+**Device:** unwinding spiral burst into the DHH portrait  
 **World / theme / tech:** home / tokyo-night / canvas  
 **Sync:** drain to 297.6, final blink off on 299.8
 
-Power off. The field drains cell by cell in dither order until only the cursor cell is left, blinking, then nothing.
+The last pixel charges on the hi-hat roll, then the snare and kick blow it apart: the owner's dot-matrix portrait of DHH flies out tile by tile on spirals unwinding the vortex, face first, and holds as the final image.

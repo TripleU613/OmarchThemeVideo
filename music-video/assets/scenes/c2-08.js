@@ -27,6 +27,81 @@ OM.ownWords.add('c2-08');
     return c;
   }`;
 
+  // The board, shared with c2-07 (which grows it out of its bridge deck for the cut).
+  OM.c2.board = (() => {
+    const HM = OM.HOME, sp = OM.cellAt(HM, 960, 540);
+    const ZX = HM.x0 + (sp.col + 0.5) * HM.cw, ZY = HM.y0 + (sp.row + 0.5) * HM.ch;
+    const CORE = 44;
+    const S0 = HM.cw / CORE;
+    // The board: Manhattan traces walking out from the core.
+    const rng = OM.rng(0xc208), traces = [];
+    for (let n = 0; n < 72; n++) {
+      const side = n % 4, off = (rng() - 0.5) * CORE * 0.9;
+      let x = ZX + [CORE / 2, 0, -CORE / 2, 0][side] + (side % 2 ? off : 0), y = ZY + [0, CORE / 2, 0, -CORE / 2][side] + (side % 2 ? 0 : off);
+      let dir = side;
+      const pts = [[x, y]];
+      let len = 0;
+      const goal = 500 + 1300 * rng();
+      while (len < goal) {
+        const L = 30 + 160 * rng();
+        const v = [[1, 0], [0, 1], [-1, 0], [0, -1]][dir];
+        x += v[0] * L;
+        y += v[1] * L;
+        len += L;
+        pts.push([x, y]);
+        const turn = rng();
+        if (turn < 0.5) dir = (side + (rng() < 0.5 ? 1 : 3)) % 4; // sideways
+        else dir = side; // outward
+      }
+      const segs = [];
+      let acc = 0;
+      for (let i = 1; i < pts.length; i++) {
+        const l = Math.abs(pts[i][0] - pts[i - 1][0]) + Math.abs(pts[i][1] - pts[i - 1][1]);
+        segs.push([pts[i - 1], pts[i], acc, l]);
+        acc += l;
+      }
+      traces.push({ pts, segs, len: acc, ph: rng() });
+    }
+
+    return { HM, ZX, ZY, CORE, S0, traces };
+  })();
+  /**
+   * The board seen from far off: its traces grown out to `grow` at the scale where
+   * the core is one lattice cell, and the core lit. c2-07 ends on chip(1) and c2-08
+   * opens on it: the cut frame both draw.
+   */
+  OM.c2.chip = (ctx, grow, { bg = true, core = true } = {}) => {
+    const { ZX, ZY, CORE, S0, traces } = OM.c2.board, ink = OM.fieldInks('tokyo-night');
+    const X = (x) => ZX + (x - ZX) * S0, Y = (y) => ZY + (y - ZY) * S0;
+    if (bg) {
+      ctx.fillStyle = ink.bg;
+      ctx.fillRect(0, 0, 1920, 1080);
+    }
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = OM.c2.rgba(ink.dim, 1);
+    ctx.beginPath();
+    for (const tr of traces) {
+      const lim = tr.len * grow;
+      for (const [a, b, acc, l] of tr.segs) {
+        if (acc > lim) break;
+        const f = Math.min(1, (lim - acc) / l);
+        ctx.moveTo(X(a[0]), Y(a[1]));
+        ctx.lineTo(X(a[0] + (b[0] - a[0]) * f), Y(a[1] + (b[1] - a[1]) * f));
+      }
+    }
+    ctx.stroke();
+    if (!core) return;
+    const cs = CORE * S0;
+    OM.c2.pool(ctx, ZX, ZY, 72, 72, ink.lit, 0.4);
+    ctx.fillStyle = ink.bg;
+    ctx.fillRect(ZX - cs / 2, ZY - cs / 2, cs, cs);
+    ctx.strokeStyle = OM.c2.rgba(ink.crest, 1);
+    ctx.lineWidth = 2;
+    ctx.strokeRect(ZX - cs / 2, ZY - cs / 2, cs, cs);
+    ctx.fillStyle = OM.c2.rgba(ink.crest, 1);
+    ctx.fillRect(ZX - (cs * 0.34) / 2, ZY - (cs * 0.34) / 2, cs * 0.34, cs * 0.34);
+  };
+
   OM.scene({
     id: 'c2-08',
     build(el, { start, duration }) {
@@ -44,45 +119,13 @@ OM.ownWords.add('c2-08');
       const KICKS = [187.757, 188.012, 188.43, 188.546];
       const DB1 = OM.downbeatsIn(188.7, 189)[0] || 188.848, DB2 = OM.downbeatsIn(191, 191.3)[0] || 191.147;
       const OFF = 192.95; // the core goes dark at the top of the roll
-      const HM = OM.HOME, sp = OM.cellAt(HM, 960, 540);
-      const ZX = HM.x0 + (sp.col + 0.5) * HM.cw, ZY = HM.y0 + (sp.row + 0.5) * HM.ch;
-      const CORE = 44, CS = 8;
-      const S0 = HM.cw / CORE;
+      const { HM, ZX, ZY, CORE, S0, traces } = OM.c2.board;
+      const CS = 8;
       /** Camera scale: from the spark out to the board, a slow drift, then the dive on the roll. */
       const scale = (T) => {
         const open = OM.lerp(S0, 1, OM.ease.inOutCubic(OM.prog(T, start + 0.03, on[0] + 0.35)));
         return open * (1 + 0.1 * OM.prog(T, on[0], DB2)) * Math.exp(2.4 * Math.max(0, T - DB2 - 0.1));
       };
-
-      // The board: Manhattan traces walking out from the core.
-      const rng = OM.rng(0xc208), traces = [];
-      for (let n = 0; n < 72; n++) {
-        const side = n % 4, off = (rng() - 0.5) * CORE * 0.9;
-        let x = ZX + [CORE / 2, 0, -CORE / 2, 0][side] + (side % 2 ? off : 0), y = ZY + [0, CORE / 2, 0, -CORE / 2][side] + (side % 2 ? 0 : off);
-        let dir = side;
-        const pts = [[x, y]];
-        let len = 0;
-        const goal = 500 + 1300 * rng();
-        while (len < goal) {
-          const L = 30 + 160 * rng();
-          const v = [[1, 0], [0, 1], [-1, 0], [0, -1]][dir];
-          x += v[0] * L;
-          y += v[1] * L;
-          len += L;
-          pts.push([x, y]);
-          const turn = rng();
-          if (turn < 0.5) dir = (side + (rng() < 0.5 ? 1 : 3)) % 4; // sideways
-          else dir = side; // outward
-        }
-        const segs = [];
-        let acc = 0;
-        for (let i = 1; i < pts.length; i++) {
-          const l = Math.abs(pts[i][0] - pts[i - 1][0]) + Math.abs(pts[i][1] - pts[i - 1][1]);
-          segs.push([pts[i - 1], pts[i], acc, l]);
-          acc += l;
-        }
-        traces.push({ pts, segs, len: acc, ph: rng() });
-      }
 
       const get = OM.c2.lazy(W, () => {
         const L = OM.c2.layout(words, { weight: W, cap: 150, maxW: 1720, cy: 540, rows: 3, lead: 1.5, minCap: 100 });
@@ -128,7 +171,7 @@ OM.ownWords.add('c2-08');
         draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
-          if (T < start + 0.05) return OM.handoff('spark', ctx, T, dpr);
+          if (T < start + 0.05) return OM.c2.chip(ctx, 1); // the board the bridge's deck grew into, from the cut
           if (T > END - 0.07) return OM.handoff('night', ctx, T, dpr);
           const circuits = get();
           ctx.fillStyle = ink.bg;
@@ -137,7 +180,7 @@ OM.ownWords.add('c2-08');
           const X = (x) => ZX + (x - ZX) * s, Y = (y) => ZY + (y - ZY) * s;
           const dark = sm(T, OFF - 0.1, OFF + 0.25); // lights out, eased into the night
           const wordsOut = OM.prog(T, DB2 + 0.5, DB2 + 1.2);
-          const grow = OM.prog(T, start + 0.03, on[0] + 0.25); // traces run out as the board opens
+          const grow = 1; // the board arrives whole from the cut
           const pulse = Math.max(decay(T, DB1, 0.16), ...KICKS.map((k) => 0.5 * decay(T, k, 0.08)));
 
           // Board traces, with packets of current riding out from the core on the hits.
@@ -247,7 +290,7 @@ OM.ownWords.add('c2-08');
             }
           // Electrons flowing out along the traces.
           const s = scale(T), X = (x) => ZX + (x - ZX) * s, Y = (y) => ZY + (y - ZY) * s;
-          const grow = OM.prog(T, start + 0.03, on[0] + 0.25), dark = sm(T, OFF - 0.1, OFF + 0.25), sz = 4 * Math.min(s, 3);
+          const grow = 1, dark = sm(T, OFF - 0.1, OFF + 0.25), sz = 4 * Math.min(s, 3);
           ctx.fillStyle = OM.c2.rgba(ink.lit, 1 - dark);
           traces.forEach((tr, n) => {
             if (n % 2) return;

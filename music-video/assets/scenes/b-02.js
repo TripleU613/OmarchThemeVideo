@@ -44,7 +44,9 @@ OM.scene({
     const lay = B.lazy(() => {
       const set = B.set(sung, { weight: 800, cap: 136, minCap: 96, maxW: 1600, cy: 530, lead: 1.3 });
       const taken = new Set();
-      const screens = [];
+      // The first screens are b-01's drums, already landed and glowing when the line begins.
+      const screens = B.bootList().map((d) => ({ col: d.col, row: d.row, at: start - 1, word: false, k: -1, boot: true }));
+      for (const s of screens) taken.add(s.col + ',' + s.row);
       set.words.forEach((w) => {
         const cells = B.cells(w, set, L);
         const x0 = Math.min(...cells.map((q) => q[0])), x1 = Math.max(...cells.map((q) => q[0]));
@@ -65,31 +67,22 @@ OM.scene({
         const u = Math.pow(i / n, 0.55);
         screens.push({ col, row, at: start + 0.25 + u * (DROP - start - 0.45), word: false, k: -1 });
       }
-      // The first screen is the spark itself.
-      screens.push({ col: SC, row: SR, at: start, word: true, k: -1, spark: true });
       // Each column's lit screens drop into the centre row, the far columns last.
       for (const s of screens) s.drop = DROP + 0.32 * (Math.abs(s.col - SC) / (L.cols / 2)) + 0.06 * OM.hash(s.col, s.row, 9);
       return { set, screens };
     });
 
-    const screen = (ctx, x, y, w, h, frame, glass) => {
-      ctx.fillStyle = frame;
-      ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
-      ctx.fillStyle = glass;
-      ctx.fillRect(x + 3, y + 3, w - 6, h - 6);
-    };
+    const screen = B.screen;
 
     return {
       draw(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
         if (T >= END - 0.1) return OM.handoff('line', ctx, T, dpr);
-        if (T < start + 0.05) return OM.handoff('spark', ctx, T, dpr);
+        if (T < start + 0.05) return B.bootCut(ctx, T, dpr);
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
         const { screens } = lay();
-        // The spark's halo fades as the first screen settles.
-        B.pool(ctx, B.SPARK.x, B.SPARK.y, 72, ink.lit, 0.4 * (1 - OM.prog(T, start, start + 0.4)));
         const flick = OM.pulse(SNARES, T, 0.06);
         const snap = (v) => Math.round(v * dpr) / dpr;
         const cw = L.cw, ch = L.ch;
@@ -109,7 +102,7 @@ OM.scene({
             frame = glass;
           } else {
             const deep = OM.hash(s.col, s.row, 3) < 0.6;
-            glass = OM.mix(deep ? ink.dim : ink.mid, ink.lit, Math.max(boot, 0.4 * flick));
+            glass = s.boot ? OM.mix(B.bootGlass(s.col, s.row), ink.crest, 0.4 * flick) : OM.mix(deep ? ink.dim : ink.mid, ink.lit, Math.max(boot, 0.4 * flick));
             frame = OM.mix(th.surface, ink.mid, boot);
           }
           if (d > 0) { glass = OM.mix(glass, ink.crest, d); frame = glass; }

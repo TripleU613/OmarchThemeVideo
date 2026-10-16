@@ -5,8 +5,9 @@
 // ghost image, specks and streaks, greyer paper. The old copies are shoved
 // back into a pile. On the held last word the lamp sweeps the whole frame,
 // the pile is blown away, and the last sheet prints the whole line crisp and
-// new: an original. Then the lamp closes back to one row and the row shrinks
-// to the single spark that v1-08's fingerprint reader wakes from.
+// new: an original. Then the lamp closes back to one row, and the row bends
+// into a ring that squares up into the mark at v1-08's print core
+// (V.lampRing, the shared cut frame).
 OM.ownWords.add('v1-07');
 (() => {
   const V = OM.v1;
@@ -136,42 +137,18 @@ vec4 effect(vec2 uv) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + H0 || T < on[0]) return OM.handoff('line', ctx, T, dpr);
-          if (T >= END - H) return OM.handoff('spark', ctx, T, dpr);
+          if (T >= END - H) {
+            ctx.fillStyle = ink.bg;
+            ctx.fillRect(0, 0, 1920, 1080);
+            return V.lampRing(ctx, T, T >= 66.9 ? 0.3 * Math.exp(-(T - 66.9) / 0.12) : 0);
+          }
           const S = get();
           ctx.fillStyle = ink.bg;
           ctx.fillRect(0, 0, 1920, 1080);
           const k = OM.hitCount(on, T) - 1;
           if (T >= CLOSE1) {
-            // The row shrinks to the spark.
-            const f = OM.ease.inOutCubic(OM.prog(T, CLOSE1, SHRINK1));
-            const n = Math.round(OM.lerp(Math.ceil(Math.max(LX, 1920 - LX) / HM.cw) + 1, 0, f)); // from the frame's edge, so the shrink is seen all the way
-            ctx.fillStyle = ink.crest;
-            for (let col = hcol - n; col <= hcol + n; col++) OM.cell(ctx, HM, col, hrow, dpr);
-            // Lamp surge on the 66.90 kick, end spit on the 67.04 snare: the shrinking lamp, both gone before the cut.
-            const calm = 1 - OM.prog(T, 67.15, 67.24);
-            const surge = (T >= 66.9 ? 0.3 * Math.exp(-(T - 66.9) / 0.12) : 0) * calm;
-            if (surge > 0.005) {
-              const sg = ctx.createLinearGradient(0, LY - 70, 0, LY + 70);
-              sg.addColorStop(0, V.rgba(ink.lit, 0));
-              sg.addColorStop(0.5, V.rgba(ink.lit, surge));
-              sg.addColorStop(1, V.rgba(ink.lit, 0));
-              ctx.fillStyle = sg;
-              ctx.fillRect(HM.x0 + (hcol - n) * HM.cw, LY - 70, (2 * n + 1) * HM.cw, 140);
-              ctx.fillStyle = ink.crest;
-            }
-            const sa = T - 67.04;
-            if (sa >= 0 && sa < 0.2) {
-              ctx.globalAlpha = (1 - sa / 0.2) * calm;
-              for (const d of [-1, 1]) OM.cell(ctx, HM, hcol + d * (n + 2 + Math.round(sa * 50)), hrow, dpr);
-              ctx.globalAlpha = 1;
-            }
-            const g = ctx.createRadialGradient(LX, LY, 0, LX, LY, 72);
-            g.addColorStop(0, V.rgba(ink.lit, 0.4 * f));
-            g.addColorStop(1, V.rgba(ink.lit, 0));
-            ctx.fillStyle = g;
-            ctx.fillRect(LX - 72, LY - 72, 144, 144);
-            ctx.fillStyle = ink.crest;
-            OM.cell(ctx, HM, hcol, hrow, dpr);
+            // Lamp to mark: the row bends into a ring; the lamp surges on the 66.90 kick.
+            V.lampRing(ctx, T, T >= 66.9 ? 0.3 * Math.exp(-(T - 66.9) / 0.12) : 0);
             return;
           }
           if (k < LAST) {

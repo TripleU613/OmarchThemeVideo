@@ -109,7 +109,11 @@ vec4 effect(vec2 uv) {
         draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
-          if (T < start + H) return OM.handoff('night', ctx, T, dpr);
+          if (T < start + H) {
+            ctx.fillStyle = ink.bg;
+            ctx.fillRect(0, 0, 1920, 1080);
+            return V.letterRain(ctx, T, dpr); // v1-04's letters, falling as rain
+          }
           if (T >= END - H) return OM.handoff('glow', ctx, T, dpr);
           const words = get();
           const rise = OM.smooth(OM.prog(T, RISE0, RISE1));
@@ -139,6 +143,7 @@ vec4 effect(vec2 uv) {
             ctx.lineTo(r.x - r.len * 0.06, y + r.len);
             ctx.stroke();
           }
+          if (T < 55.1) V.letterRain(ctx, T, dpr);
           // The words, traced in beads on the glass.
           const flash = OM.pulse([BEAT], T, 0.12);
           const run = OM.prog(T, RUN0, RUN1);

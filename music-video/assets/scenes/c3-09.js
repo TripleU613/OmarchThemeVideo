@@ -1,6 +1,7 @@
 // c3-09 · Collapse and rebirth (keep). The girders' lattice is the home grid,
 // and the line is set into it in lit cells: the first word flashes up on its
-// onset, the second lands under the downbeat and holds. On the name's onset
+// onset and the girder steel sheds off the grid round it, leaving the bare
+// grid; the second lands under the downbeat and holds. On the name's onset
 // everything collapses: every lit cell is pulled out of the words into the
 // mark at the centre, which locks solid and pulses on the kick and downbeat.
 // On the next kick the mark detonates, a square shock ring runs out, and behind
@@ -60,55 +61,88 @@ OM.scene({
       const out = OM.ease.outExpo(OM.clamp((T - BOOM) / 1.0));
       const back = OM.ease.outExpo(OM.clamp((T - BOOM) / 0.7));
       const shake = C.decay(T, BOOM, 0.08);
+      // The finale kicks punch the camera in, each harder (zero by the cut through the window envelope).
+      const punch = [[279.429, 0.012], [279.615, 0.02], [280.149, 0.03], [280.597, 0.045]].reduce((m, [k, a]) => Math.max(m, a * C.decay(T, k, 0.06)), 0);
       return {
         amount: T >= BOOM && T < BOOM + 1 ? 1 - out : 0, p0: [out * 1500, 0, 0, 0],
-        cam: { zoom: 1 + 0.22 * OM.ease.inCubic(OM.prog(T, PULL - 0.05, PULL + 0.32)) * (1 - back), x: 14 * shake * Math.sin(T * 97), y: 10 * shake * Math.cos(T * 83) },
+        cam: {
+          zoom: 1 + 0.22 * OM.ease.inCubic(OM.prog(T, PULL - 0.05, PULL + 0.32)) * (1 - back) + (T > REST ? punch : 0),
+          x: 14 * shake * Math.sin(T * 97) + (T > REST ? 900 * punch * Math.sin(T * 97) : 0), y: 10 * shake * Math.cos(T * 83),
+        },
       };
     };
     return OM.c3.withFx(el, c, start, END, FX, fxAt)({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (C.seam(ctx, T, dpr, start, END, 'grid', 'word')) return;
+        const GD = OM.c3cut.girders, SHED = 0.3; // the girders shed over the first word's read
+        if (T < start + 0.05) return GD.paint(ctx, T, dpr);
+        if (C.seam(ctx, T, dpr, start, END, 'grid', 'word', start)) return;
         if (T >= REST) {
-          // The reborn wordmark performs on the last four kicks (event times), the last the biggest, then lands
-          // back exactly on the field with the wordmark at home before the cut.
-          const KK = [279.429, 279.615, 280.149, 280.497], KS = [0.55, 0.7, 0.85, 1.25];
-          const gate = 1 - C.sm(T, 280.58, END - 0.08);
-          // Field heartbeat: the field glows out from the name on every kick.
+          // The finale, one bigger move on each of the last four kicks (event times): the wordmark's echo
+          // ripples out across the field; the letters split along their rows and slam back under a triple
+          // echo; the field flips to crest in a giant wordmark filling the frame, the home letters cut dark
+          // out of it; and the giant mark contracts into the home wordmark and rebounds as one last echo.
+          // Everything settles to the exact field with the wordmark at home before the cut.
+          const [K1, K2, K3, K4] = [279.429, 279.615, 280.149, 280.497], OFF = 280.68;
+          if (T >= OFF || T < K1) return OM.handoff('word', ctx, T, dpr);
+          const g = 1 - C.sm(T, 280.6, OFF);
+          const WR = OM.WORDMARK.rows, WC = 40.5, WRc = 9.5, BIG = 2.05;
+          const bit = (c, r) => r >= 0 && r < 19 && c >= 0 && c < 81 && WR[r][c] === '1';
+          const at = (col, row, sc) => bit(Math.floor(WC + (col + 0.5 - WC) / sc), Math.floor(WRc + (row + 0.5 - WRc) / sc));
+          // The giant wordmark's scale: grows out on kick 3, contracts home on kick 4.
+          const big = T < K3 ? 0 : T < K4 ? OM.lerp(1, BIG, OM.ease.outExpo(OM.prog(T, K3, K3 + 0.1))) : OM.lerp(BIG, 1, OM.ease.inCubic(OM.prog(T, K4, K4 + 0.1)));
+          const landed = T >= K4 + 0.1;
           let hb = 0;
-          KK.forEach((k, i) => (hb = Math.max(hb, KS[i] * C.decay(T, k, 0.09))));
-          hb *= gate;
-          if (hb < 0.003) return OM.handoff('word', ctx, T, dpr);
-          // Letter punch: the wordmark jumps up a cell on each kick (two on the last), and a crest wave sweeps its letters.
-          let lift = 0;
-          KK.forEach((k, i) => { const a = T - k; if (a >= 0 && a < 0.09 && gate > 0.5) lift = Math.max(lift, i === 3 ? 2 : 1); });
+          [[K1, 0.5], [K2, 0.75], [K3, 1.0], [K4 + 0.1, 1.5]].forEach(([k, a]) => (hb = Math.max(hb, a * C.decay(T, k, 0.1))));
+          hb *= g;
           ctx.fillStyle = ink.bg;
           ctx.fillRect(0, 0, 1920, 1080);
-          const g = [{ x: 960, y: 540, strength: 0.45 * hb, reach: 380 + 700 * hb }];
-          OM.hero(ctx, T, dpr, { inks: ink, L, word: false, gain: 0.8, bg: false, glows: g });
-          // Lattice rings: each kick throws a ring of lit cells out through the field.
-          KK.forEach((k, i) => {
-            const age = T - k, life = i === 3 ? 0.18 : 0.3;
-            if (age < 0 || age >= life) return;
-            const r = 140 + age * (i === 3 ? 3800 : 2600), f = (1 - age / life) * gate, w = L.cw * (i === 3 ? 2 : 1.2);
-            ctx.fillStyle = f > 0.5 ? ink.hover : ink.lit;
-            for (let row = L.rMin; row < L.rMin + L.rows; row++)
-              for (let col = L.cMin; col < L.cMin + L.cols; col++) {
-                const d = Math.hypot(L.x0 + (col + 0.5) * L.cw - 960, (L.y0 + (row + 0.5) * L.ch - 540) * 1.7);
-                if (Math.abs(d - r) < w && OM.hash(col, row, 0x909) < 0.35 + 0.5 * f) OM.cell(ctx, L, col, row, dpr);
+          const gl = [{ x: 960, y: 540, strength: 0.5 * hb, reach: 380 + 900 * hb }];
+          OM.hero(ctx, T, dpr, { inks: ink, L, word: false, gain: 0.8, bg: false, glows: gl });
+          const C0 = L.cMin, C1 = L.cMin + L.cols, R0 = L.rMin, R1 = L.rMin + L.rows;
+          // Wordmark-shaped ripples: the band between the echo at scale sc and at 0.82 sc.
+          const echo = (sc, col0) => {
+            ctx.fillStyle = col0;
+            for (let row = R0; row < R1; row++)
+              for (let col = C0; col < C1; col++) if (at(col, row, sc) && !at(col, row, sc * 0.82)) OM.cell(ctx, L, col, row, dpr);
+          };
+          const waves = [];
+          const a1 = T - K1;
+          if (a1 < 0.32) waves.push([1 + 5 * OM.ease.outCubic(a1 / 0.32), a1 < 0.16 ? ink.hover : ink.lit]);
+          for (let w = 0; w < 3; w++) {
+            const a2 = T - K2 - w * 0.05;
+            if (a2 >= 0 && a2 < 0.34) waves.push([1 + 7 * OM.ease.outCubic(a2 / 0.34), a2 < 0.12 ? ink.crest : a2 < 0.24 ? ink.hover : ink.lit]);
+          }
+          const a4 = T - K4 - 0.1;
+          if (landed && a4 < 0.12) waves.push([1 + 9 * OM.ease.outExpo(a4 / 0.12), a4 < 0.06 ? ink.crest : ink.hover]);
+          for (const [sc, col0] of waves) echo(sc, col0);
+          // The flip: the giant wordmark filled with crest, shimmering on the hats.
+          const flip = T >= K3 && !landed;
+          if (flip) {
+            const tw = Math.floor(T * 16);
+            for (let row = R0; row < R1; row++)
+              for (let col = C0; col < C1; col++) {
+                if (!at(col, row, big)) continue;
+                ctx.fillStyle = OM.hash(col, row, tw) > 0.88 ? ink.hover : ink.crest;
+                OM.cell(ctx, L, col, row, dpr);
               }
-          });
-          const sweep = (col) => KK.some((k, i) => {
-            const a = T - k, dur = i === 3 ? 0.18 : 0.25;
-            return a >= 0 && a < dur && gate > 0.3 && Math.abs(col - (-5 + (a / dur) * 91)) < (i === 3 ? 6 : 4);
-          });
-          // The beat's glow stays out of the letters: the field inside the wordmark's box (empty at rest, the hero
-          // clears it) is held dark, so only the letters light.
-          ctx.fillStyle = ink.bg;
-          ctx.fillRect(L.x0 - L.cw, L.y0 - 3 * L.ch, 83 * L.cw, 24 * L.ch);
-          const Lw = lift ? Object.assign({}, L, { y0: L.y0 - lift * L.ch }) : L;
-          OM.paintWord(ctx, Lw, dpr, ink, { glows: g, wordInk: (row, col) => (sweep(col) ? ink.crest : null) });
+          }
+          // The home wordmark: dark inside the flip, split along its rows on kick 2, crest as the giant lands.
+          if (!flip) {
+            ctx.fillStyle = ink.bg;
+            ctx.fillRect(L.x0 - L.cw, L.y0 - 3 * L.ch, 83 * L.cw, 24 * L.ch);
+          }
+          const a2 = T - K2, sp = a2 < 0 ? 0 : a2 < 0.04 ? OM.ease.outExpo(a2 / 0.04) : 1 - OM.ease.inCubic(OM.clamp((a2 - 0.04) / 0.12));
+          const crest = landed ? C.decay(T, K4 + 0.1, 0.05) * g : 0;
+          const sweep = (col) => T - K1 < 0.25 && Math.abs(col - (-5 + ((T - K1) / 0.25) * 91)) < 4;
+          if (flip || sp > 0.001) {
+            for (const [col, row] of WM) {
+              const dx = sp * (row % 2 ? 1 : -1) * (14 + 10 * OM.hash(row, 0, 0x90a)) * L.cw, dy = sp * (row - 9.5) * 1.6 * L.ch;
+              ctx.fillStyle = flip ? ink.bg : sp > 0.5 ? ink.crest : ink[OM.BANDS[row]];
+              ctx.fillRect(Math.round(L.x0 + col * L.cw + dx), Math.round(L.y0 + row * L.ch + dy), Math.ceil(L.cw), Math.ceil(L.ch));
+            }
+          } else OM.paintWord(ctx, L, dpr, ink, { glows: gl, wordInk: (row, col) => (crest > 0.12 || sweep(col) ? ink.crest : crest > 0.04 ? ink.hover : null) });
           return;
         }
         const { cells } = type();
@@ -118,7 +152,8 @@ OM.scene({
         if (T < BOOM) {
           // The grid, fading as the line collapses out of it.
           const gA = 1 - C.sm(T, PULL, PULL + 0.3);
-          if (gA > 0) {
+          if (T < on[0] + SHED) GD.paint(ctx, T, dpr, OM.prog(T, on[0], on[0] + SHED));
+          else if (gA > 0) {
             ctx.globalAlpha = gA;
             OM.handoff('grid', ctx, T, dpr);
             ctx.globalAlpha = 1;

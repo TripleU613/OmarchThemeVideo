@@ -41,9 +41,29 @@ OM.ownWords.add('p2-01');
     },
     /** Exact handoff on the first and last couple of frames; true when it painted. */
     cut: (ctx, T, dpr, start, end, a, b) => {
-      if (T < start + 0.05) return OM.handoff(a, ctx, T, dpr), true;
-      if (T >= end - 0.07) return OM.handoff(b, ctx, T, dpr), true;
+      const paint = (x) => (typeof x === 'function' ? x(ctx, T, dpr) : OM.handoff(x, ctx, T, dpr));
+      if (T < start + 0.05) return paint(a), true;
+      if (T >= end - 0.07) return paint(b), true;
       return false;
+    },
+    /** The city's empty lots: dim blocks by hash on the home lattice, off the avenue row. */
+    lot: (col, row) => Math.abs(row - OM.cellAt(OM.HOME, 960, 540).row) >= 1 && OM.hash(col, row, 7) >= 0.74,
+    block: (ctx, col, row) => {
+      const L = OM.HOME;
+      ctx.fillRect(L.x0 + col * L.cw + 1.5, L.y0 + row * L.ch + 1.5, L.cw - 3, L.ch - 3);
+    },
+    /**
+     * The p2-02 > p2-03 cut, "plan to map": the plan's grid, its rail, and the
+     * lots its walls spread into, which are the city's blocks.
+     */
+    planMap: (ctx, T, dpr) => {
+      const L = OM.HOME, ink = OM.fieldInks('tokyo-night'), row0 = OM.cellAt(L, 960, 540).row;
+      OM.handoff('grid', ctx, T, dpr);
+      ctx.fillStyle = ink.dim;
+      for (let row = L.rMin; row < L.rMin + L.rows; row++)
+        for (let col = L.cMin; col < L.cMin + L.cols; col++) if (OM.p2.lot(col, row)) OM.p2.block(ctx, col, row);
+      ctx.fillStyle = ink.crest;
+      for (let col = L.cMin; col < L.cMin + L.cols; col++) OM.cell(ctx, L, col, row0, dpr);
     },
   };
 

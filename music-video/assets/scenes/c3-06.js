@@ -4,8 +4,42 @@
 // pulls back together into the second; then into the whole line at once, the
 // last word's birds joining on its onset. On the kick after the line the
 // flock goes wild, folding and wheeling in clean sweeps that turn hard on the
-// snares, and on the last downbeat it pours into a single point: the spark.
+// snares, and on the last downbeat it flares out and comes down as the rain
+// of c3-07's storm, every bird stretching into a falling drop round the sun,
+// landing on the snare before the cut.
 OM.ownWords.add('c3-06');
+// The c3-06 > c3-07 match cut: the flock come down as rain, falling past the sun.
+OM.c3cut = OM.c3cut || {};
+(() => {
+  const S7 = 268.423, SNARE = 268.399;
+  const rng = OM.rng(0xc307), drops = [];
+  for (let i = 0; i < 560; i++) drops.push({ x: rng() * 2100 - 90, y: rng() * 1300, sp: 1500 + rng() * 700, len: 14 + rng() * 16, r: rng() });
+  /** Drop d's top at rain time Tr: falling, wrapping round 1300px. */
+  const at = (d, Tr) => {
+    const y = ((((d.y + (Tr - S7) * d.sp) % 1300) + 1300) % 1300) - 110;
+    return [d.x - (y + 110) * 0.18, y];
+  };
+  /** The same drop unwrapped, in free fall through `ref` (for things falling into it). */
+  const fall = (d, T, ref) => {
+    const y = at(d, ref)[1] + (T - ref) * d.sp;
+    return [d.x - (y + 110) * 0.18, y];
+  };
+  const paint = (ctx, T, dpr) => {
+    const C = OM.c3, ink = C.ink, L = OM.HOME, hc = OM.cellAt(L, 960, 540);
+    ctx.fillStyle = ink.bg;
+    ctx.fillRect(0, 0, 1920, 1080);
+    C.pool(ctx, L.x0 + (hc.col + 0.5) * L.cw, L.y0 + (hc.row + 0.5) * L.ch, 72, ink.lit, 0.4);
+    ctx.fillStyle = ink.crest;
+    OM.cell(ctx, L, hc.col, hc.row, dpr);
+    // The drops glint on the snare as the flock lands as rain.
+    ctx.fillStyle = T >= SNARE && T < SNARE + 0.05 ? ink.hover : C.th['text-muted'] || ink.mid;
+    for (const d of drops) {
+      const [x, y] = at(d, T);
+      ctx.fillRect(Math.round(x), Math.round(y), 2, Math.round(d.len));
+    }
+  };
+  OM.c3cut.rain = { drops, at, fall, paint, S7 };
+})();
 OM.scene({
   id: 'c3-06',
   build(el, { start, duration }) {
@@ -112,15 +146,26 @@ OM.scene({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (C.seam(ctx, T, dpr, start, END, 'field', 'spark')) return;
+        const RN = OM.c3cut.rain, LANDR = END - 0.07;
+        if (T > LANDR) return RN.paint(ctx, T, dpr);
+        if (C.seam(ctx, T, dpr, start, END, 'field', 'spark')) return; // out-side never reached: the rain paints the last frames
         const { F, B } = flock();
         const lift = OM.ease.inOutCubic(OM.prog(T, start + 0.05, start + 0.7));
-        const pour = OM.ease.inOutCubic(OM.prog(T, POUR, END - 0.32)); // settles before the cut, so the spark is still
+        const pour = OM.ease.inOutCubic(OM.prog(T, POUR - 0.046, LANDR)); // the flock flares out and falls as the rain
+        const rainC = C.th['text-muted'] || ink.mid;
         const down = OM.pulse(DOWNS, T, 0.14);
 
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
         C.stars(ctx, T, 0.5 * C.sm(T, start + 0.1, start + 0.6) * (1 - pour));
+        // The sun the rain falls past comes up as the flock leaves it.
+        if (pour > 0) {
+          C.pool(ctx, SX, SY, 72, ink.lit, 0.4 * pour);
+          ctx.globalAlpha = pour;
+          ctx.fillStyle = ink.crest;
+          OM.cell(ctx, L, hc.col, hc.row, dpr);
+          ctx.globalAlpha = 1;
+        }
         const ws = F.map((f) => (T < f.tin - f.lead || T > f.tout + 0.4 ? 0 : C.arrive(T, f.tin, f.lead) * (1 - OM.ease.inOutCubic(OM.prog(T, f.tout, f.tout + 0.4)))));
         for (let i = 0; i < B.length; i++) {
           const b = B[i];
@@ -146,11 +191,10 @@ OM.scene({
             }
           }
           if (T < start + 0.06 + 0.3 && inForm < 0 && lift < 0.2) sz = OM.lerp(L.cw, 4, lift / 0.2);
+          let p = 0, d = null;
           if (pour > 0) {
-            const p = OM.clamp(pour * 1.2 - b.r * 0.2);
-            x = OM.lerp(x, SX, p);
-            y = OM.lerp(y, SY, p);
-            sz = OM.lerp(sz, 2, p);
+            p = OM.clamp(pour * 1.2 - b.r * 0.2);
+            d = RN.drops[i % RN.drops.length];
           }
           // Wingbeat flare: on each pause hit a beat of light runs through the free flock.
           if (inForm < 0 && T > 265.8) {
@@ -159,6 +203,13 @@ OM.scene({
             sz += 1.5 * wb * (1 - pour);
           }
           ctx.fillStyle = inForm < 0 && lift < 0.15 ? ink.dim : v > 1.2 ? ink.crest : v > 0.7 ? ink.hover : v > 0.42 ? ink.lit : ink.mid;
+          if (p > 0) {
+            // Each bird stretches into its drop, falling through the drop's place at the landing.
+            const [dx, dy] = RN.fall(d, T, LANDR);
+            if (p > 0.6) ctx.fillStyle = rainC;
+            ctx.fillRect(Math.round(OM.lerp(x - sz / 2, dx, p)), Math.round(OM.lerp(y - sz / 2, dy, p)), Math.round(OM.lerp(sz, 2, p)), Math.round(OM.lerp(sz, d.len, p)));
+            continue;
+          }
           ctx.fillRect(Math.round(x - sz / 2), Math.round(y - sz / 2), Math.round(sz), Math.round(sz));
         }
         // Specks shed off the flock, drifting behind it and fading.
@@ -169,12 +220,6 @@ OM.scene({
           const [fx0, fy0] = flockAt(b, T - age);
           ctx.fillStyle = C.rgba(ink.mid, spA * (1 - age / 1.3));
           ctx.fillRect(Math.round(fx0 - 30 * age), Math.round(fy0 + 40 * age * age), 2, 2);
-        }
-        // The point it pours into.
-        if (pour > 0) {
-          C.pool(ctx, SX, SY, 72, ink.lit, 0.4 * pour);
-          ctx.fillStyle = ink.crest;
-          OM.cell(ctx, L, hc.col, hc.row, dpr);
         }
       },
       release: () => c.release(),

@@ -481,7 +481,7 @@ OM.c1 = {
         const rot = ((2 * Math.PI) / 180) * Math.sin(Math.PI * p) * e;
         const x = -16 * Math.sin(2 * Math.PI * p) * e, y = 0;
         // 1.00 to 1.05 of push, never less than the roll needs to keep the corners covered.
-        const zoom = Math.max(1 + 0.05 * e * OM.smooth(OM.prog(T, start, 84.4)), OM.c1.cover(rot, x, y));
+        const zoom = Math.max(1 + 0.05 * e * OM.smooth(OM.prog(T, start, 84.4)), OM.c1.cover(rot, x, y)) + 0.022 * novaKick(T);
         // The sweep runs off each hit: the key word's landing, every snare pulse, the surge.
         const h = OM.lastHit(GLINTS, T), run = h === null ? -1 : OM.prog(T, h, h + (h === LAND ? 0.7 : 0.4));
         const amount = e * OM.smooth(OM.prog(T, LAND + 0.05, LAND + 0.35)) * (1 - sm(T, 84.6, 84.9));
@@ -517,6 +517,42 @@ OM.c1 = {
         }
       };
 
+      // ---- explosion, supernova: on the key word the spark goes nova. A round ring of crest light blooms out
+      // of the impact point across the frame, lattice debris flies out behind it and cools, the camera kicks
+      // gently. The ring is past the words in under 0.1 s and the debris is sparse, so the line reads at once. ----
+      const novaKick = (T) => {
+        const a = T - LAND;
+        return a < 0 ? 0 : (1 - Math.exp(-a / 0.02)) * Math.exp(-a / 0.16);
+      };
+      const supernova = (ctx, T) => {
+        const a = T - LAND;
+        if (a < 0 || a > 0.9) return;
+        const R = 1250 * OM.ease.outExpo(OM.clamp(a / 0.7)), k = 1 - OM.smooth(a / 0.9);
+        // The ring: lattice cells round its front, crest at the leading edge, hover behind.
+        const n = Math.ceil((2 * Math.PI * R) / 9);
+        for (const [dr, col, al] of [[0, ink.crest, 1], [-10, ink.hover, 0.7], [-22, ink.lit, 0.4]]) {
+          const r = R + dr;
+          if (r <= 0) continue;
+          ctx.globalAlpha = al * k;
+          ctx.fillStyle = col;
+          for (let i = 0; i < n; i++) {
+            const th = (i / n) * 2 * Math.PI;
+            ctx.fillRect(Math.round(hubX + r * Math.cos(th)) - 3, Math.round(hubY + 0.82 * r * Math.sin(th)) - 3, 6, 6);
+          }
+        }
+        // The debris: square cells thrown out radially with drag, cooling crest to lit to mid.
+        for (let i = 0; i < 56; i++) {
+          const h1 = OM.hash(i, 1, 0x50), h2 = OM.hash(i, 2, 0x50), h3 = OM.hash(i, 3, 0x50);
+          const th = 2 * Math.PI * h1, v = 2400 + 2200 * h2, tau = 0.45, r = v * tau * (1 - Math.exp(-a / tau));
+          const life = 0.5 + 0.4 * h3, u = a / life;
+          if (u >= 1) continue;
+          ctx.globalAlpha = 1 - u * u;
+          ctx.fillStyle = u < 0.25 ? ink.crest : u < 0.6 ? ink.lit : ink.mid;
+          const sz = Math.round(9 * (1 - 0.6 * u));
+          ctx.fillRect(Math.round(hubX + r * Math.cos(th)), Math.round(hubY + 0.82 * r * Math.sin(th)), sz, sz);
+        }
+        ctx.globalAlpha = 1;
+      };
       // ---- pause sprinkle: the mended bowl rings. Each snare sends a chime of light round the front of the
       // rim from the lip's centre; the 84.17 kick rings the whole mouth, back edge too. Above the words. ----
       const CHIMES = [[83.48, 0], [83.73, 0], [83.89, 0], [84.06, 0], [84.17, 1]];
@@ -637,6 +673,7 @@ OM.c1 = {
           }
           sparkles(ctx, T);
           rimChime(ctx, T);
+          supernova(ctx, T);
         },
         release: () => c.release(),
       }, fx, look);
