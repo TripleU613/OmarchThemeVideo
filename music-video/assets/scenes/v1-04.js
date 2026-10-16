@@ -166,6 +166,19 @@ vec4 effect(vec2 uv) {
               }
             }
           }
+          // Seam ember: on the 53.06 snare the old seam glows once in crest cells and cools, around the words.
+          const EMBER = 53.06;
+          if (T >= EMBER && T < EMBER + 0.4) {
+            ctx.fillStyle = ink.crest;
+            ctx.globalAlpha = Math.exp(-(T - EMBER) / 0.12);
+            for (const [x, y] of seam) {
+              const cl = OM.cellAt(HM, x, y + HM.ch / 2);
+              const px = HM.x0 + (cl.col + 0.5) * HM.cw, py = HM.y0 + (cl.row + 0.5) * HM.ch;
+              if (words.some((wd) => px > wd.x - 20 && px < wd.x + wd.w + 20 && py > wd.base - wd.cap - 20 && py < wd.base + 20)) continue;
+              OM.cell(ctx, HM, cl.col, cl.row, dpr);
+            }
+            ctx.globalAlpha = 1;
+          }
           if (T >= GONE) return;
           // The page: printed live until the rip, then the frozen sheet in two halves.
           if (T < RIP - 0.02) {

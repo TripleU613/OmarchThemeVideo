@@ -240,6 +240,10 @@ OM.ownWords.add('b-01');
           // Year wheels, carrying like a real counter.
           const YW = 150, YH = 210, YX = 960 - 2 * YW - 30, YY = 210;
           const pos = wheels(year(T));
+          // Wheel Shiver: on the pause's snares the year's last two wheels tick half a notch and settle back.
+          const shiver = [196.37, 196.51].reduce((m, h) => m + (T >= h ? 0.22 * Math.exp(-(T - h) / 0.06) * Math.cos((T - h) * 45) : 0), 0);
+          pos[2] += shiver * 0.6;
+          pos[3] -= shiver;
           const ycap = 128;
           const yfont = B.font(700, ycap / B.metrics(700).cap);
           ctx.fillStyle = th['surface-2'];
@@ -302,7 +306,6 @@ OM.ownWords.add('b-01');
           const ctx = c.ensure();
           ctx.globalAlpha = 1;
           if (e > 0) {
-
             const { set, drums } = lay();
             // Dust in the counter's light.
             B.motes(ctx, T, { seed: 101, n: 46, color: OM.fieldInks('tokyo-night').mid, alpha: 0.45 * e, vx: 14, vy: -6, size: 3 });

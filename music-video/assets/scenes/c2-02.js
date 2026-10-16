@@ -200,6 +200,29 @@ OM.ownWords.add('c2-02');
           this.draw(t, T);
           const ctx = c.ensure();
           if (OM.c2.live(T, start, END)) {
+            // Roll call (k164.68, k164.79, k164.86): each machine's status lamp, in its bezel corner clear of the word, lights in turn down the fleet, a third of the fleet per kick, and rides off with it.
+            {
+              const list = get().ms.filter(Boolean), n = list.length;
+              const run = OM.ease.inCubic(OM.prog(T, RUN, DB2)) * 2300;
+              list.forEach((mc, i) => {
+                const h = [164.676, 164.792, 164.862][Math.min(2, Math.floor((i * 3) / n))];
+                const a = T - h;
+                if (a < 0) return;
+                const x = mc.sx + mc.sw - 20 + run, y = mc.sy + mc.sh - 18;
+                if (x > 1940) return;
+                const fl = decay(T, h, 0.12);
+                if (fl > 0.02) {
+                  // The machine answers: its face glows and its bezel lights crest.
+                  pool(ctx, mc.sx + mc.sw / 2 + run, mc.sy + mc.sh / 2, mc.sw * 0.75, mc.sh * 0.9, ink.lit, 0.4 * fl);
+                  ctx.strokeStyle = OM.c2.rgba(ink.crest, fl);
+                  ctx.lineWidth = 6;
+                  ctx.strokeRect(mc.sx + run - 3, mc.sy - 3, mc.sw + 6, mc.sh + 6);
+                }
+                pool(ctx, x + 6, y + 6, 60, 60, ink.lit, 0.3 + 0.5 * fl);
+                ctx.fillStyle = a < 0.08 ? ink.crest : ink.hover;
+                ctx.fillRect(x, y, 12, 12);
+              });
+            }
           const { ms } = get();
           // High windows along the top, where the shafts come from.
           ctx.fillStyle = OM.c2.rgba(th['surface-2'], 0.9 * OM.post.envelope(T, start, END, { ramp: 0.4 }));

@@ -327,6 +327,38 @@ OM.ownWords.add('c2-01');
           this.draw(t, T);
           const ctx = c.ensure();
           if (OM.c2.live(T, start, END)) {
+            // Late slivers (s160.22, s160.80, k160.91, s161.29): the last crumbs of glass fly home onto the pane's rim, outside the words, and the rim glows where each lands.
+            // Rim ring: as the slivers land, the pane's whole rim rings in light, a band around the words, never over them.
+            {
+              let ring = 0;
+              for (const h of [160.218, 160.798, 160.91, 161.286]) if (T >= h && T < h + 0.3) ring = Math.max(ring, 1 - (T - h) / 0.3);
+              if (ring > 0) {
+                ctx.strokeStyle = OM.c2.rgba(ink.lit, 0.4 * ring);
+                ctx.lineWidth = 40;
+                ctx.strokeRect(320 - 12, 140 - 12, 1280 + 24, 800 + 24);
+                ctx.strokeStyle = OM.c2.rgba(ink.crest, ring);
+                ctx.lineWidth = 8;
+                ctx.strokeRect(320 - 4, 140 - 4, 1280 + 8, 800 + 8);
+              }
+            }
+            [160.218, 160.798, 160.91, 161.286].forEach((h, hi) => {
+              const u = OM.prog(T, h - 0.2, h), a = T - h;
+              if (u <= 0 || a > 0.25) return;
+              for (let n = 0; n < 6; n++) {
+                const side = (n + hi) % 4, f = OM.hash(n, hi, 81);
+                const tx = side === 0 ? 320 + 1280 * f : side === 2 ? 320 + 1280 * f : side === 1 ? 1600 : 320;
+                const ty = side === 1 || side === 3 ? 140 + 800 * f : side === 0 ? 140 : 940;
+                const ox = tx + (tx - 960) * 0.9 * (1 - OM.ease.inCubic(u)), oy = ty + (ty - 540) * 0.9 * (1 - OM.ease.inCubic(u));
+                const al = a < 0 ? OM.clamp(u * 3) : 1 - a / 0.25;
+                ctx.fillStyle = OM.c2.rgba(a < 0 ? ink.hover : ink.crest, al);
+                ctx.beginPath();
+                ctx.moveTo(ox, oy - 26);
+                ctx.lineTo(ox + 24, oy + 18);
+                ctx.lineTo(ox - 21, oy + 15);
+                ctx.fill();
+                if (a >= 0) pool(ctx, tx, ty, 140, 140, ink.lit, 0.45 * (1 - a / 0.25));
+              }
+            });
           // Glass glints: four-point stars flaring on the mesh's joints once the pane is whole.
           if (T > on[0] + 0.1 && T < DB2) {
             for (let n = 0; n < 22; n++) {

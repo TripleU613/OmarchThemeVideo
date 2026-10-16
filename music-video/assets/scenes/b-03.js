@@ -169,6 +169,27 @@ OM.scene({
           ctx.globalAlpha = 1;
           if (e > 0) {
 
+            // Seam Studs: as the road settles into the grid, its crossings stud crest on the snares.
+            {
+              const p = OM.pulse([205.22, 205.36], T, 0.07);
+              if (p > 0.02) {
+                const L = OM.HOME, ik = OM.fieldInks('tokyo-night');
+                const { lanes } = lay();
+                const H2 = B.sub(2);
+                ctx.fillStyle = ik.crest;
+                ctx.globalAlpha = e * p;
+                for (const ln of lanes) {
+                  const r0 = Math.floor((ln.rTop - 3) / 2), r1 = Math.ceil((ln.rBot + 3) / 2);
+                  for (let row = r0; row <= r1; row++)
+                    for (let col = L.cMin; col <= L.cMin + L.cols; col++) {
+                      if (OM.hash(col, row, T >= 205.36 ? 2 : 1) > 0.2) continue;
+                      ctx.fillRect(L.x0 + col * L.cw - 2, L.y0 + row * L.ch - 2, 4, 4);
+                    }
+                }
+                ctx.globalAlpha = 1;
+              }
+            }
+
             const { lanes, spans } = lay();
             const ink2 = OM.fieldInks('tokyo-night'), th2 = OM.theme('tokyo-night');
             const H2 = B.sub(2);

@@ -118,13 +118,19 @@ OM.scene({
         // The tape catching: rewind marks and tracking lines while time runs back.
         if (rew) {
           const p = OM.prog(T, R0, R1 + 0.08);
-          const fl = Math.floor(T * 30) % 2 ? 1 : 0.55;
+          const hic = T >= 125.16 ? Math.exp(-(T - 125.16) / 0.1) : 0; // sprinkle: the tape hiccups on the kick
+          const fl = Math.max(Math.floor(T * 30) % 2 ? 1 : 0.55, hic);
+          if (hic > 0.03) {
+            ctx.fillStyle = OM.v2.rgba(ink.crest, 0.35 * hic);
+            ctx.fillRect(0, 300 + 420 * OM.hash(1, 2, 3), 1920, 4 + 10 * hic);
+          }
           ctx.fillStyle = OM.v2.rgba(ink.crest, fl);
           for (let i = 0; i < 2; i++) {
             ctx.beginPath();
-            ctx.moveTo(150 + i * 44, 900);
-            ctx.lineTo(106 + i * 44, 930);
-            ctx.lineTo(150 + i * 44, 960);
+            const hs = 1 + 0.5 * hic;
+            ctx.moveTo(150 + i * 44 * hs, 930 - 30 * hs);
+            ctx.lineTo(150 + (i * 44 - 44) * hs, 930);
+            ctx.lineTo(150 + i * 44 * hs, 930 + 30 * hs);
             ctx.closePath();
             ctx.fill();
           }

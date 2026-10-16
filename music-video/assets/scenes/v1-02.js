@@ -59,10 +59,13 @@ vec4 effect(vec2 uv) {
         return { dy: 34 * j * Math.cos((a / 0.19) * Math.PI * 2) - 4 * j, rot: 0.05 * Math.exp(-a / 0.5) * Math.sin(a * 9 + t0) };
       };
       const yank = (T) => (T < YANK ? 0 : 1) * Math.exp(-(T - YANK) / 0.12) * 40;
+      // String pluck: on the 45.53 kick in the pause every string twangs, bowing and settling.
+      const PLUCK = 45.53;
+      let pluck = 0;
       const string = (ctx, x0, y0, x1, y1) => {
         ctx.beginPath();
         ctx.moveTo(x0, y0);
-        ctx.lineTo(x1, y1);
+        ctx.quadraticCurveTo((x0 + x1) / 2 + pluck, (y0 + y1) / 2, x1, y1);
         ctx.stroke();
       };
       const barX = (x) => 960 + (x - 960) * 0.42;
@@ -97,6 +100,7 @@ vec4 effect(vec2 uv) {
           const dpr = c.dpr;
           if (T < start + H0) return V.phoneFrame(ctx);
           if (T >= END - H) return OM.handoff('white', ctx, T, dpr);
+          pluck = T >= PLUCK ? 26 * Math.exp(-(T - PLUCK) / 0.18) * Math.sin((T - PLUCK) * 38) : 0;
           const L = lay();
           const cy = camY(T), Y = (y) => y + cy;
           const yk = yank(T);

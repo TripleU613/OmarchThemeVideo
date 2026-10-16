@@ -31,6 +31,7 @@ OM.scene({
     const FROM = V.grid(6), TO = V.grid(N);
     const CHORD = V.hitsIn(OM.T && OM.T.downbeats, on[N - 1], END, [122.903])[0];
     const KICKS = [119.211, 119.676, 120.279];
+    const GAPK = [120.72, 120.88], GAPS = 121.25; // the mid-line gap's kicks and snare
     const CL0 = END - 0.26, CL1 = END - 0.09;
     let fits = null;
     const fit = () => TO.map((r, k) => V.fitWord((sung[k] && sung[k].text) || '', r.x + r.w / 2, r.y + r.h / 2 + 10, r.w - 44, 112));
@@ -64,12 +65,20 @@ OM.scene({
             border: OM.mix(border, th['border-strong'], clear), face: OM.mix(face, th.bg, clear),
             s: (0.87 + 0.13 * pop) * (1 + 0.012 * kick + 0.02 * strike), alpha: pop >= 1 ? 1 : OM.clamp(pop * 3),
           });
+          // Sprinkle, the snare before the next note: the next window's hammer lifts, its border catching light.
+          const hl = T >= GAPS && on[k] > GAPS ? Math.exp(-(T - GAPS) / 0.09) * (k === OM.hitCount(on, GAPS) ? 1 : 0) : 0;
+          if (hl > 0.03) V.ring(ctx, r, 3, 3, ink.hover, hl);
           if (!played) return;
           // The note rings out of the tile while it is held, and once more on the chord.
           const held = T <= off[k] + 0.25;
           for (let j = 0; j < 3; j++) {
             const ph = (age - j * 0.12) / 0.55;
             if (held && ph > 0 && ph < 1) V.ring(ctx, r, 6 + 70 * OM.ease.outCubic(ph), 3 - j * 0.6, ink.hover, (1 - ph) * 0.8 * (1 - clear));
+          }
+          // Sprinkle, mid-line gap: the played windows ring again in sympathy on each kick.
+          for (const h of GAPK) {
+            const ga = T - h;
+            if (ga >= 0 && ga < 0.4 && on[k] < h) V.ring(ctx, r, 8 + 40 * OM.ease.outCubic(ga / 0.4), 2, ink.lit, 0.7 * (1 - ga / 0.4) * (1 - clear));
           }
           if (chord > 0.02) V.ring(ctx, r, 6 + 60 * (1 - chord), 3, ink.crest, chord * (1 - clear));
           // The word: struck in crest, cooling to text; the voice shakes it while it sounds.

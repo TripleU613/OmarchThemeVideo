@@ -150,6 +150,23 @@ OM.ownWords.add('c2-06');
           this.draw(t, T);
           const ctx = c.ensure();
           if (OM.c2.live(T, start, END)) {
+            // Settling puffs (s180.70) and hat glitter: the snare knocks dust up off every word's baseline, and the hats glint single dashes in the letters until they drop.
+            {
+              const rows6 = get().filter(Boolean);
+              const a = T - 180.698;
+              if (a >= 0 && a < 0.6)
+                for (const r of rows6)
+                  for (let n = 0; n < 16; n++) {
+                    const x = r.p.x + r.p.w * OM.hash(n, r.k, 101), y = r.foot - 30 - 160 * a * (0.4 + OM.hash(r.k, n, 102)) + 200 * a * a;
+                    ctx.fillStyle = OM.c2.rgba(n % 2 ? ink.mid : ink.lit, 1 - a / 0.6);
+                    ctx.fillRect(x, y, 5, 5);
+                  }
+              if (T > 180.5 && T < DROP) {
+                const hat = OM.audio(T).bands[13] || 0, slot = Math.floor(T / (OM.SPB / 4));
+                for (const r of rows6)
+                  for (const cl of r.cells) if (OM.hash(cl.i, cl.j, slot) < 0.03 * hat) { ctx.fillStyle = ink.crest; ctx.fillRect(cl.x, cl.y + 1, CS, CS - 2); }
+              }
+            }
           // Grass flying up off the hooves of each herd.
           const herds = get().filter(Boolean).map((r) => [r.p.x + (T - on[r.k]) * r.v + 50, r.foot]);
           if (T > HERD0) herds.push([(T - HERD0) * HV - 40, lineY]);

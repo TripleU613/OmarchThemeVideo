@@ -590,6 +590,14 @@
             ctx.fillStyle = ink.bg;
             runs(lay.die, T, (x, y, w, h) => ctx.fillRect(x, y, w, h));
           }
+          // Pause sprinkle, lattice aftershock: the 100.22 kick shakes the ruled lattice once more, under the letters.
+          const shock = T >= 100.22 && T < 100.5 ? Math.pow(0.5, (T - 100.22) / 0.06) : 0;
+          if (shock > 0.03) {
+            ctx.globalAlpha = 0.8 * shock;
+            ctx.fillStyle = ink.mid;
+            lines(ctx, dpr);
+            ctx.globalAlpha = 1;
+          }
 
           // The words.
           if (T < SNARE) {

@@ -33,6 +33,7 @@ vec4 effect(vec2 uv) {
       const on = sung.map((w) => w.t0);
       const N = on.length;
       const KEY = on.findIndex((t0, k) => t0 <= 47.996 && (k === N - 1 || on[k + 1] > 47.996));
+      const SN = [49.32, 49.71, 49.81, 50.2, 50.39];
       const STOP = 49.72, DARK = 49.95, FADE0 = 50.2, FADE1 = END - H - 0.02;
       // The meter, its display window and the receipt printer.
       const M = { x: 110, y: 230, w: 720, h: 620 }, D = { x: 150, y: 290, w: 640, h: 230 };
@@ -88,7 +89,9 @@ vec4 effect(vec2 uv) {
           const fade = 1 - OM.smooth(OM.prog(T, FADE0, FADE1));
           ctx.globalAlpha = fade;
           const keyHit = KEY >= 0 && T >= on[KEY] ? Math.exp(-(T - on[KEY]) / 0.1) : 0;
-          const bump = 5 * OM.pulse(on, T, 0.05) + 14 * keyHit * Math.sin((T - on[KEY]) * 70);
+          // Meter creep: after the last fare the meter keeps ticking a cent on every snare of the pause.
+          const creep = OM.hitCount(SN, T);
+          const bump = 4 * OM.pulse(SN, T, 0.04) + 5 * OM.pulse(on, T, 0.05) + 14 * keyHit * Math.sin((T - on[KEY]) * 70);
           ctx.save();
           ctx.translate(0, bump);
           // The meter body and its coin slot.
@@ -139,7 +142,7 @@ vec4 effect(vec2 uv) {
             const r = k >= 0 ? roll(T, on[k], 0.2) : 1;
             const off = j === k ? (1 - r) * 140 : -r * 140;
             if (j === k - 1 && r >= 1) continue;
-            ctx.fillText(j < 0 ? '0.00' : totals[j].toFixed(2), D.x + D.w, 735 + off);
+            ctx.fillText(j < 0 ? '0.00' : (totals[j] + (j === k ? 0.01 * creep : 0)).toFixed(2), D.x + D.w, 735 + off);
           }
           ctx.restore();
           ctx.fillStyle = WI.dim;

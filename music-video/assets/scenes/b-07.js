@@ -198,6 +198,35 @@ OM.scene({
           ctx.globalAlpha = 1;
           if (e > 0) {
 
+            // Keystroke Taps and Afterglow Pips: the person's hand strikes the keys on the kicks; once the screen is off, the last point pips on each hit.
+            {
+              const ik = OM.fieldInks('tokyo-night');
+              const S = lay()[stageAt(T)], si = stageAt(T);
+              const tap = OM.pulse([220.94, 221.08], T, 0.06) * (1 - OM.prog(T, OFF, OFF + 0.2));
+              if (tap > 0.03) {
+                const tall = S.tall, x = 1830 - (2 - si) * 10 - tall * 0.21, y = 1000 - tall + tall * 0.17 + 8 + tall * 0.45 * 0.35 + 4 * tap;
+                ctx.globalAlpha = e * tap;
+                ctx.fillStyle = ik.crest;
+                ctx.fillRect(x - 10, y, 10, tall * 0.05);
+                ctx.fillRect(x - 40, DESK - 4, 26, 3);
+              }
+              const pip = OM.pulse([221.61, 221.7, 221.89], T, 0.08) * (1 - OM.prog(T, END - 0.17, END - 0.125));
+              if (T > OFF + 0.35 && pip > 0.03) {
+                const u = OM.ease.inOutCubic(OM.prog(T, OFF + 0.35, END - 0.14));
+                const x = OM.lerp(960, B.SPARK.x, u), y = OM.lerp(S.cy, B.SPARK.y, u);
+                // The dying point flares wide: a halo and long crest arms of light.
+                ctx.globalAlpha = 1;
+                B.pool(ctx, x, y, 320, ik.lit, 0.6 * pip);
+                B.pool(ctx, x, y, 110, ik.crest, 0.5 * pip);
+                const arm = 60 + 260 * pip;
+                ctx.globalAlpha = pip;
+                ctx.fillStyle = ik.crest;
+                ctx.fillRect(x - arm, y - 3, 2 * arm, 6);
+                ctx.fillRect(x - 3, y - arm * 0.55, 6, arm * 1.1);
+              }
+              ctx.globalAlpha = 1;
+            }
+
             // Dust turning in the lamp's light.
             B.motes(ctx, T, { seed: 707, n: 50, color: OM.fieldInks('tokyo-night').hover, alpha: 0.35 * e * (1 - OM.prog(T, OFF, OFF + 0.4)), x: 600, y: 0, w: 720, h: 860, vx: 8, vy: 6, size: 3 });
           }

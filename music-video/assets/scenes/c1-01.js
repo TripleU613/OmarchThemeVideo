@@ -484,6 +484,33 @@ OM.c1 = {
         }
       };
 
+      // ---- pause sprinkle: the mended bowl rings. Each snare sends a chime of light round the front of the
+      // rim from the lip's centre; the 84.17 kick rings the whole mouth, back edge too. Above the words. ----
+      const CHIMES = [[83.48, 0], [83.73, 0], [83.89, 0], [84.06, 0], [84.17, 1]];
+      const rimChime = (ctx, T) => {
+        const fade = 1 - sm(T, 84.45, 84.6);
+        if (fade <= 0) return;
+        for (const [t0, full] of CHIMES) {
+          const a = T - t0, life = full ? 0.42 : 0.3;
+          if (a < 0 || a > life) continue;
+          const reach = (full ? Math.PI : Math.PI / 2) * OM.ease.outCubic(a / life), k = (1 - a / life) * fade;
+          // The lit arc of rim: a wide glow on the lip with a crest core, the leading ends brightest.
+          const a0 = Math.PI / 2 - reach, a1 = Math.PI / 2 + reach;
+          for (const [w, col, al] of [[90, ink.lit, 0.16], [40, ink.lit, 0.4], [18, ink.hover, 0.75], [7, ink.crest, 1]]) {
+            ctx.globalAlpha = al * k;
+            ctx.strokeStyle = col;
+            ctx.lineWidth = w;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.ellipse(BX, RIM, RX, RY, 0, a0, a1);
+            ctx.stroke();
+          }
+          ctx.lineCap = 'butt';
+          for (const th of [a0, a1]) OM.c1.star(ctx, BX + RX * Math.cos(th), RIM + RY * Math.sin(th), 22 * k + 6, ink.crest, k);
+        }
+        ctx.globalAlpha = 1;
+      };
+
       return OM.c1.post({
         render(t, T) {
           const ctx = c.ensure();
@@ -576,6 +603,7 @@ OM.c1 = {
             OM.cell(ctx, HM, sp.col, sp.row, dpr);
           }
           sparkles(ctx, T);
+          rimChime(ctx, T);
         },
         release: () => c.release(),
       }, fx, look);

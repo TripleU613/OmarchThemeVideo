@@ -203,6 +203,27 @@ OM.ownWords.add('c2-03');
           this.draw(t, T);
           const ctx = c.ensure();
           if (OM.c2.live(T, start, END)) {
+            // Deck lamp chase (k168.37, k168.62, s168.79, k168.86, k169.44): on each hit a run of light races the gunwale from bow to stern, above the words.
+            {
+              const cam = OM.ease.inOutCubic(OM.prog(T, 168.62, DB2)), S2 = 1 + 0.55 * cam, ny2 = NL.y0 + 9.5 * NL.ch;
+              const fade = 1 - sm(T, 169.2, DB2);
+              ctx.save();
+              ctx.translate(960, OM.lerp(ny2, 540, cam));
+              ctx.scale(S2, S2);
+              ctx.translate(-960, -ny2);
+              for (const h of [168.368, 168.623, 168.786, 168.856, 169.436]) {
+                const a = T - h;
+                if (a < 0 || a > 0.7 || fade <= 0) continue;
+                const head = BOW - a * 3000;
+                for (let col = HM.cMin; col < HM.cMin + HM.cols; col++) {
+                  const x = HM.x0 + (col + 0.5) * HM.cw;
+                  if (x > BOW || x > head + 140 || x < head) continue;
+                  ctx.fillStyle = OM.c2.rgba(x < head + 40 ? ink.crest : ink.hover, fade);
+                  OM.cell(ctx, HM, col, cR, c.dpr);
+                }
+              }
+              ctx.restore();
+            }
           // Foam drifting at the waterline after the smash.
           if (T > on[K]) {
             const a = T - on[K];

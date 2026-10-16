@@ -174,3 +174,29 @@ Each scene gets the camera move, signature shader and extras from its row in
 - One sentence: the idea, and how the words drive it.
 - The hits you used (times).
 - Anything that needs fixing outside your file.
+
+## Pause sprinkles pass
+
+After a line's last word the frame can sit for 1 to 3 s until the cut. Fill that
+pause, and any gap of 0.8 s or more inside a line, with small extra touches timed
+to the music.
+
+- **Additive only.** These stay exactly as they are: each word's arrival, the
+  read hold (at least 0.4 s after the last word lands, with the whole line still),
+  the exit into the out-handoff, and the cut frames. No new devices, no rebuilds.
+- **Every kick and snare in the pause gets a visible accent that grows out of
+  the scene's own device and objects.** A crane's cable swings and a rivet sparks
+  on the kick; a skyline's windows twinkle on the hats. No generic overlays (glint
+  sweeps, particle bursts, bloom pulses, flashes) unless they come from the
+  scene's own objects. A pause with no kicks or snares rides the hi-hat rolls or
+  the energy (`npm run facts <id>`).
+- **A touch in a mid-line gap never delays or covers a word.**
+- **The line stays readable.** The accents go around it or on it, never over it,
+  and everything eases to rest for the exit as before.
+- **Optional:** in the last ~0.4 s before the exit, a small anticipation of what
+  comes next, with the out-handoff unchanged.
+- **Same rules as ever:** pure function of T, Tokyo Night, 12 ms per frame
+  (extra draws and particles are the usual cost, so time it), no lyric text, at
+  most 2 snapshot rounds per scene through the flock.
+- **Report each sprinkle by name,** with the hits it lands on. Names are unique
+  across the film, because nothing repeats.

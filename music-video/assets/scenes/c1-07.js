@@ -376,7 +376,9 @@ OM.ownWords.add('c1-07');
           // The stage light arriving under the drain.
           const mc = OM.smooth(OM.prog(T, DRAIN, LAND)), mp = OM.smooth(OM.prog(T, DRAIN + FALL * 0.9, LAND));
           if (mc > 0) spot(ctx, ink, mc, mp);
-
+          // Pause sprinkles. Monitor blink: the snares at 109.37 and 109.55 blink the HR lamp and flare the grid.
+          // Drain throb: the 109.76 and 110.06 kicks and the 110.16 snare pulse the falling trace.
+          const blink = OM.pulse([109.37, 109.55], T, 0.06) * (T < 109.75 ? 1 : 0);
           // Defibrillator thump: the frame jolts on each word, softly on each kick after.
           const [jx, jy, flash] = joltAt(T);
           ctx.save();
@@ -387,7 +389,7 @@ OM.ownWords.add('c1-07');
           const reach = 620 * OM.ease.outCubic(OM.prog(T, POWER, POWER + 0.36));
           if (dim > 0 && reach > 1) {
             const snap = (v) => Math.round(v * dpr) / dpr;
-            const ga = dim * (1 + 1.4 * flash);
+            const ga = dim * (1 + 1.4 * flash + 0.9 * blink);
             ctx.fillStyle = ink.dim;
             for (let r = HL.rMin; r <= HL.rMin + HL.rows; r++) {
               const y = HL.y0 + r * HL.ch;
@@ -418,7 +420,7 @@ OM.ownWords.add('c1-07');
           if (headOn) pool(ctx, L.x0 + (hq + 0.5) * L.cw, L.y0 + (hr + 0.5) * L.ch, 44, 44, ink.lit, T < on[3] ? 0.3 : 0.5);
 
           // The trace: written by the sweep, cooling from crest; broken until the key word mends it.
-          const beat = OM.pulse(KICKS, T, 0.11);
+          const beat = OM.pulse([...KICKS, 109.76, 110.06, 110.16], T, 0.11);
           const drawn = [];
           for (const cl of M.cells) {
             if (cl.at > T) continue;
@@ -467,7 +469,7 @@ OM.ownWords.add('c1-07');
             ctx.fillStyle = alive ? (lamp > 0.5 ? ink.crest : ink.lit) : flash > 0.2 ? th.text : th['text-muted'];
             ctx.fillText(alive ? String(T >= KICKS[1] ? 112 : T >= KICKS[0] ? 88 : 60) : '---', 1836, 216);
             ctx.textAlign = 'left';
-            ctx.fillStyle = alive && lamp > 0.3 ? ink.crest : flash > 0.2 ? ink.mid : ink.dim;
+            ctx.fillStyle = (alive && lamp > 0.3) || blink > 0.3 ? ink.crest : flash > 0.2 ? ink.mid : ink.dim;
             ctx.fillRect(1640, 196, 20, 20);
             ctx.globalAlpha = 1;
           }

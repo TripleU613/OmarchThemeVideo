@@ -70,7 +70,17 @@ OM.scene({
         const ctx = c.ensure();
         const dpr = c.dpr;
         if (C.seam(ctx, T, dpr, start, END, 'grid', 'word')) return;
-        if (T >= REST) return OM.handoff('word', ctx, T, dpr);
+        if (T >= REST) {
+          // Field heartbeat: on the two last kicks the field and the wordmark glow out from the name, then settle.
+          const hb = (C.decay(T, 280.149, 0.09) + C.decay(T, 280.497, 0.09)) * (1 - C.sm(T, 280.55, END - 0.08));
+          if (hb < 0.003) return OM.handoff('word', ctx, T, dpr);
+          ctx.fillStyle = ink.bg;
+          ctx.fillRect(0, 0, 1920, 1080);
+          const g = [{ x: 960, y: 540, strength: 0.6 * hb, reach: 380 + 700 * hb }];
+          OM.hero(ctx, T, dpr, { inks: ink, L, word: false, gain: 0.8, bg: false, glows: g });
+          OM.paintWord(ctx, L, dpr, ink, { glows: g });
+          return;
+        }
         const { cells } = type();
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);

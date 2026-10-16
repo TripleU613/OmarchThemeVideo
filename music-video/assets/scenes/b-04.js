@@ -178,6 +178,27 @@ OM.scene({
           ctx.globalAlpha = 1;
           if (e > 0) {
 
+            // Hat Blinkers: on each 16th of the hi-hat roll, a few blinkers pop in the dark of the board, away from the letters.
+            {
+              const HATS = ticks.filter((x) => x >= 208.05 && x < END - 0.15);
+              const h = OM.lastHit(HATS, T);
+              if (h !== null && T - h < 0.16) {
+                const n = HATS.indexOf(h), ik = OM.fieldInks('tokyo-night');
+                const G2 = B.sub(2);
+                const a = (T - h) / 0.16;
+                ctx.fillStyle = OM.mix(ik.crest, ik.mid, a);
+                ctx.globalAlpha = e * (1 - a);
+                for (let i = 0; i < 16; i++) {
+                  const x = 120 + OM.hash(i, n, 41) * 1680, y = 80 + OM.hash(i, n, 42) * 920;
+                  if (y > 380 && y < 720) continue; // the letters' band stays clear
+                  if (T >= DIE && (x < 340 || x > 1580 || y < 160 || y > 920)) continue;
+                  const q = Math.floor((x - G2.x0) / G2.cw), r = Math.floor((y - G2.y0) / G2.ch), vert = (n + i) % 2;
+                  for (let k = -1; k <= 1; k++) OM.cell(ctx, L, Math.floor(q / 2) + (vert ? 0 : k), Math.floor(r / 2) + (vert ? k : 0), c.dpr);
+                }
+                ctx.globalAlpha = 1;
+              }
+            }
+
             // Micro-particles drifting through the slide.
             B.motes(ctx, T, { seed: 404, n: 60, color: OM.fieldInks('tokyo-night').dim, alpha: 0.7 * e, vx: 9, vy: 5, size: 4 });
             B.motes(ctx, T, { seed: 405, n: 18, color: OM.fieldInks('tokyo-night').mid, alpha: 0.4 * e, vx: -5, vy: 8, size: 2 });

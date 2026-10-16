@@ -224,6 +224,27 @@ OM.ownWords.add('c2-08');
           this.draw(t, T);
           const ctx = c.ensure();
           if (OM.c2.live(T, start, END)) {
+            // Roll couriers and core ticks (hat roll 191.73 to 193.03): more electrons pour onto the traces as the roll climbs, and the core's rim ticks on every sixteenth.
+            {
+              const s8 = scale(T), X8 = (x) => ZX + (x - ZX) * s8, Y8 = (y) => ZY + (y - ZY) * s8;
+              const roll = OM.prog(T, 191.727, 192.8), dark8 = sm(T, OFF - 0.1, OFF + 0.25), sz8 = 4 * Math.min(s8, 3);
+              if (roll > 0 && dark8 < 1) {
+                ctx.fillStyle = OM.c2.rgba(ink.hover, 1 - dark8);
+                traces.forEach((tr, n) => {
+                  if (n % 2 === 0 || OM.hash(n, 0, 121) > roll) return;
+                  const d = (T * 900 + tr.ph * 3 * tr.len) % tr.len;
+                  for (const [a, b, acc, l] of tr.segs) {
+                    if (d < acc || d > acc + l) continue;
+                    const f = (d - acc) / l;
+                    ctx.fillRect(X8(a[0] + (b[0] - a[0]) * f) - sz8 / 2, Y8(a[1] + (b[1] - a[1]) * f) - sz8 / 2, sz8, sz8);
+                  }
+                });
+                const tick = ((T - 191.727) / (OM.SPB / 4)) % 1, cs8 = CORE * s8 * 1.18;
+                ctx.strokeStyle = OM.c2.rgba(ink.lit, roll * (1 - tick) * (1 - dark8));
+                ctx.lineWidth = Math.max(1.5, cs8 / 40);
+                ctx.strokeRect(X8(ZX) - cs8 / 2, Y8(ZY) - cs8 / 2, cs8, cs8);
+              }
+            }
           // Electrons flowing out along the traces.
           const s = scale(T), X = (x) => ZX + (x - ZX) * s, Y = (y) => ZY + (y - ZY) * s;
           const grow = OM.prog(T, start + 0.03, on[0] + 0.25), dark = sm(T, OFF - 0.1, OFF + 0.25), sz = 4 * Math.min(s, 3);

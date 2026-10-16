@@ -144,6 +144,14 @@ vec4 effect(vec2 uv) {
           ctx.stroke(ANVIL);
           ctx.fillStyle = ink.mid;
           ctx.fillRect(438, FACE, 1218, 3);
+          // Anvil ring: the face rings on the kicks in the mid-line gap, its rim shivering crest.
+          const ring = OM.pulse([60.325, 60.86], T, 0.08);
+          if (ring > 0.02 && T >= 60.325) {
+            ctx.fillStyle = ink.crest;
+            ctx.globalAlpha = world * ring;
+            for (let x = 438; x < 1656; x += 24) ctx.fillRect(x, FACE - 2 + 4 * ring * Math.sin(x * 0.05 + T * 90), 24, 3 + 3 * ring);
+            ctx.globalAlpha = 1;
+          }
           ctx.globalAlpha = 1;
           // The words: forged on their strike, squashed by it, cooling.
           for (const wd of words) {

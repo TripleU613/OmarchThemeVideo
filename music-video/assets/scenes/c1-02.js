@@ -383,9 +383,11 @@ OM.ownWords.add('c1-02'); // this scene draws its own words, so the caption bar 
       /** One key row: keycaps (pressed down a little on the lock) and their legends. */
       const drawRow = (ctx, K, dpr, r, yo, T, m) => {
         const a = T - on[r.k];
-        const hb = a >= 0 ? 1 - 0.4 * Math.exp(-a / 0.06) : 1;
+        // Pause sprinkle, keyboard ripple: the 88.47 kick runs a press down the rows, back to front.
+        const rk = T - 88.47 - 0.035 * r.k, rip = rk >= 0 && rk < 0.3 ? Math.exp(-rk / 0.07) : 0;
+        const hb = (a >= 0 ? 1 - 0.4 * Math.exp(-a / 0.06) : 1) - 0.3 * rip;
         const flash = a >= 0 ? Math.exp(-a / 0.12) : 0;
-        const legend = a < 0 ? ink.lit : a < 0.1 || r.k === KEY ? ink.crest : OM.mix(ink.crest, ink.hover, smooth(prog(a, 0.1, 0.6)));
+        const legend = a < 0 ? ink.lit : a < 0.1 || r.k === KEY || rip > 0.3 ? ink.crest : OM.mix(ink.crest, ink.hover, smooth(prog(a, 0.1, 0.6)));
         const lit = { fa: m, ea: m, edge: flash > 0.01 ? OM.mix(KEY_EDGE, ink.crest, flash) : KEY_EDGE, lw: 1, top: flash > 0.01 ? OM.mix(KEYCAP.tone[TOP], ink.mid, 0.8 * flash) : null };
         const u = [1, 0, 0], v = [0, 0, 1];
         const keys = K.sy < 0 ? r.keys : [...r.keys].reverse(); // far side first

@@ -147,6 +147,24 @@ vec4 effect(vec2 uv) {
             const n = Math.round(OM.lerp(Math.ceil(Math.max(LX, 1920 - LX) / HM.cw) + 1, 0, f)); // from the frame's edge, so the shrink is seen all the way
             ctx.fillStyle = ink.crest;
             for (let col = hcol - n; col <= hcol + n; col++) OM.cell(ctx, HM, col, hrow, dpr);
+            // Lamp surge on the 66.90 kick, end spit on the 67.04 snare: the shrinking lamp, both gone before the cut.
+            const calm = 1 - OM.prog(T, 67.15, 67.24);
+            const surge = (T >= 66.9 ? 0.3 * Math.exp(-(T - 66.9) / 0.12) : 0) * calm;
+            if (surge > 0.005) {
+              const sg = ctx.createLinearGradient(0, LY - 70, 0, LY + 70);
+              sg.addColorStop(0, V.rgba(ink.lit, 0));
+              sg.addColorStop(0.5, V.rgba(ink.lit, surge));
+              sg.addColorStop(1, V.rgba(ink.lit, 0));
+              ctx.fillStyle = sg;
+              ctx.fillRect(HM.x0 + (hcol - n) * HM.cw, LY - 70, (2 * n + 1) * HM.cw, 140);
+              ctx.fillStyle = ink.crest;
+            }
+            const sa = T - 67.04;
+            if (sa >= 0 && sa < 0.2) {
+              ctx.globalAlpha = (1 - sa / 0.2) * calm;
+              for (const d of [-1, 1]) OM.cell(ctx, HM, hcol + d * (n + 2 + Math.round(sa * 50)), hrow, dpr);
+              ctx.globalAlpha = 1;
+            }
             const g = ctx.createRadialGradient(LX, LY, 0, LX, LY, 72);
             g.addColorStop(0, V.rgba(ink.lit, 0.4 * f));
             g.addColorStop(1, V.rgba(ink.lit, 0));

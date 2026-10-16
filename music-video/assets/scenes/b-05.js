@@ -188,6 +188,47 @@ OM.scene({
           ctx.globalAlpha = 1;
           if (e > 0) {
 
+            // Pool Drops: a fat drop leaves the deck lip and lands in the pool on each kick; the pool flares and rings wide.
+            {
+              const ik = OM.fieldInks('tokyo-night');
+              const H2 = B.sub(2);
+              for (const h of [212.9, 213.41]) {
+                const f = OM.prog(T, h - 0.16, h);
+                if (f > 0 && f < 1) {
+                  ctx.globalAlpha = e;
+                  ctx.fillStyle = ik.crest;
+                  ctx.fillRect(948, OM.lerp(372, IMPACT.y - 18, f * f), 24, 36);
+                }
+                const a = T - h;
+                if (a >= 0 && a < 0.4) {
+                  const k = 1 - a / 0.4;
+                  ctx.globalAlpha = 1;
+                  B.pool(ctx, IMPACT.x, IMPACT.y, 340, ik.hover, 0.6 * e * k);
+                  const R = 30 + a * 900, qc = (IMPACT.x - H2.x0) / H2.cw, rc = (IMPACT.y - H2.y0) / H2.ch;
+                  ctx.globalAlpha = e * k;
+                  ctx.fillStyle = ik.crest;
+                  for (let ring = 0; ring < 3; ring++)
+                    for (let i = 0; i < 120; i++) {
+                      const ang = (i / 120) * Math.PI * 2, rr = R - ring * 9;
+                      OM.cell(ctx, H2, Math.round(qc + (Math.cos(ang) * rr) / H2.cw), Math.round(rc + (Math.sin(ang) * rr * 0.32) / H2.ch), c.dpr);
+                    }
+                }
+              }
+              // Channel Surge: the snare floods every channel crest at once, three cells wide, and it drains back.
+              const a = T - 212.97;
+              if (a >= 0 && a < 0.35) {
+                const { words } = lay();
+                ctx.globalAlpha = e * (1 - a / 0.35);
+                ctx.fillStyle = ik.crest;
+                for (const w of words)
+                  for (const [q, r] of w.pts)
+                    for (let d = -1; d <= 1; d++) { OM.cell(ctx, H2, q + d, r, c.dpr); OM.cell(ctx, H2, q, r + d, c.dpr); }
+                ctx.globalAlpha = 1;
+                for (const w of words) { const [q, r] = w.pts[w.pts.length - 1]; B.pool(ctx, H2.x0 + q * H2.cw, H2.y0 + r * H2.ch, 120, ik.lit, 0.45 * e * (1 - a / 0.35)); }
+              }
+              ctx.globalAlpha = 1;
+            }
+
             const { set, words } = lay();
             const ik = OM.fieldInks('tokyo-night');
             // Droplets falling through the pour.

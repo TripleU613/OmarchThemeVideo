@@ -185,6 +185,9 @@ OM.ownWords.add('c1-04');
         });
         if (T >= ON[KEY]) g += 0.55 * Math.exp(-(T - ON[KEY]) / 0.6);
         if (T >= DB2) g += 0.3 * Math.exp(-(T - DB2) / 0.22);
+        // Pause sprinkle, rim-light roll: in the gap the two lit words throb on the snare roll and the kick,
+        // so the faces' rim light, the keys and the table pool answer each hit.
+        if (T > ON[cut] && T < W2 - 0.05) g += 0.14 * OM.pulse([94.3, 94.69, 94.97, 95.22], T, 0.06) + 0.3 * OM.pulse([94.88], T, 0.09);
         return g * (1 + 0.15 * OM.audio(T).kick) * (1 - OM.smooth(OM.prog(T, FADE0, FADE1)));
       };
       const leanAt = (T) => OM.ease.outCubic(OM.prog(T, ON[KEY], ON[KEY] + 0.32));

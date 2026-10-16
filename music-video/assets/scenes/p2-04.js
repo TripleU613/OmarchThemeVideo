@@ -96,6 +96,7 @@ OM.scene({
 
         // Clouds rush down past us; above the tops, open sky.
         const y = Y(T);
+        const sun = OM.pulse([157.62, 157.83], T, 0.06); // sunbreak cells: cloud tops catch the light
         const cloudIn = OM.prog(T, start + 0.05, start + 0.35) * (1 - OM.prog(T, end - 0.3, end - 0.1));
         if (cloudIn > 0)
           for (const pl of PLANES) {
@@ -116,7 +117,7 @@ OM.scene({
                 const lum = OM.clamp((n - 0.53 + pl.bias) / 0.3) * clear;
                 const thr = OM.threshold(C + 4096, R + 4096);
                 if (lum <= thr) continue;
-                ctx.fillStyle = lum - thr > 0.38 ? pl.core : pl.edge;
+                ctx.fillStyle = sun > 0.25 && lum - thr > 0.3 && OM.hash(C, R, pl.seed) < 0.35 * sun ? ink.lit : lum - thr > 0.38 ? pl.core : pl.edge;
                 ctx.fillRect(Math.round((C * cell + sway + gap / 2) * dpr) / dpr, Math.round((sy + gap / 2) * dpr) / dpr, cell - gap, cell - gap);
               }
             }
@@ -139,7 +140,8 @@ OM.scene({
             for (const sg of [-1, 1])
               for (let j = 0; j < 3; j++) {
                 if (OM.hash(xi, j * sg, 5) > dens * (1 - j * 0.28)) continue;
-                ctx.fillStyle = d < 120 ? ink.crest : j ? ink.mid : ink.lit;
+                const bead = T >= 157.29 && Math.abs(d - (T - 157.29) * 2600) < 60; // trail bead: a pulse runs out the vortex trails
+                ctx.fillStyle = d < 120 || bead ? ink.crest : j ? ink.mid : ink.lit;
                 ctx.fillRect(x, tip.y + fall + sg * (spread + j * cs) - cs / 2, cs - 2, cs - 2);
               }
           }
@@ -194,8 +196,9 @@ OM.scene({
             ctx.lineTo(X + 900, Yt + 150 + 410 * f);
             ctx.stroke();
           }
-          ctx.strokeStyle = ink.lit;
-          ctx.lineWidth = 3;
+          const flick = OM.pulse([156.804, 156.944, 157.083], T, 0.05); // leading-edge flick on the kicks
+          ctx.strokeStyle = flick > 0.2 ? OM.mix(ink.lit, ink.crest, flick) : ink.lit;
+          ctx.lineWidth = 3 + 3 * flick;
           ctx.beginPath();
           ctx.moveTo(X - 24, Yt - 104);
           ctx.lineTo(X + 6, Yt - 8);

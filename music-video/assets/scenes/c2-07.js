@@ -175,6 +175,53 @@ OM.ownWords.add('c2-07');
           this.draw(t, T);
           const ctx = c.ensure();
           if (OM.c2.live(T, start, END)) {
+            // Rail-end sparks (s186.43, k186.57) and last plank (s186.78): the drawing-in deck ends throw sparks on the hits, and on the final snare the spark briefly reaches one plank either side before settling.
+            {
+              const R2 = 1100 * (1 - OM.ease.inExpo(OM.prog(T, PULL, DB2)));
+              for (const [h, hi] of [[186.433, 0], [186.572, 1]]) {
+                const a = T - h;
+                if (a < 0 || a > 0.3) continue;
+                ctx.fillStyle = ink.crest;
+                for (let n = 0; n < 12; n++) {
+                  const side = n % 2 ? 1 : -1, v = 200 + 400 * OM.hash(n, hi, 111);
+                  const x = 960 + side * (R2 + 10 + v * a * 0.4), y = lineY - 200 * a * OM.hash(hi, n, 112) + 900 * a * a;
+                  if (OM.hash(n, hi, 113) > a / 0.3) ctx.fillRect(x, y, 4, 4);
+                }
+              }
+              // Deck beat: on s186.43 and k186.57 the drawing-in deck swells to three rows of light across its whole span.
+              for (const h of [186.433, 186.572]) {
+                const a = T - h;
+                if (a < 0 || a > 0.22) continue;
+                const f = 1 - a / 0.22;
+                ctx.fillStyle = OM.c2.rgba(ink.crest, f);
+                for (let col = HM.cMin; col < HM.cMin + HM.cols; col++) {
+                  const x = HM.x0 + (col + 0.5) * HM.cw;
+                  if (Math.abs(x - 960) > R2) continue;
+                  for (const dr of [-2, -1, 1, 2]) if (Math.abs(dr) === 1 || OM.threshold(col, cR + dr) < f) OM.cell(ctx, HM, col, cR + dr, c.dpr);
+                }
+                pool(ctx, 960, lineY, Math.max(200, R2), 60, ink.lit, 0.35 * f);
+              }
+              // Deck echo: on s186.78 the vanished deck flashes back out across the frame from the spark and fades.
+              {
+                const b2 = OM.prog(T, 186.781, 187.05);
+                if (b2 > 0 && b2 < 1) {
+                  const f = Math.sin(Math.PI * Math.min(1, b2 * 3)) * (1 - b2) + (b2 < 0.33 ? 0 : 0), w = 1100 * OM.ease.outCubic(Math.min(1, b2 * 2));
+                  ctx.fillStyle = OM.c2.rgba(ink.hover, Math.max(f, (1 - b2) * 0.8));
+                  for (let col = HM.cMin; col < HM.cMin + HM.cols; col++) {
+                    const x = HM.x0 + (col + 0.5) * HM.cw;
+                    if (Math.abs(x - 960) > w || Math.abs(x - 960) < HM.cw) continue;
+                    for (const dr of [-1, 0, 1]) OM.cell(ctx, HM, col, cR + dr, c.dpr);
+                  }
+                }
+              }
+              const b = OM.prog(T, 186.781, 187.12), reach = Math.sin(Math.PI * b);
+              if (b > 0 && b < 1) {
+                ctx.fillStyle = OM.c2.rgba(ink.hover, reach);
+                const sp2 = OM.cellAt(HM, 960, 540);
+                OM.cell(ctx, HM, sp2.col - 1, sp2.row, c.dpr);
+                OM.cell(ctx, HM, sp2.col + 1, sp2.row, c.dpr);
+              }
+            }
           const { gx0, gx1 } = get();
           const fade = 1 - sm(T, DIM, PULL);
           // Grit trickling off the broken deck edges into the canyon.

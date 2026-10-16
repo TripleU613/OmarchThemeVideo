@@ -307,11 +307,12 @@ OM.ownWords.add('c3-01');
             OM.cell(ctx, HL, hc.col, hc.row, dpr);
             ctx.globalAlpha = 1;
           }
+          const surge = T > 245.25 ? OM.pulse([245.296, 245.435, 246.155], T, 0.14) : 0;
           // The sky glows green behind every curtain that has opened, flaring on each onset.
           let flare = 0;
           words.forEach((w, k) => (flare = Math.max(flare, (k === K ? 1 : 0.55) * C.decay(T, on[k], 0.16))));
           const glowY = OM.lerp(560, LINE_Y, fall);
-          C.pool(ctx, 960, glowY, 980, ink.lit, (0.06 * C.sm(T, on[0], on[K]) + 0.16 * flare) * (1 - fold) + 0.12 * skyIn * (1 - fall));
+          C.pool(ctx, 960, glowY, 980, ink.lit, (0.06 * C.sm(T, on[0], on[K]) + 0.16 * flare + 0.12 * surge) * (1 - fold) + 0.12 * skyIn * (1 - fall)); // the sky glow flares with the curtain surge
 
           // Snare ripples: a brightness wave running across every curtain.
           const ripple = (x) => {
@@ -337,18 +338,22 @@ OM.ownWords.add('c3-01');
             const s = steps[k];
             // Rays: green from the letter top, fading through blue into the sky.
             if (pass === 0 && ray > 4) {
+              const sg = k === K ? 0 : surge; // the key word's rays cross the row above, so only the others brighten
               const g = ctx.createLinearGradient(0, p.base - p.cap - ray * 1.6, 0, p.base - p.cap * 0.6);
               g.addColorStop(0, C.rgba(th.brand || ink.hover, 0));
-              g.addColorStop(0.45, C.rgba(th.brand || ink.hover, 0.12 + 0.12 * hit));
-              g.addColorStop(0.85, C.rgba(ink.lit, 0.22 + 0.3 * hit));
-              g.addColorStop(1, C.rgba(ink.hover, 0.4 + 0.4 * hit));
+              g.addColorStop(0.45, C.rgba(th.brand || ink.hover, 0.12 + 0.12 * hit + 0.3 * sg));
+              g.addColorStop(0.85, C.rgba(ink.lit, 0.22 + 0.3 * hit + 0.45 * sg));
+              g.addColorStop(1, C.rgba(ink.hover, 0.4 + 0.4 * hit + 0.4 * sg));
               ctx.fillStyle = g;
               for (const [x, top] of cols[k]) {
                 if (x > edge) continue;
                 const n = OM.heroNoise(x * 0.012 + T * 0.55, k * 13 + T * 0.2);
-                const len = ray * (0.35 + 0.85 * n * n + 0.6 * hit + 0.5 * ripple(x));
+                const base = ray * (0.35 + 0.85 * n * n + 0.6 * hit + 0.5 * ripple(x));
+                // Curtain surge on the pause snares; the key word's surge stops short of the row above so it stays clear.
+                let len = base * (1 + 0.7 * surge);
+                if (k === K && place[0] && surge > 0) len = Math.max(base, Math.min(len, top - place[0].base - 30));
                 const y1 = sink(top);
-                const rw = Math.max(2, Math.round(s * 0.4));
+                const rw = Math.max(2, Math.round(s * (0.4 + 0.35 * surge)));
                 ctx.fillRect(Math.round(x - rw / 2), Math.round(y1 - len), rw, Math.round(len));
               }
             }
@@ -379,7 +384,20 @@ OM.ownWords.add('c3-01');
             ctx.fillStyle = ink.mid;
             for (let x = 0; x < 1920; x += 8) {
               const y = Math.round(RIDGE(x + 4) / 4) * 4;
-              ctx.fillRect(x, y - 2, 7, 2);
+              // Ridge echo: each pause snare runs a lit band along the ridge crest.
+              let echo = 0;
+              for (const s of [245.296, 245.435, 246.155]) {
+                const a = T - s;
+                if (a >= 0 && a < 0.4 && Math.abs(x - a * 5000) < 320) echo = Math.max(echo, (1 - a / 0.4) * (1 - Math.abs(x - a * 5000) / 400));
+              }
+              ctx.fillStyle = echo > 0.5 ? ink.hover : echo > 0.1 ? ink.lit : ink.mid;
+              ctx.fillRect(x, y - 2, 7, echo > 0.1 ? 3 : 2);
+              // The aurora's light pooling down the ridge face under the band.
+              for (let r = 1; echo > 0.1 && r < 9; r++) {
+                if (OM.hash(x, r, 11) > echo * (1 - r / 10)) continue;
+                ctx.fillStyle = r < 3 ? ink.lit : ink.mid;
+                ctx.fillRect(x, y + r * 8, 7, 7);
+              }
             }
             ctx.globalAlpha = 1;
           }

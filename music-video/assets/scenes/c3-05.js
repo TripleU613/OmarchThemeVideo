@@ -21,6 +21,7 @@ OM.scene({
     const n = words.length;
     const DOWN = 261.503, FILL = 261.735, CLOSE = 262.4;
     const KEY = words.reduce((b, w, k) => (Math.abs(w.t0 - DOWN) < Math.abs(words[b].t0 - DOWN) ? k : b), 0);
+    const PK = [262.15, 262.27, 262.52, 262.76]; // the pause kicks: petal shake and heart beat
     const OPEN = 0.22; // seconds for the bloom to cross a word
 
     const type = C.lazy(() => {
@@ -64,6 +65,7 @@ OM.scene({
         const { place, pts, step } = type();
         OM.handoff('field', ctx, T, dpr);
         const keyP = place[KEY] || { cx: 960, cy: 650 };
+        const boxes = place.filter(Boolean).map((p) => [p.x - 30, p.base - p.cap - 30, p.x + p.w + 30, p.base + 30]);
 
         // The meadow: lit field cells bloom as the wave out of the key word reaches them, and fold before the cut.
         if (T > DOWN) {
@@ -77,8 +79,22 @@ OM.scene({
             ctx.fillStyle = ink.bg;
             OM.cell(ctx, L, cl.col, cl.row, dpr);
             const age = T - tb;
-            flower(ctx, x, y, s, L.cw, age < 0.12 ? ink.crest : ink.hover, cl.heat > 0.5 ? ink.lit : ink.mid);
+            flower(ctx, x, y, s * (1 + 0.9 * OM.pulse(PK, T, 0.1)), L.cw * (1 + 0.5 * OM.pulse(PK, T, 0.1)), age < 0.12 ? ink.crest : ink.hover, cl.heat > 0.5 ? ink.lit : ink.mid);
           }
+        }
+        // Bloom ring: each pause kick throws a ring of blossoms out across the meadow from the key word, around the beds.
+        for (const k of PK) {
+          const age = T - k;
+          if (age < 0 || age > 0.4) continue;
+          const front = 300 + age * 2600, fade = 1 - age / 0.4;
+          for (let row = L.rMin; row < L.rMin + L.rows; row += 1)
+            for (let col = L.cMin; col < L.cMin + L.cols; col += 1) {
+              const x = L.x0 + (col + 0.5) * L.cw, y = L.y0 + (row + 0.5) * L.ch;
+              const d = Math.hypot(x - keyP.cx, (y - keyP.cy) * 1.4);
+              if (Math.abs(d - front) > 110 || OM.hash(col, row, 0x55) > 0.55 * fade) continue;
+              if (boxes.some((b) => x > b[0] && x < b[2] && y > b[1] && y < b[3])) continue;
+              flower(ctx, x, y, fade, L.cw * 1.3, ink.crest, fade > 0.5 ? ink.hover : ink.lit);
+            }
         }
         // A green haze over the beds as they open.
         let haze = 0;
@@ -98,9 +114,9 @@ OM.scene({
             const s = Math.max(T >= on[k] ? 0.25 : 0, open) * shut;
             if (s <= 0.02) continue;
             const age = T - tb;
-            const kickGlow = big ? OM.pulse([261.062, 261.201, 262.525, 262.757], T, 0.1) : 0;
+            const kickGlow = OM.pulse(big ? [261.062, 261.201, ...PK] : PK, T, 0.1); // heart beat on the pause kicks
             const heart = age < 0.1 || kickGlow > 0.5 ? ink.crest : (OM.hash(x, y, k) > 0.3 ? ink.crest : ink.hover);
-            flower(ctx, x, y, s, sz * 1.15, heart, age < 0.2 ? ink.crest : ink.hover);
+            flower(ctx, x, y, s, sz * (1.15 + 0.25 * kickGlow), heart, age < 0.2 || kickGlow > 0.4 ? ink.crest : ink.hover);
           }
         });
         // Pollen drifting up through the meadow.

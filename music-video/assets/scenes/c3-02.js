@@ -20,7 +20,7 @@ OM.scene({
     const words = OM.sung('c3-02');
     const on = words.map((w) => w.t0);
     const n = words.length;
-    const DOWN = 248.709, KICKS = [249.754, 250.032], COLLAPSE = 250.845;
+    const DOWN = 248.709, KICKS = [249.754, 250.032, 250.54], COLLAPSE = 250.845;
     const KEY = words.reduce((b, w, k) => (Math.abs(w.t0 - DOWN) < Math.abs(words[b].t0 - DOWN) ? k : b), 0);
     const LAST = n - 1;
     const HL = OM.HOME, hc = OM.cellAt(HL, 960, 540);
@@ -184,10 +184,12 @@ OM.scene({
               for (let i = 0; i < L.d.length; i += 2) ctx.fillRect(Math.round(x0 + L.d[i] - 3), Math.round(y0 + L.d[i + 1] - 3), 6, 6);
             }
             // Bolts at the seams on the lock.
-            if (q.hit > 0.05) {
+            // Seam re-strike: the pause snares spark every seam of the closed ring again.
+            const bh = Math.max(q.hit, T > on[LAST] + 0.3 ? 0.55 * OM.pulse([249.893, 250.404], T, 0.07) : 0);
+            if (bh > 0.05) {
               for (const a of [sg.a0, sg.a1]) {
                 const [x, y] = P(a);
-                C.pool(ctx, x, y, 90 * q.hit + 20, ink.hover, 0.6 * q.hit);
+                C.pool(ctx, x, y, 90 * bh + 20, ink.hover, 0.6 * bh);
                 ctx.fillStyle = ink.crest;
                 ctx.fillRect(Math.round(x - 4), Math.round(y - BAND), 8, 2 * BAND);
               }

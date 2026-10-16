@@ -130,6 +130,38 @@ OM.scene({
           ctx.globalAlpha = 1;
           if (e > 0) {
 
+            // Refresh Rows: on each snare a band of strangers' screens re-boots crest as the wall drops.
+            {
+              const HITS = [199.99, 200.27, 200.53, 200.92];
+              const { screens } = lay();
+              const ik = OM.fieldInks('tokyo-night'), L = OM.HOME;
+              HITS.forEach((h, hi) => {
+                const a = T - h;
+                if (a < 0 || a > 0.16) return;
+                ctx.fillStyle = ik.crest;
+                ctx.globalAlpha = e * (1 - a / 0.16);
+                for (const s of screens) {
+                  if (s.word || T < s.at || OM.hash(s.col, s.row, 31 + hi) > 0.22) continue;
+                  const d = OM.ease.inCubic(OM.prog(T, s.drop, s.drop + 0.34));
+                  if (d >= 1) continue;
+                  const row = OM.lerp(s.row, SR, d);
+                  ctx.fillRect(L.x0 + s.col * L.cw + 3, L.y0 + row * L.ch + 3, L.cw - 6, L.ch - 6);
+                }
+              });
+              // Line Pips: the closed line throws cells off its edges on the last kick.
+              const a = T - 201.09;
+              if (a >= 0 && a < 0.09) {
+                ctx.globalAlpha = e * (1 - a / 0.09);
+                ctx.fillStyle = ik.hover;
+                for (let col = C0; col < C1; col++) if (OM.hash(col, 5, 77) < 0.12) {
+                  const off = 1 + Math.round(a * 30);
+                  ctx.fillRect(L.x0 + col * L.cw + 3, L.y0 + (SR - off) * L.ch + 3, L.cw - 6, L.ch - 6);
+                  ctx.fillRect(L.x0 + col * L.cw + 3, L.y0 + (SR + off) * L.ch + 3, L.cw - 6, L.ch - 6);
+                }
+              }
+              ctx.globalAlpha = 1;
+            }
+
             const { screens } = lay();
             const ik = OM.fieldInks('tokyo-night');
             const L = OM.HOME;

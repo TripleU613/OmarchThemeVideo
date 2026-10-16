@@ -43,7 +43,7 @@ vec4 effect(vec2 uv) {
       const HM = OM.HOME, hc = OM.cellAt(HM, 960, 540);
       const PX = HM.x0 + (hc.col + 0.5) * HM.cw, PY = HM.y0 + (hc.row + 0.5) * HM.ch; // the spark's centre
       const S = 8, Gp = { x0: PX - S / 2, y0: PY - S / 2, cw: S, ch: S }; // print cell (0,0) sits on the spark
-      const DONE = 71.634, SNARES = [68.104, 68.778, 69.404, 71.053, 71.471];
+      const DONE = 71.634, SNARES = [68.104, 68.778, 69.404, 70.24, 71.053, 71.471, 71.94]; // pad blink, through the gap and the pause too
       const LIE0 = 72.2, LIE1 = END - H - 0.01, PRESS = 0.22, CAPMAX = 62;
       const TOPS = Math.ceil(N / 2), RINGS = Math.max(TOPS, N - TOPS);
       // Top words run outer to inner, bottom words inner to outer, so the stack reads in order.
@@ -194,6 +194,8 @@ vec4 effect(vec2 uv) {
             let fill = k.logo ? (done ? ink.crest : ink.lit) : k.e < 0.4 ? ink.lit : ink.mid;
             if (age < 0.5) fill = th2 > age / 0.5 ? ink.crest : age < 0.25 ? ink.hover : fill;
             if (wave >= 0 && Math.abs(k.e - wave) < 0.05) fill = ink.crest;
+            // Inward echo: on the 71.94 snare a ring runs back from the rim to the core along the ridges.
+            if (T >= 71.94 && T < 72.24 && Math.abs(k.e - (1 - (T - 71.94) / 0.3)) < 0.03) fill = ink.hover;
             ctx.fillStyle = fill;
             ctx.fillRect(Gp.x0 + k.q * S, Gp.y0 + k.r * S, S, S);
           }

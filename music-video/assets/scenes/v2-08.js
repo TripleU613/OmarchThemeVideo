@@ -40,6 +40,7 @@ OM.scene({
     const FL = 900, CAMH = 1.3, VEL = 16, ROAD = 4.2;
     const Z_SIGN = 10, Z_MARK = 5.5, LZ = 4.5;
     const SET0 = END - 0.62, SET1 = END - 0.12; // the sun up, everything into the horizon
+    const PAUSEK = [148.84, 149.12, 149.37, 149.51], PAUSES = 148.91;
     const KICKS = [146.193, 146.704, 147.377, 148.19, 148.445, 148.84, 149.119, 149.374];
     const X = (x, z) => 960 + (FL * x) / z;
     const Y = (y, z) => YH - (FL * (y - CAMH)) / z;
@@ -107,7 +108,7 @@ OM.scene({
           if (z0 + 2 < 0.6) continue;
           const a = Math.max(z0, 0.6), b = z0 + 2;
           const wA = (FL * 0.12) / a, wB = (FL * 0.12) / b;
-          ctx.fillStyle = OM.mix(ink.mid, ink.crest, OM.clamp(hit + kick * 0.5));
+          ctx.fillStyle = OM.mix(ink.mid, ink.crest, OM.clamp(hit + kick * 0.5 + (T >= PAUSES ? Math.exp(-(T - PAUSES) / 0.1) : 0))); // sprinkle: lane flash on the snare
           ctx.beginPath();
           ctx.moveTo(960 - wA, Y(0, a));
           ctx.lineTo(960 + wA, Y(0, a));
@@ -141,6 +142,18 @@ OM.scene({
         // The horizon itself: the crest row, always there.
         ctx.fillStyle = ink.crest;
         for (let col = OM.HOME.cMin; col < OM.HOME.cMin + OM.HOME.cols; col++) OM.cell(ctx, OM.HOME, col, H0.row, dpr);
+
+        // Sprinkle, horizon pulse: each pause kick sends a pair of lit swells running out along the horizon.
+        for (const h of PAUSEK) {
+          const age = T - h;
+          if (age < 0 || age > 0.36) continue;
+          const reach = 80 + age * 2600, g = 1 - age / 0.36;
+          ctx.fillStyle = V.rgba(ink.lit, g);
+          for (let col = OM.HOME.cMin; col < OM.HOME.cMin + OM.HOME.cols; col++) {
+            const x = OM.HOME.x0 + (col + 0.5) * OM.HOME.cw;
+            if (Math.abs(Math.abs(x - 960) - reach) < 70) OM.cell(ctx, OM.HOME, col, H0.row + 1, dpr);
+          }
+        }
 
         // Overhead signs: dark until the headlights catch them on their onset, then sweeping overhead.
         for (let k = N - (N % 2 ? 1 : 2); k >= 0; k -= 2) {

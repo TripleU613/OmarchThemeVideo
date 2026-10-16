@@ -135,6 +135,11 @@ OM.scene({
             y = OM.lerp(y, d.sy + 20 * Math.sin(T * 2 + d.r * 9), p);
             sz = OM.lerp(sz, 3, p);
             v = OM.lerp(v, 0.3, p);
+            // Beam pulse: each kick sends a bright band falling down the spotlight through the drones.
+            for (const k of [254.073, 254.68, 255.35]) {
+              const a = T - k;
+              if (a >= 0 && a < 0.45 && Math.abs(y - (140 + a * 1700)) < 55) v += 0.7 * (1 - a / 0.45) * p;
+            }
           }
           XS[i] = x;
           YS[i] = y;

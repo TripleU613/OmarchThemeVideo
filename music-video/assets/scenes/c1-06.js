@@ -213,20 +213,28 @@ OM.ownWords.add('c1-06');
           const fold = 1 - OM.ease.inCubic(OM.prog(T, FOLD, FOLD + 0.1));
           const uRise = OM.ease.inOutCubic(OM.prog(T, RISE, RISE + GROW));
 
+          // Pause sprinkles. Checker tick: each snare runs a crest cursor along the sorted bar tops, left to right,
+          // re-checking the order. Run-line thump: the 105.14 kick squashes every bar a cell into the run line.
+          const TICKS = [104.35, 104.89, 104.95, 105.42, 105.51];
+          const tick = (col) => TICKS.some((s0) => {
+            const a = (T - s0) / 0.3;
+            return a >= 0 && a < 1 && Math.abs(col - OM.lerp(COL0 - 4, COL1 + 4, a)) < PITCH * 4.5;
+          });
+          const thump = T >= 105.14 && T < 105.3 ? Math.pow(0.5, (T - 105.14) / 0.05) : 0;
           // Bars: height is the letter's place in the line, jumping with the spectrum while unsorted.
           for (let v = 0; v < N; v++) {
             const rise = OM.ease.inOutCubic(OM.prog(T, RISE + delay[v], RISE + delay[v] + GROW - 0.03));
             const band = a.bands[Math.min(15, Math.floor((at[v] / N) * 16))];
             const jump = 1 + calm * (band * 0.9 - 0.35 + kick * 0.3);
-            const h = OM.clamp(Math.round(height(v) * jump * rise * (1 - drain)), 0, HMAX + 5);
+            const h = OM.clamp(Math.round(height(v) * jump * rise * (1 - drain)) - (thump > 0.3 ? 1 : 0), 0, HMAX + 5);
             if (h <= 0) continue;
             const col = cols[v], top = BB - h + 1;
             const lit = T - passed(L.x0 + (col + BW / 2) * L.cw);
-            const swept = sw > 0 && lit >= 0 && lit < 0.12; // each bar flashes as the check crosses it
+            const swept = (sw > 0 && lit >= 0 && lit < 0.12) || tick(col) || thump > 0.35; // each bar flashes as the check crosses it, and on the pause sprinkles
             ctx.fillStyle = swept ? ink.crest : RAMP[Math.min(2, Math.floor((v / N) * 3))];
             rect(ctx, dpr, col, top, col + BW, BB + 1);
             if (swept) continue;
-            const hot = moved[v] && heat > 0.25;
+            const hot = (moved[v] && heat > 0.25) || tick(col);
             ctx.fillStyle = hot ? ink.crest : ink.hover;
             rect(ctx, dpr, col, top, col + BW, Math.min(BB + 1, top + (hot ? 2 : 1)));
           }

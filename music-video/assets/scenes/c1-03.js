@@ -157,6 +157,7 @@ OM.ownWords.add('c1-03');
         for (const [q, r] of cells) if (OM.threshold(q + off, r + off) < 0.2 + 0.8 * near) OM.cell(ctx, G, q + off, r + off, dpr);
       };
 
+      const NB = { c0: Math.min(...name.map((p) => p.box.c0)), c1: Math.max(...name.map((p) => p.box.c1)), r0: Math.min(...name.map((p) => p.box.r0)), r1: Math.max(...name.map((p) => p.box.r1)) };
       // ---- camera: a punch in on every press, overshooting back; then a slow push carried through the cut ----
       const th = OM.theme('tokyo-night');
       const PUSH = OM.c1.push34, T0 = END - (2 * (PUSH.ZOOM - 1)) / PUSH.SPEED;
@@ -261,6 +262,27 @@ OM.ownWords.add('c1-03');
             if (u > 0 && u < 1) block(ctx, H, l.cells, l.cx, l.cy, OM.ease.inCubic(1 - u), 2.6);
           }
           for (const p of presses) splash(ctx, T, p);
+
+          // Pause sprinkles. Platen kiss: on each kick the platen comes down lightly on the name again and an
+          // impact line runs out above and below it (kept tight while the small type still sits above).
+          // Fresh-ink shimmer: on each snare a band of the name's cells re-wets to hover in dither order.
+          for (const k0 of [91.88, 92.16, 93.0]) {
+            const age = T - k0;
+            if (age < 0 || age >= 0.2) continue;
+            const reach = Math.round(1 + (k0 < LIFT + 0.4 ? 1 : 4) * OM.ease.outExpo(age / 0.2));
+            ctx.fillStyle = ink.hover;
+            for (let col = NB.c0 - reach; col <= NB.c1 + reach; col++)
+              for (const row of [NB.r0 - reach, NB.r1 + reach]) if (OM.threshold(col, row) > 0.25 + age / 0.2) OM.cell(ctx, L, col, row, dpr);
+          }
+          for (const s0 of [91.39, 92.07, 92.62, 93.09]) {
+            const a = (T - s0) / 0.22;
+            if (a < 0 || a >= 1) continue;
+            ctx.fillStyle = ink.hover;
+            for (const p of name) for (const [q, r] of p.cells) {
+              const d = OM.threshold(q, r) - a;
+              if (d > 0 && d < 0.12) OM.cell(ctx, L, q, r, dpr);
+            }
+          }
         },
         release: () => c.release(),
       }, fx, look);

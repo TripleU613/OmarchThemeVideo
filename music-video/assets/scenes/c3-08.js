@@ -115,6 +115,15 @@ OM.scene({
           for (const x of [X0, X0 + W - 10]) ctx.fillRect(Math.round(x), Math.round(y0), 10, FH);
           beam(y0, word && s.landed, s.hit);
           beam(y1, word && s.landed, s.hit);
+          // Rivet chain: on the pause snares the joints flash storey by storey up the tower.
+          if (s.landed) {
+            for (const sn of [273.276, 273.554]) {
+              const a = T - sn - i * 0.035;
+              if (a < 0 || a > 0.22) continue;
+              ctx.fillStyle = C.rgba(ink.crest, 1 - a / 0.22);
+              for (const x of [X0 - 4, X0 + W - 10]) for (const y of [y0, y1]) ctx.fillRect(Math.round(x), Math.round(y - 7), 14, 14);
+            }
+          }
           // The word's letters: the storey's lit girders.
           if (word && place[i]) {
             const p = place[i], P = pts[i], cy = (y0 + y1) / 2, lx = 960 - p.w / 2, ly = cy + p.cap / 2;
@@ -169,7 +178,9 @@ OM.scene({
           ctx.fillRect(X0 + 77 - cl, top - 8, jl + cl, 10);
           ctx.fillStyle = ink.mid;
           ctx.fillRect(X0 + 77 - cl, top - 2, 60, 28); // counterweight
-          const hookX = X0 + 77 + jl * (0.55 + 0.4 * Math.sin((T - start) * 2.3));
+          let kickSwing = 0; // cable kick: the hook swings out on the pause snares
+          for (const sn of [273.276, 273.554]) if (T >= sn) kickSwing += 60 * C.decay(T, sn, 0.3) * Math.sin((T - sn) * 12);
+          const hookX = X0 + 77 + jl * (0.55 + 0.4 * Math.sin((T - start) * 2.3)) + kickSwing;
           const next = lands.find((x) => x > T + 0.3);
           const hookY = top + 60 + 120 * (0.5 + 0.5 * Math.sin((T - start) * 3.1));
           ctx.fillRect(Math.round(hookX), top, 2, hookY - top);

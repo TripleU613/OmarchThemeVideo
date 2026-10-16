@@ -55,6 +55,7 @@ OM.scene({
         const dpr = c.dpr;
         ctx.globalAlpha = 1;
         draw(ctx, T, dpr);
+        if (T >= 292.7 && T < end - 0.07) roll(ctx, T, dpr);
         // The hero floats: a faint scale breath and a few px of lift, at rest at both cuts.
         const env = OM.post.envelope(T, start, end, { ramp: 0.5 });
         const br = Math.sin(((T - start) / duration) * Math.PI * 2);
@@ -70,6 +71,26 @@ OM.scene({
         c.release();
       },
     };
+    // Band roll: in the pause, the wordmark's own ink bands roll crest through its rows on the
+    // snares, down on the first, up on the second, softer each time; with the second the cursor cell
+    // (the one x-end keeps) stirs, and all of it is at rest well before the cut.
+    const ROLLS = [[293.2, 1, 1, 0.003, 0.04], [293.38, -1, 0.45, 0.002, 0.025]]; // the second is soft and quick: at rest by ~293.44
+    function roll(ctx, T, dpr) {
+      const word = (row) => {
+        let e = 0;
+        for (const [t0, dir, amp, step, decay] of ROLLS) {
+          const a = T - (t0 + step * (dir > 0 ? row : 18 - row));
+          if (a >= 0) e = Math.max(e, amp * Math.exp(-a / decay));
+        }
+        return e > 0.5 ? ink.crest : e > 0.2 ? ink.hover : null;
+      };
+      if (ROLLS.some(([t0]) => T >= t0 && T < t0 + 0.2)) OM.paintWord(ctx, OM.HOME, dpr, ink, { wordInk: (row) => word(row) });
+      // The cursor cell stirs with the second roll and is back to its band ink by 293.45.
+      if (T >= 293.38 && T < 293.45) {
+        ctx.fillStyle = T < 293.41 ? ink.crest : ink.hover;
+        OM.cell(ctx, OM.HOME, O.cursor.col, O.cursor.row, dpr);
+      }
+    }
     function draw(ctx, T, dpr) {
         if (T < Math.min(on[0], start + 0.07)) return OM.handoff('word', ctx, T, dpr);
         const lay = O.layout();

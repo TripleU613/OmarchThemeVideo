@@ -32,6 +32,8 @@ OM.scene({
     const DB = V.hitsIn(OM.T && OM.T.downbeats, LOCK, END, [131.448])[0];
     const K1 = 132.331, K2 = 132.47; // kicks: collapse to a line, then to a dot
     const SLOT = V.grid(7);
+    const TICKS = [131.26, 131.40, 131.54, 132.07], TICK_WIN = [0, 3, 5, 1]; // boot ticks: pause kicks, one window each, clear of the line
+    const JOLT = 131.91, DIP = 132.07; // the snare jolts the copies out of register; the kick browns the tube out
     let F = null;
     const fit = () => V.layout(sung, { cap: 118, maxW: 1580, cx: 960, cy: 540, lead: 1.45 });
 
@@ -42,12 +44,21 @@ OM.scene({
       const dim = OM.ease.inOutCubic(OM.prog(T, start + V.HOLD_IN, start + 0.7));
       const lock = T >= LOCK ? Math.exp(-(T - LOCK) / 0.2) : 0;
       const db = OM.pulse([DB], T, 0.12);
-      for (const r of SLOT) {
+      SLOT.forEach((r, j) => {
         V.win(x, r, {
           border: OM.mix(OM.mix(th['border-strong'], th['border-subtle'] || ink.dim, dim), ink.crest, lock * 0.8),
           face: OM.mix(th.bg, ink.bg, dim * 0.55),
         });
-      }
+        // Sprinkle, boot ticks: each pause kick wakes one window's prompt, its cursor flaring and border lit.
+        TICKS.forEach((h, i) => {
+          const ta = T - h;
+          if (ta < 0 || ta > 0.5 || TICK_WIN[i] !== j) return;
+          const g = Math.exp(-ta / 0.14);
+          V.ring(x, r, 2, 2, ink.lit, g);
+          x.fillStyle = OM.mix(th.brand, ink.crest, g);
+          x.fillRect(r.x + 40, r.y + 24, 6 + 30 * g, 10);
+        });
+      });
       sung.forEach((w, k) => {
         if (T < w.t0) return;
         const a = F.at[k], age = T - w.t0;
@@ -59,7 +70,7 @@ OM.scene({
     const drift = (T) => {
       const out = OM.ease.inOutCubic(OM.prog(T, start + V.HOLD_IN, start + 1.0)); // eased out of the cut
       const pull = OM.ease.inCubic(OM.prog(T, LOCK - 1.1, LOCK));
-      const a = out * (1 - pull);
+      const a = out * (1 - pull) + (T >= JOLT ? 0.14 * Math.exp(-(T - JOLT) / 0.07) : 0); // sprinkle: registration jolt
       const d = T - start;
       return { a, x: a * (46 + 18 * Math.sin(d * 1.7)), y: a * (30 + 12 * Math.cos(d * 1.3)), r: a * 0.014 * Math.sin(d * 1.1 + 0.6), s: a * 0.025 };
     };
@@ -110,6 +121,9 @@ OM.scene({
           ctx.globalAlpha = 1;
         }
         ctx.setTransform(c.dpr, 0, 0, c.dpr, 0, 0);
+        // Sprinkle, brownout: the tube sags on the kick before power-off.
+        const dip = T >= DIP && T < K1 ? Math.exp(-(T - DIP) / 0.06) : 0;
+        if (dip > 0.02) { ctx.fillStyle = V.rgba(ink.bg, 0.4 * dip); ctx.fillRect(0, 0, 1920, 1080); }
         // Phosphor: the dot's afterglow lingering on the tube after power-off.
         const ph = T >= K2 + 0.12 ? 1 - OM.prog(T, K2 + 0.12, K2 + 0.48) : 0;
         if (ph > 0) {

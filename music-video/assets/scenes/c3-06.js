@@ -129,6 +129,12 @@ OM.scene({
             y = OM.lerp(y, SY, p);
             sz = OM.lerp(sz, 2, p);
           }
+          // Wingbeat flare: on each pause hit a beat of light runs through the free flock.
+          if (inForm < 0 && T > 265.8) {
+            const wb = OM.pulse([266.008, 266.89, 267.424, 267.59, 268.0], T, 0.09) * (0.4 + 0.6 * (0.5 + 0.5 * Math.sin(b.u * 5 + b.v * 3)));
+            v += 0.8 * wb;
+            sz += 1.5 * wb * (1 - pour);
+          }
           ctx.fillStyle = inForm < 0 && lift < 0.15 ? ink.dim : v > 1.2 ? ink.crest : v > 0.7 ? ink.hover : v > 0.42 ? ink.lit : ink.mid;
           ctx.fillRect(Math.round(x - sz / 2), Math.round(y - sz / 2), Math.round(sz), Math.round(sz));
         }
