@@ -144,7 +144,9 @@ OM.scene({
           const hw = OM.lerp(980, W2, o), hh = OM.lerp(L.ch / 2, H2, o);
           ctx.scale(hw / W2, hh / H2);
           const lightK = sm(P.u, 0.2, 0.8); // far away it is just light
-          const col = (hex) => OM.mix(ink.bg, OM.mix(OM.mix(ink.crest, hex, o), ink.crest, lightK), 0.4 + 0.6 * o); // brightness ramps 40% -> full as it opens
+          // Brightness: the thin line eases down to 30% as it opens, then the page lights to full on the kick, with word 0's stamp.
+          const lit = OM.lerp(OM.lerp(1, 0.3, sm(o, 0, 0.25)), 1, OM.ease.outCubic(OM.prog(T, 79.366, 79.396)));
+          const col = (hex) => OM.mix(ink.bg, OM.mix(OM.mix(ink.crest, hex, o), ink.crest, lightK), lit);
           // Body: the sheet below the folds.
           const py = OM.lerp(-H2, -H2 * (1 - 1240 / 1600), f2), px = W2 - H2;
           const body = f1 <= 0 ? [[-W2, -H2], [W2, -H2], [W2, H2], [-W2, H2]] : [[-W2, -H2], [px, py], [W2, 0], [px, -py], [-W2, H2]];
@@ -168,7 +170,7 @@ OM.scene({
             path(body);
             ctx.clip();
             ctx.globalAlpha = planeA * OM.prog(o, 0.3, 1) * (1 - lightK);
-            ctx.fillStyle = PRINT;
+            ctx.fillStyle = OM.mix(ink.bg, PRINT, lit);
             for (let r = 0; r < 28; r++) {
               const y = -H2 + 34 + r * 24;
               let x = -W2 + 50;
