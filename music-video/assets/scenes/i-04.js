@@ -122,16 +122,20 @@ vec4 effect(vec2 uv) {
       const BLOOM = OM.downbeatsIn(35, 35.2)[0]; // 35.109
       const WHITE = END - 0.08; // the last frames are exactly the white handoff
       const white = OM.theme('white').bg;
-      // Focus distance: 0 = the mark (far), 1 = the title (near).
+      // The assembly: the mark's cells fly into the title's, one word locking in on each hit.
+      const HITS = [29.164, 29.304, 29.977];
+      const LAUNCH = [28.8, 28.86, 29.4];
+      const ASSEMBLED = HITS[2] + 0.4;
+      // Focus: 1 = the title sharp. Assembled sharp; it slips on the 30.79 kick, hunts on the roll, locks on the downbeat.
       const guess = (j) => 1 + (j % 2 ? -1 : 1) * 0.42 * Math.pow(0.66, j);
       const focus = (T) => {
-        if (T < KICK) return 0.45 * OM.ease.inOutSine(OM.prog(T, OPEN, KICK));
-        if (T < HUNT[0]) return OM.lerp(0.45, 0.82, OM.ease.outCubic(OM.prog(T, KICK, KICK + 0.33)));
+        if (T < KICK) return 1;
+        if (T < HUNT[0]) return OM.lerp(1, 0.55, OM.ease.outCubic(OM.prog(T, KICK, KICK + 0.3)));
         if (T >= LOCK) return 1;
         const k = OM.hitCount(HUNT, T) - 1;
-        return OM.lerp(k === 0 ? 0.82 : guess(k - 1), guess(k), OM.ease.outCubic(OM.prog(T, HUNT[k], HUNT[k] + 0.08)));
+        return OM.lerp(k === 0 ? 0.55 : guess(k - 1), guess(k), OM.ease.outCubic(OM.prog(T, HUNT[k], HUNT[k] + 0.08)));
       };
-      const BLUR_MARK = 6, BLUR_TITLE = 6; // cells of defocus per unit of focus distance
+      const BLUR_TITLE = 6; // cells of defocus per unit of focus distance
 
       // ---- the mark, exactly as i-03 leaves it: 60x60 cells, inks from the hero's noise ----
       const N = 60, HN = N / 2;
@@ -145,7 +149,6 @@ vec4 effect(vec2 uv) {
         const val = 0.3 + 0.7 * n * n + 0.12 * Math.sin(T * 1.1 + OM.heroJitter[(v * 37 + u * 11) & 4095] * 6.283);
         return val > 0.62 + 0.3 * t2 ? 3 : val > 0.2 + 0.25 * t2 ? 2 : 1;
       };
-      const markBokeh = bokeh({ cols: N, rows: N, sub: 3, rMax: BLUR_MARK * 1.45, cellW: L.cw, cellH: L.ch, x0: markX0, y0: markY0 });
 
       // ---- the title: JetBrains Mono ExtraBold rasterized onto a half-size lattice ----
       const cw = L.cw / 2, ch = L.ch / 2;
@@ -225,6 +228,63 @@ vec4 effect(vec2 uv) {
         ctx.textAlign = 'left';
       };
 
+      /**
+       * Flight pairs: every mark cell splits into four title-size quarters (so at the cut they are the
+       * mark exactly), both sides sorted left to right, and each quarter is paired with a title cell
+       * (repeating whichever side is shorter). A pair's group is its title cell's word.
+       */
+      let flights = null;
+      const buildFlights = () => {
+        const subs = [];
+        for (const m of markCells) for (let j = 0; j < 2; j++) for (let i = 0; i < 2; i++) subs.push({ u: m.gq, v: m.gr, x: markX0 + (m.gq + i / 2) * L.cw, y: markY0 + (m.gr + j / 2) * L.ch });
+        subs.sort((a, b) => a.x - b.x || a.y - b.y);
+        // Words: runs of title columns separated by wide empty gaps.
+        const used = new Set(type.cells.map((cl) => cl.gq));
+        const maxQ = Math.max(...used);
+        const wordOf = new Int16Array(maxQ + 1);
+        let w = 0, gap = 0;
+        for (let q = 0; q <= maxQ; q++) {
+          if (used.has(q)) { if (gap >= 6 && q > 0) w++; gap = 0; } else gap++;
+          wordOf[q] = w;
+        }
+        const nW = w + 1;
+        const tc = type.cells.slice().sort((a, b) => a.gq - b.gq || a.gr - b.gr);
+        const M = Math.max(subs.length, tc.length);
+        const out = [];
+        for (let k = 0; k < M; k++) {
+          const sb = subs[Math.floor((k * subs.length) / M)], cl = tc[Math.floor((k * tc.length) / M)];
+          const g = Math.min(2, Math.floor((wordOf[cl.gq] * 3) / nW));
+          out.push({ sb, cl, g, launch: LAUNCH[g] + 0.08 * OM.hash(k, 1, 13), arc: (OM.hash(k, 2, 13) - 0.5) * 2 * (110 + 170 * OM.hash(k, 3, 13)) });
+        }
+        return out;
+      };
+      /** Draw the flights at T (all on screen until the title is assembled). */
+      const fly = (ctx, dpr, T, sFar, sNear, dx, dy) => {
+        const snap = (v) => Math.round(v * dpr) / dpr;
+        const k0 = 1 - 0.035 * OM.smooth(OM.prog(T, 28.66, 28.8)); // the wind-up: the mark draws in before it breaks
+        const mcx = markX0 + HN * L.cw, mcy = markY0 + HN * L.ch;
+        for (const f of flights) {
+          const { sb, cl } = f, H = HITS[f.g];
+          const p = OM.prog(T, f.launch, H), o = T - H;
+          let e = p * p; // it arrives with momentum...
+          if (o > 0) e = 1 + 0.06 * Math.sin((Math.PI * o) / 0.12) * Math.exp(-o / 0.08) * (1 - OM.prog(o, 0, 0.3)); // ...and settles
+          const sx = at(mcx + (sb.x - mcx) * k0, sFar, dx * 0.35, 960), sy = at(mcy + (sb.y - mcy) * k0, sFar, dy * 0.35, 540);
+          const tx = at(type.x0 + cl.gq * cw, sNear, dx, 960), ty = at(type.y0 + cl.gr * ch, sNear, dy, 540);
+          const vx = tx - sx, vy = ty - sy, len = Math.hypot(vx, vy) || 1;
+          const bulge = f.arc * Math.sin(Math.PI * p);
+          const x = sx + vx * e - (vy / len) * bulge, y = sy + vy * e + (vx / len) * bulge;
+          const ee = Math.min(1, e);
+          const w = OM.lerp((L.cw / 2) * sFar, cw * sNear, ee), h = OM.lerp((L.ch / 2) * sFar, ch * sNear, ee);
+          let id;
+          if (p <= 0) id = markInk(sb.u, sb.v, T);
+          else if (o < 0) id = 3;
+          else id = o < 0.08 || OM.threshold(cl.gq, cl.gr) > (o - 0.08) / 0.3 ? 4 : cl.ink;
+          ctx.fillStyle = INKS[id];
+          const xa = snap(x), ya = snap(y);
+          ctx.fillRect(xa, ya, snap(x + w) - xa, snap(y + h) - ya);
+        }
+      };
+
       return {
         render(t, T) {
           const ctx = c.ensure();
@@ -233,7 +293,10 @@ vec4 effect(vec2 uv) {
             OM.handoff('white', ctx, T, dpr);
             return fx.apply(T);
           }
-          if (!type || (!type.ok && document.fonts.check(FONT))) type = rasterize();
+          if (!type || (!type.ok && document.fonts.check(FONT))) {
+            type = rasterize();
+            flights = buildFlights();
+          }
           ctx.fillStyle = ink.bg;
           ctx.fillRect(0, 0, 1920, 1080);
           const d = focus(T);
@@ -247,25 +310,18 @@ vec4 effect(vec2 uv) {
           const punch = T >= LOCK ? 0.018 * Math.exp(-(T - LOCK) / 0.18) : 0;
           const sNear = OM.lerp(0.95, 1, OM.smooth(OM.prog(T, OPEN, LOCK))) + punch + 0.012 * OM.prog(T, LOCK + 0.5, END);
 
-          // Far plane: the mark, its light spreading as it defocuses; after the surge it breathes with the kick.
-          const rMark = BLUR_MARK * d;
-          const breath = T >= LOCK ? 0.85 + 0.3 * OM.audio(T).kick : 1;
-          plane(ctx, dpr, {
-            cells: markCells, x0: markX0, y0: markY0, w: L.cw, h: L.ch, blur: markBokeh,
-            ink: (cl) => markInk(cl.gq, cl.gr, T),
-          }, rMark, OM.lerp(1, 0.42, OM.smooth(OM.clamp(rMark / 2.5))) * breath, sFar, dx * 0.35, dy * 0.35);
-
-          // Near plane: the title, invisible at the cut, condensing out of its haze as focus arrives.
+          // The title: assembled out of the mark's own cells, then one sharp plane that hunts focus and locks.
           const rTitle = BLUR_TITLE * Math.abs(1 - d);
-          const show = OM.smooth(OM.clamp(d / 0.3));
+          const show = OM.smooth(OM.prog(T, ASSEMBLED - 0.35, ASSEMBLED + 0.25)); // the subtitle follows the assembly
           const flash = T >= LOCK ? (T - LOCK) / 0.1 : -1;
-          plane(ctx, dpr, {
+          if (T < ASSEMBLED) fly(ctx, dpr, T, sFar, sNear, dx, dy);
+          else plane(ctx, dpr, {
             cells: type.cells, x0: type.x0, y0: type.y0, w: cw, h: ch, blur: type.blur,
             ink: (cl) => {
               if (flash >= 0 && cl.gr <= flash * type.R && OM.threshold(cl.gq, cl.gr) > (T - LOCK - 0.1 - cl.gr * 0.006) / 0.45) return 4;
               return cl.ink;
             },
-          }, rTitle, show, sNear, dx, dy);
+          }, rTitle, 1, sNear, dx, dy);
 
           // Subtitle on the near plane; the credit racks in on its own on the ad-lib.
           text(ctx, dpr, 'THE ULTIMATE MACHINE', "500 34px 'JetBrains Mono'", th.text, at(960, sNear, dx, 960), at(598, sNear, dy, 540), '0.34em', rTitle * cw * sNear, show * 0.92);

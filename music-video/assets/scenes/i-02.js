@@ -1,13 +1,13 @@
-// i-02 · Dawn behind the name. It opens on i-01's horizon: the night, one mid
-// line, the cursor on it. Stars come out over the first bar. On the 9.27
-// downbeat the cursor ignites and a flash runs out along the horizon; the sun
-// rises from it behind the wordmark, which stands on the horizon as a dark
-// mountain range, rim-lit. The light is the homepage field's own dither, and
-// the letters cut it into shafts: each sky cell is shadowed where a letter
-// stands between it and the sun, so rays stream up through the gaps and the
-// counters. The 12.93 kick bursts the shafts; the downbeats pulse them and the
-// snares flick the stars, which fade as the sky fills. A lake below mirrors
-// it. The dawn holds from 19.96, the frame i-03 opens on (OM.intro.dawn).
+// i-02 · Dawn behind the name. It opens on i-01's horizon: the console's slot,
+// stretched bright across the frame, the cursor on it. Within the first beat
+// light rises off it and the stars come out; the cursor glides out to stand
+// after the last letter as a text cursor, rising as a bar on the 9.27
+// downbeat. The wordmark (75% of the frame) is a crisp silhouette with a dark
+// keyline and a rim on the sun side; the dawn builds behind it through the
+// perc roll; on the 12.93 kick and the 13.58 downbeat the letters ignite and
+// the sky steps back, so the name blazes alone, breathing on the snares and
+// shimmering on the hats, until the riser swells everything.
+// The dawn holds from 19.96, the frame i-03 opens on (OM.intro.dawn).
 // Camera: a crane, low and close on the range by the kick, then lifting out
 // and settling at rest for the cut. Shader: crepuscular rays, the lit cells
 // smeared back along the line to the sun so shafts stream between the
@@ -37,16 +37,16 @@ vec4 effect(vec2 uv) {
   acc /= 14.0;
   return vec4(c.rgb + acc * uAmount * uP0.w * vec3(0.78, 1.0, 0.62), 1.0);
 }` });
-    const { L, ink, HR, R0, C0, C1, home, sunRow, DAWN0, KICK, dawn, FREEZE } = OM.intro;
+    const { LD: L, HY, ink, HR, R0, C0, C1, sunRow, DAWN0, KICK, dawn, FREEZE } = OM.intro;
     const END = start + duration;
-    const horizonY = L.y0 + (HR + 0.5) * L.ch;
+    const horizonY = HY;
     // The brightest stars, the same cells the dawn paints, each with its own moment to go out.
     const GLINTS = [];
     for (let row = R0; row < HR - 3; row++)
       for (let col = C0; col < C1; col++) {
         const inW = row >= 0 && row < OM.WORDMARK.h && col >= 0 && col < OM.WORDMARK.w && OM.WORDMARK.rows[row][col] === '1';
         if (!inW && OM.hash(col, row, 7) < 0.016 && OM.hash(col, row, 8) > 0.7)
-          GLINTS.push({ x: L.x0 + (col + 0.5) * L.cw, y: L.y0 + (row + 0.5) * L.ch, at: 10.4 + 4.6 * OM.hash(col, row, 11) });
+          GLINTS.push({ x: L.x0 + (col + 0.5) * L.cw, y: L.y0 + (row + 0.5) * L.ch, at: 9.4 + 3.4 * OM.hash(col, row, 11) });
       }
     return {
       render(t, T) {
@@ -86,7 +86,9 @@ vec4 effect(vec2 uv) {
         const lift = down * (1 - up);
         const sunY = L.y0 + (sunRow(T) + 0.5) * L.ch;
         fx.apply(T, {
-          amount: OM.post.envelope(T, start, END, { ramp: 0.6, hold: 0.12 }) * OM.smooth(OM.prog(T, DAWN0, DAWN0 + 2.5)),
+          // Rays ease back while the lit name holds the frame, and surge again on the riser.
+          amount: OM.post.envelope(T, start, END, { ramp: 0.6, hold: 0.12 }) * OM.smooth(OM.prog(T, DAWN0, DAWN0 + 2.5))
+            * (1 - 0.55 * OM.smooth(OM.prog(T, 13.6, 14.0)) * (1 - OM.smooth(OM.prog(T, 17.9, 19.3)))),
           cam: { zoom: 1 + 0.075 * lift, y: -55 * lift },
           p0: [0.5, 1 - sunY / 1080, 0.55, 1.2 + 1.6 * (T >= KICK ? Math.exp(-(T - KICK) / 0.6) : 0)],
         });

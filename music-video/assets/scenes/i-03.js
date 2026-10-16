@@ -58,15 +58,17 @@ OM.scene({
     const hy = Math.max(home.row - L.rMin, L.rMin + L.rows - home.row);
     const rMax = Math.hypot(hx, hy);
     const P = [];
-    for (let r = 0; r < L.rows; r++)
-      for (let k = 0; k < L.cols; k++) {
-        const col = L.cMin + k, row = L.rMin + r;
-        const x = Math.floor(L.x0 + (col + 0.5) * L.cw), y = Math.floor(L.y0 + (row + 0.5) * L.ch);
+    // The dawn is painted on its own, larger lattice (LD): sample its cells and measure them in home cells.
+    const LD = OM.intro.LD;
+    for (let r = 0; r < LD.rows; r++)
+      for (let k = 0; k < LD.cols; k++) {
+        const col = LD.cMin + k, row = LD.rMin + r;
+        const x = Math.floor(LD.x0 + (col + 0.5) * LD.cw), y = Math.floor(LD.y0 + (row + 0.5) * LD.ch);
         if (x < 0 || y < 0 || x >= 1920 || y >= 1080) continue;
         const i = (y * 1920 + x) * 4;
         const id = inkKey.get(`${px[i]},${px[i + 1]},${px[i + 2]}`);
         if (id === undefined) continue;
-        const sx = col + 0.5 - home.col, sy = row + 0.5 - home.row;
+        const sx = (LD.x0 + (col + 0.5) * LD.cw - L.x0) / L.cw - home.col, sy = (LD.y0 + (row + 0.5) * LD.ch - L.y0) / L.ch - home.row;
         const ju = (OM.hash(col, row, 5) - 0.5) * 3, jv = (OM.hash(col, row, 6) - 0.5) * 3;
         const tu = OM.clamp(H + (sx / hx) * H + ju, 0, N - 1), tv = OM.clamp(H + (sy / hy) * H + jv, 0, N - 1);
         const t = nearest(Math.round(tu), Math.round(tv));
@@ -177,14 +179,20 @@ vec4 effect(vec2 uv) {
             const e = Math.pow(OM.prog(T, T0 + p.delay, LAND), 3);
             const r = p.rs + (p.rg - p.rs) * e;
             const a = p.as + p.da * e;
-            const col = Math.floor(home.col + r * Math.cos(a));
-            const row = Math.floor(home.row + r * Math.sin(a));
-            ids[e > 0.82 ? 4 : e > 0.45 ? Math.max(p.ink, 3) : p.ink].push(col, row);
+            // Each cell flies as a square, shrinking from the dawn's cell size to the home lattice's;
+            // at e = 0 it is exactly its dawn cell, at e = 1 exactly its cell of the mark.
+            const w = OM.lerp(LD.cw, L.cw, e), h = OM.lerp(LD.ch, L.ch, e);
+            const x = L.x0 + (home.col + r * Math.cos(a)) * L.cw - w / 2, y = L.y0 + (home.row + r * Math.sin(a)) * L.ch - h / 2;
+            ids[e > 0.82 ? 4 : e > 0.45 ? Math.max(p.ink, 3) : p.ink].push(x, y, w, h);
           }
+          const sn = (v) => Math.round(v * dpr) / dpr;
           for (let i = 0; i < 5; i++) {
             ctx.fillStyle = INKS[i];
             const a = ids[i];
-            for (let k = 0; k < a.length; k += 2) OM.cell(ctx, L, a[k], a[k + 1], dpr);
+            for (let k = 0; k < a.length; k += 4) {
+              const x = sn(a[k]), y = sn(a[k + 1]);
+              ctx.fillRect(x, y, sn(a[k] + a[k + 2]) - x, sn(a[k + 1] + a[k + 3]) - y);
+            }
           }
           return;
         }
