@@ -41,7 +41,7 @@ OM.scene({
     const RISE = 217.12;
 
     const lay = B.lazy(() => {
-      const set = B.set(sung, { weight: 800, cap: 92, minCap: 60, maxW: 1640, cy: 430, lead: 2.6, maxRows: 2 });
+      const set = B.set(sung, B.CANDLE_SET);
       const candles = [];
       set.words.forEach((w) => {
         const cells = B.cells(w, set, H);
@@ -102,7 +102,9 @@ OM.scene({
       draw(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (T < start + 0.05 || T >= END - 0.1) return OM.handoff(T < start + 0.05 ? 'glow' : 'spot', ctx, T, dpr);
+        if (T >= END - 0.1) return OM.handoff('spot', ctx, T, dpr);
+        // In from the wax cut: the unlit row, and the drop of light on its way to the first wick.
+        if (T < on[0]) return B.waxCut(ctx, T);
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
         const { set, candles } = lay();
@@ -112,11 +114,6 @@ OM.scene({
         spot(ctx, OM.ease.inOutCubic(OM.prog(T, RISE + 0.05, END - 0.12)));
 
         // The glow draws down into the first flame.
-        if (T < on[0] && first) {
-          const u = OM.ease.inCubic(OM.prog(T, start + 0.05, on[0]));
-          B.pool(ctx, OM.lerp(960, first.x, u), OM.lerp(540, first.top - 20, u), OM.lerp(620, 50, u), ink.lit, OM.lerp(0.5, 0.7, u));
-          return;
-        }
         const duck = OM.pulse(STOPS, T, 0.08);
         candles.forEach((cd, i) => {
           const lit = T >= cd.at;
@@ -137,7 +134,7 @@ OM.scene({
           // The candle body, lit by its own flame.
           ctx.globalAlpha = keep;
           const bw = Math.max(14, set.adv * 0.34), bh = set.cap * 0.95;
-          ctx.fillStyle = lit ? OM.mix(th['surface-2'], th['text-secondary'], 0.35 + 0.3 * catchF) : OM.mix(ink.bg, th.surface, 0.5);
+          ctx.fillStyle = lit ? OM.mix(th['surface-2'], th['text-secondary'], 0.35 + 0.3 * catchF) : B.WAX;
           ctx.fillRect(cd.x - bw / 2, cd.top, bw, bh);
           ctx.fillStyle = th['border-strong'];
           ctx.fillRect(cd.x - 1, cd.top - 8, 2, 8);

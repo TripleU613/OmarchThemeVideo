@@ -1,20 +1,22 @@
-// x-o1 · Morning after. The word handoff was the machine's screen all along: on
-// the first kick the camera pulls back to a laptop on a desk at dawn, the paper
-// plane landed beside it, the window's lattice sky filling with light. On the
-// downbeat a terminal tiles over the homepage and the credits print as its
-// output, a row per hit; the hard stops stutter the cursor, the terminal closes
-// on the kick and the camera pushes back into the homepage, landing on the kick
-// before the cut, so the section ends on the same word handoff it started on.
+// x-o1 · Morning after: the name becomes the logo. From the word handoff the
+// field dissolves cell by cell into an Omarchy desktop at dawn (bar, gaps, a
+// terminal with the gradient border, nvim and a cpu meter tiled beside it). The
+// prompt types fastfetch on the hats; on the kick the wordmark's own cells fly
+// into the terminal and pack into the block-art mark, and fastfetch prints the
+// credits as system info, a line per kick, then its palette swatches. The hard
+// stops stutter the cursor and the last line; the output dims, the mark's cells
+// fly back out to the wordmark and the desktop dissolves into the field, landing
+// on the word handoff the next scene starts on.
 //
 // Also defines OM.outro, shared with o-01 and x-end: the homepage on the home
 // lattice (field, wordmark, the sung line as hero text in half cells, the two
 // buttons) and its drain order, so the cuts between those scenes match by
 // construction.
 (() => {
-  const HEAD = "800 100px 'JetBrains Mono'", LABEL = "600 100px 'JetBrains Mono'", TERM = "500 92px 'JetBrains Mono'", MADE = "800 118px 'JetBrains Mono'";
+  const HEAD = "800 100px 'JetBrains Mono'", LABEL = "600 100px 'JetBrains Mono'";
   window.__hf = window.__hf || {};
   window.__hf.buildReady = window.__hf.buildReady || {};
-  window.__hf.buildReady['outro-type'] = Promise.all([HEAD, LABEL, TERM, MADE].map((f) => document.fonts.load(f)));
+  window.__hf.buildReady['outro-type'] = Promise.all([HEAD, LABEL].map((f) => document.fonts.load(f)));
 
   const O = (OM.outro = {});
   const L = OM.HOME;
@@ -215,21 +217,8 @@
     const [r, g, b] = OM.rgb(hex);
     return `rgba(${r},${g},${b},${a})`;
   };
-  const ROWS = [
-    ['Song', 'We Can Fix Everything (The Ultimate Machine)'],
-    ['Music', 'Kevin Koontz / REARRANGED'],
-    ['Made in code', 'HyperFrames, Three.js and GSAP'],
-    ['Made by', 'TripleU613'],
-    ['Look', 'Themed after omarchy.org, in Tokyo Night'],
-    ['Omarchy', 'by DHH · omarchy.org'],
-  ];
-  // Room space. The screen is the whole 1920x1080 frame scaled by S1 at (SX, SY); the camera zooms
-  // about P, the point that stays put, so at k = 1 / S1 the screen exactly fills the frame.
-  const S1 = 0.6, SX = 230, SY = 104, SW = 1920 * S1, SH = 1080 * S1;
-  const P = { x: SX / (1 - S1), y: SY / (1 - S1) };
-  const DESK = 812;
   // Morning light leak with gentle halation: bright cells bloom softly green, and a soft
-  // blue-white band of dawn sweeps down from the window's corner across the room (uP0.x 0..1).
+  // blue-white band of dawn sweeps down across the desktop (uP0.x 0..1).
   const FX = `
 vec4 effect(vec2 uv) {
   vec2 p = cam(uv);
@@ -253,6 +242,54 @@ vec4 effect(vec2 uv) {
   c += uAmount * (h * 0.5 * vec3(0.75, 1.0, 0.7) + leak * (0.7 + 0.3 * vnoise(uv * 3.0 + uTime * 0.1)));
   return vec4(c, 1.0);
 }`;
+  /** Tokyo Night's terminal palette (its ANSI colours), for the prompt, the keys and the swatches. */
+  const TN = { black: '#414868', red: '#f7768e', green: '#9ece6a', yellow: '#e0af68', blue: '#7aa2f7', magenta: '#bb9af7', cyan: '#7dcfff', white: '#c0caf5' };
+  const F_TERM = "500 32px 'JetBrains Mono'", F_BOLD = "800 32px 'JetBrains Mono'", F_MADE = "800 34px 'JetBrains Mono'";
+  const F_BAR = "600 22px 'JetBrains Mono'", F_CODE = "400 21px 'JetBrains Mono'";
+  window.__hf.buildReady['x-o1-type'] = Promise.all([F_TERM, F_BOLD, F_MADE, F_BAR, F_CODE].map((f) => document.fonts.load(f)));
+  /** fastfetch's output: the credits as system info, a line per hit. */
+  const INFO = [
+    { t: 282.006, kind: 'head' },
+    { t: 282.285, kind: 'sep' },
+    { t: 282.819, k: 'OS', v: 'Omarchy' },
+    { t: 283.376, k: 'WM', v: 'Hyprland' },
+    { t: 283.91, k: 'Song', v: 'We Can Fix Everything (The Ultimate Machine)' },
+    { t: 284.537, k: 'Music', v: 'Kevin Koontz / REARRANGED' },
+    { t: 284.979, k: 'Made by', v: 'TripleU613', made: true },
+    { t: 285.698, k: 'Built with', v: 'HyperFrames, Three.js, GSAP' },
+    { t: 285.954, k: 'Theme', v: 'Tokyo Night' },
+    { t: 286.418, k: 'Font', v: 'JetBrains Mono' },
+    { t: 286.952, k: 'Inspired by', v: 'omarchy.org, by DHH' },
+    { t: 287.115, kind: 'swatch' },
+  ];
+  const KEYINK = [TN.blue, TN.magenta, TN.cyan, TN.green, TN.yellow, TN.red];
+  const CODE = [
+    [['kw', 'const '], ['id', 'scene'], ['op', ' = '], ['fn', 'OM.scene'], ['op', '({']],
+    [['op', '  '], ['id', 'id'], ['op', ': '], ['str', "'x-o1'"], ['op', ',']],
+    [['op', '  '], ['fn', 'build'], ['op', '(el, { start }) {']],
+    [['op', '    '], ['kw', 'const '], ['id', 'fx'], ['op', ' = '], ['fn', 'OM.post'], ['op', '(el);']],
+    [['op', '    '], ['kw', 'return '], ['op', '{ render };']],
+    [['op', '  },']],
+    [['op', '});']],
+    [],
+    [['cm', '// morning after.']],
+    [['cm', '// ship it.']],
+  ];
+  const CODEINK = { kw: TN.magenta, id: TN.white, op: '#a9b1d6', fn: TN.blue, str: TN.green, cm: '#565f89' };
+  /** Tiny bar icons as pixel bitmaps (drawn, not font glyphs). */
+  const ICONS = {
+    cpu: ['0101010', '1111111', '0100010', '1101011', '0100010', '1111111', '0101010'],
+    wifi: ['0011100', '0100010', '1000001', '0011100', '0100010', '0000000', '0001000'],
+    vol: ['0001001', '0011010', '1111001', '1111001', '1111001', '0011010', '0001001'],
+    bat: ['0111110', '1100011', '1011101', '1011101', '1011101', '1100011', '0111110'],
+  };
+
+  // Desktop geometry (1080p px).
+  const BAR = 44, TX0 = 14, TY0 = 56, TX1 = 1528, TY1 = 1066, RX0 = 1540, RX1 = 1906, RMID = 540;
+  const LH = 44, TOP = TY0 + 34, PX = TX0 + 40;
+  const rowBase = (r) => TOP + r * LH + 32;
+  const LX = PX + 4, LY = TOP + 2 * LH + 6, LCELL = 24, LSUB = 8; // the mark, 15x15 cells of 3x3 sub-cells
+  const IX = LX + 15 * LCELL + 64; // info column
 
   OM.scene({
     id: 'x-o1',
@@ -265,249 +302,248 @@ vec4 effect(vec2 uv) {
       const ink = OM.fieldInks('tokyo-night');
       const th = OM.theme('tokyo-night');
       const end = start + duration;
-      const PULL0 = 281.031, PULL1 = 282.842; // first kick to the downbeat
-      const OPEN = 282.842, TYPE0 = 283.0, CLOSE = 288.369, LAND = 289.483;
-      const PRINT = [283.91, 284.537, 284.979, 285.698, 286.418, 287.115]; // a row per hit; the maker on the kick, early enough to stay in view to the close
-      const STOPS = [287.486, 287.602, 287.742, 287.858, 287.974, 288.113, 288.253, 288.369];
-      const CMD = 'credits';
-      const ZIN = 1 / S1, CREEP = 1.035;
+      const IN0 = start + 0.07, IN1 = 281.55; // the field dissolves into the desktop
+      const TYPE0 = 281.031, ENTER = 281.751, FLY0 = 281.751; // fastfetch typed on the hats, entered on the kick
+      const STOPS = [287.486, 287.602, 287.742, 287.858, 287.974, 288.113, 288.253, 288.369, 288.554];
+      const PROMPT2 = 287.3, DIM0 = 288.3, DIM1 = 288.6; // the output dims before the wordmark re-forms over it
+      const BACK0 = 288.554, OUT0 = 288.62, OUT1 = 289.26, DONE = 289.3;
+      const KICKS = [281.031, 281.751, 282.006, 282.285, 282.819, 285.698, 285.954, 286.418, 286.952, 287.022, 288.369, 289.483];
+      const CMD = 'fastfetch';
 
-      /** Camera zoom relative to the room view: in on the screen, out to the room, a creep, back in. */
-      const zoom = (T) => {
-        if (T < PULL1) return Math.pow(ZIN, 1 - OM.ease.inOutCubic(OM.prog(T, PULL0, PULL1)));
-        if (T < CLOSE) return 1 + (CREEP - 1) * OM.ease.inOutSine(OM.prog(T, PULL1, CLOSE));
-        return CREEP * Math.pow(ZIN / CREEP, OM.ease.inCubic(OM.prog(T, CLOSE, LAND)));
-      };
-      const dawnOf = (T) => OM.smooth(OM.prog(T, 280.9, 289.3));
-
-      /** Lattice light inside a polygon-free rect: cells lit where lum(x, y) clears their threshold. */
-      const lightCells = (ctx, x0, y0, x1, y1, size, lum, inside) => {
-        for (let y = y0; y < y1; y += size)
-          for (let x = x0; x < x1; x += size) {
-            if (inside && !inside(x + size / 2, y + size / 2)) continue;
-            const l = lum(x + size / 2, y + size / 2);
-            const q = Math.round(x / size), r = Math.round(y / size);
-            const t = OM.threshold(q, r);
-            if (l <= t) continue;
-            const h = l - t;
-            ctx.fillStyle = h > 0.5 ? ink.crest : h > 0.34 ? ink.hover : h > 0.2 ? ink.lit : h > 0.08 ? ink.mid : ink.dim;
-            ctx.fillRect(x, y, size, size);
-          }
-      };
-
-      const drawRoom = (ctx, T) => {
-        const d = dawnOf(T);
-        // Wall, the dawn wash from the window, the desk.
-        ctx.fillStyle = ink.bg;
-        ctx.fillRect(-200, -200, 2400, 1500);
-        let g = ctx.createRadialGradient(1650, 360, 0, 1650, 360, 1400);
-        g.addColorStop(0, rgba(th['text-secondary'], 0.2 * d));
-        g.addColorStop(0.5, rgba(th['text-secondary'], 0.08 * d));
-        g.addColorStop(1, rgba(th['text-secondary'], 0));
-        ctx.fillStyle = g;
-        ctx.fillRect(-200, -200, 2400, DESK + 200);
-        g = ctx.createLinearGradient(0, DESK, 0, 1080);
-        g.addColorStop(0, OM.mix(th['bg-deep'], th.surface, 0.3 + 0.6 * d));
-        g.addColorStop(1, OM.mix(ink.bg, th['bg-deep'], d));
-        ctx.fillStyle = g;
-        ctx.fillRect(-200, DESK, 2400, 500);
-        ctx.fillStyle = OM.mix(th['border-subtle'], th['border-strong'], d);
-        ctx.fillRect(-200, DESK, 2400, 2);
-
-        // The window: a lattice sky brightening from the horizon up, the sun's crest cells last.
-        const WX0 = 1500, WY0 = 130, WX1 = 1810, WY1 = 560;
-        g = ctx.createLinearGradient(0, WY0, 0, WY1);
-        g.addColorStop(0, OM.mix(ink.bg, th['bg-deep'], d));
-        g.addColorStop(1, OM.mix(th['bg-deep'], th['border-strong'], 0.8 * d));
-        ctx.fillStyle = g;
-        ctx.fillRect(WX0, WY0, WX1 - WX0, WY1 - WY0);
-        lightCells(ctx, WX0, WY0, WX1, WY1, 10, (x, y) => {
-          const v = (y - WY0) / (WY1 - WY0);
-          const sun = Math.max(0, 1 - Math.hypot(x - 1640, (y - 600) * 1.3) / 260);
-          return d * (0.08 + 0.55 * v * v) + sun * sun * Math.max(0, d - 0.25) * 1.3;
-        });
-        ctx.fillStyle = OM.mix(th['border-subtle'], th['border-strong'], 0.4 + 0.6 * d);
-        ctx.fillRect(WX0 - 10, WY0 - 10, WX1 - WX0 + 20, 10);
-        ctx.fillRect(WX0 - 10, WY1, WX1 - WX0 + 20, 14);
-        ctx.fillRect(WX0 - 10, WY0, 10, WY1 - WY0);
-        ctx.fillRect(WX1, WY0, 10, WY1 - WY0);
-        ctx.fillRect((WX0 + WX1) / 2 - 4, WY0, 8, WY1 - WY0);
-        ctx.fillRect(WX0, 340, WX1 - WX0, 8);
-
-        // The window's light thrown across the desk, in dim lattice cells.
-        const inside = (x, y) => {
-          const v = (y - DESK) / 250;
-          return v >= 0 && v <= 1 && x > 1280 - 330 * v && x < 1760 - 300 * v;
+      // The wordmark's cells, paired with the mark's sub-cells left to right, so the name packs into the logo.
+      const src = OM.cells(OM.WORDMARK).sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      const dst = [];
+      OM.cells(OM.LOGO).forEach(([q, r]) => {
+        for (let sy = 0; sy < 3; sy++) for (let sx = 0; sx < 3; sx++) dst.push({ x: LX + q * LCELL + sx * LSUB, y: LY + r * LCELL + sy * LSUB, row: r * 3 + sy });
+      });
+      dst.sort((a, b) => a.x - b.x || a.y - b.y);
+      const FLY = dst.map((d, j) => {
+        const [col, row] = src[Math.floor((j * src.length) / dst.length)];
+        return {
+          col, row, x0: L.x0 + col * L.cw, y0: L.y0 + row * L.ch, x1: d.x, y1: d.y,
+          a: ink[OM.BANDS[row]], b: ink[OM.BANDS[Math.min(18, Math.floor((d.row * 19) / 45))]], s: col / 80,
         };
-        lightCells(ctx, 900, DESK + 4, 1760, 1062, 10, (x, y) => d * 0.42 * (1 - 0.6 * ((y - DESK) / 250)), inside);
+      });
 
-        // The paper plane, landed on the desk, nose to the machine, its top edge catching the dawn.
-        const plane = [
-          { pts: [[1460, 802], [1756, 696], [1780, 770]], c: OM.mix(th.surface, th['border-strong'], 0.4 + 0.4 * d) },
-          { pts: [[1460, 802], [1780, 770], [1786, 812]], c: OM.mix(th['bg-deep'], th['surface-2'], 0.5 + 0.5 * d) },
-          { pts: [[1460, 802], [1806, 738], [1780, 770]], c: OM.mix(th['surface-2'], th['text-secondary'], 0.3 + 0.5 * d) },
-        ];
-        ctx.fillStyle = rgba('#000000', 0.35);
-        ctx.beginPath();
-        ctx.ellipse(1630, 814, 180, 7, 0, 0, Math.PI * 2);
-        ctx.fill();
-        for (const f of plane) {
-          ctx.fillStyle = f.c;
-          ctx.beginPath();
-          f.pts.forEach(([x, y]) => ctx.lineTo(x, y));
-          ctx.closePath();
-          ctx.fill();
-        }
-        ctx.strokeStyle = rgba(ink.hover, 0.25 + 0.6 * d);
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(1460, 802);
-        ctx.lineTo(1806, 738);
-        ctx.moveTo(1460, 802);
-        ctx.lineTo(1756, 696);
-        ctx.stroke();
-
-        // Dust in the sunbeam: motes drifting on slow seeded paths, lit only inside the beam.
-        for (let i = 0; i < 70; i++) {
-          const h1 = OM.hash(i, 1, 801), h2 = OM.hash(i, 2, 801), h3 = OM.hash(i, 3, 801), h4 = OM.hash(i, 4, 801);
-          const y = 180 + 860 * ((((h2 + T * 0.012 * (0.4 + h4)) % 1) + 1) % 1);
-          const v = (y - 180) / 860;
-          const x = 1720 - 520 * v + (h1 - 0.5) * 300 + 22 * Math.sin(T * (0.25 + 0.3 * h3) + h1 * 6.283);
-          const inBeam = 1 - Math.abs(x - (1720 - 520 * v)) / 170;
-          const a = d * OM.clamp(inBeam) * (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(T * 1.7 + h3 * 9)));
-          if (a <= 0.02) continue;
-          ctx.fillStyle = rgba(ink.crest, 0.8 * a);
-          const sz = 2 + 2 * h4;
-          ctx.fillRect(x, y, sz, sz);
-        }
-
-        // The machine: lid around the screen, the base slab on the desk, the dawn on its right edge.
-        ctx.fillStyle = th['bg-deep'];
-        ctx.fillRect(SX - 22, SY - 22, SW + 44, SH + 44);
-        ctx.strokeStyle = th['border-strong'];
-        ctx.lineWidth = 2;
-        ctx.strokeRect(SX - 21, SY - 21, SW + 42, SH + 42);
-        ctx.fillStyle = rgba(ink.mid, 0.2 + 0.5 * d);
-        ctx.fillRect(SX + SW + 20, SY - 21, 2, SH + 42);
-        const b0 = SY + SH + 22;
-        ctx.fillStyle = OM.mix(th.surface, th['surface-2'], d);
-        ctx.beginPath();
-        ctx.moveTo(SX - 30, b0);
-        ctx.lineTo(SX + SW + 30, b0);
-        ctx.lineTo(SX + SW + 80, DESK);
-        ctx.lineTo(SX - 80, DESK);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = th['border-strong'];
-        ctx.fillRect(SX - 30, b0, SW + 60, 2);
-        ctx.fillStyle = rgba(ink.hover, 0.15 + 0.4 * d);
-        ctx.fillRect(SX - 80, DESK - 3, SW + 160, 2);
-        ctx.fillStyle = th['bg-deep'];
-        ctx.fillRect(960 - 110, DESK - 9, 220, 5);
-      };
-
-      /** The terminal tile over the homepage, in screen space (1920x1080). */
-      const drawTerminal = (ctx, T) => {
-        let s = 1, a = 1;
-        if (T < OPEN + 0.14) s = 0.94 + 0.06 * OM.ease.outExpo(OM.prog(T, OPEN, OPEN + 0.14));
-        if (T >= CLOSE) {
-          const e = OM.prog(T, CLOSE, CLOSE + 0.12);
-          s = 1 - 0.06 * OM.ease.inCubic(e);
-          a = 1 - e;
-        }
-        if (a <= 0) return;
+      const fieldOver = (ctx, T, dpr, keep) => {
         ctx.save();
-        ctx.globalAlpha = a;
-        ctx.translate(960, 540);
-        ctx.scale(s, s);
-        ctx.translate(-960, -540);
-        ctx.fillStyle = th.bg;
-        ctx.fillRect(40, 40, 1840, 1000);
-        ctx.strokeStyle = th.brand;
-        ctx.lineWidth = 4;
-        ctx.strokeRect(42, 42, 1836, 996);
-        ctx.font = TERM;
-        ctx.textBaseline = 'alphabetic';
-        // Phone-size terminal type: each credit's label on one line, its value wrapped under it,
-        // and the output scrolls up as new rows print, as a real terminal does.
-        const ADV = ctx.measureText('M').width, X = 96, LH = 112, LHM = 150, TOP = 64, AREA = 912, MAXW = 1880 - X - 56;
-        const wrap = (text) => {
-          const out = [];
-          let cur = '';
-          for (const w of text.split(' ')) {
-            const next = cur ? cur + ' ' + w : w;
-            if (cur && ctx.measureText(next).width > MAXW - 2 * ADV) { out.push(cur); cur = w; } else cur = next;
-          }
-          if (cur) out.push(cur);
-          return out;
-        };
-        const lines = [{ kind: 'cmd', t: -Infinity, h: LH }];
-        ROWS.forEach(([k, v], i) => {
-          const t = PRINT[i];
-          if (k === 'Made by') return lines.push({ kind: 'made', text: k + ' ' + v, t, h: LHM });
-          lines.push({ kind: 'key', text: k.toLowerCase(), t, h: LH });
-          for (const w of wrap(v)) lines.push({ kind: i === ROWS.length - 1 ? 'brand' : 'val', text: w, t, h: LH });
-        });
-        const PROMPT_T = PRINT[PRINT.length - 1] + 0.2;
-        lines.push({ kind: 'prompt', t: PROMPT_T, h: LH });
-        // Scroll: after each print the output glides up (0.16 s) just enough to keep the newest line in view.
-        const events = [...PRINT, PROMPT_T];
-        const target = (te) => Math.max(0, lines.filter((l) => l.t <= te).reduce((s, l) => s + l.h, 0) - AREA);
-        let scroll = 0;
-        for (const te of events) {
-          if (T < te) break;
-          const to = target(te);
-          scroll += (to - scroll) * OM.ease.outCubic(OM.prog(T, te, te + 0.16));
-        }
-        const prompt = (y) => {
-          ctx.fillStyle = ink.lit;
-          ctx.fillText('~', X, y);
-          ctx.fillStyle = th.brand;
-          ctx.fillText('❯', X + 2 * ADV, y);
-          return X + 4 * ADV;
-        };
-        const block = (x, y, color) => {
-          ctx.fillStyle = color;
-          ctx.fillRect(x, y - 0.8 * LH * 0.68, ADV, LH * 0.68);
-        };
         ctx.beginPath();
-        ctx.rect(44, 44, 1832, 992);
-        ctx.clip();
-        // The output dims away over the 0.3 s before the tile closes, so the homepage behind it
-        // never shows through readable text.
-        ctx.globalAlpha = a * (1 - OM.smooth(OM.prog(T, CLOSE - 0.3, CLOSE)));
-        let y = TOP + 40 - scroll;
-        for (const l of lines) {
-          if (T < l.t) break;
-          const base = y + l.h * 0.72;
-          y += l.h;
-          if (base < 0 || base - l.h > 1080) continue;
-          const fresh = T - l.t < 0.09;
-          if (l.kind === 'cmd') {
-            // The command, typed at a hi-hat pace.
-            const x = prompt(base);
-            const n = Math.max(0, Math.min(CMD.length, Math.floor((T - TYPE0) / 0.075) + 1));
-            ctx.fillStyle = th.text;
-            ctx.fillText(CMD.slice(0, n), x, base);
-            if (T < PRINT[0]) block(x + n * ADV, base, th.text);
-          } else if (l.kind === 'prompt') {
-            // A fresh prompt; its cursor stutters on the hard stops.
-            const px = prompt(base);
-            if (OM.hitCount(STOPS, T) % 2 === 0) block(px, base, OM.hitCount(STOPS, T) ? ink.crest : th.text);
-          } else if (l.kind === 'made') {
-            // The maker's credit, the loudest line: heavy, larger, in crest ink with a brand bar.
-            ctx.font = MADE;
-            ctx.fillStyle = th.brand;
-            ctx.fillRect(X - 40, base - LHM * 0.62, 12, LHM * 0.72);
-            ctx.fillStyle = ink.crest;
-            ctx.fillText(l.text, X, base);
-            ctx.font = TERM;
-          } else {
-            ctx.fillStyle = fresh ? ink.crest : l.kind === 'key' ? th['text-muted'] : l.kind === 'brand' ? th.brand : th.text;
-            ctx.fillText(l.text, l.kind === 'key' ? X : X + 2 * ADV, base);
+        const sn = (v) => Math.round(v * dpr) / dpr;
+        let n = 0;
+        for (let r = L.rMin; r < L.rMin + L.rows; r++)
+          for (let col = L.cMin; col < L.cMin + L.cols; col++) {
+            if (!keep(col, r)) continue;
+            n++;
+            const x = sn(L.x0 + col * L.cw), y = sn(L.y0 + r * L.ch);
+            ctx.rect(x, y, sn(L.x0 + (col + 1) * L.cw) - x, sn(L.y0 + (r + 1) * L.ch) - y);
           }
+        if (n) {
+          ctx.clip();
+          OM.handoff('field', ctx, T, dpr);
         }
         ctx.restore();
+      };
+
+      const icon = (ctx, bm, x, y, px, color) => {
+        ctx.fillStyle = color;
+        bm.forEach((row, r) => { for (let q = 0; q < row.length; q++) if (row[q] === '1') ctx.fillRect(x + q * px, y + r * px, px, px); });
+      };
+
+      const drawDesktop = (ctx, T, textA) => {
+        const d = OM.smooth(OM.prog(T, 280.9, 289.3)); // dawn
+        // Wallpaper: dawn rising from the bottom, seen in the gaps.
+        let g = ctx.createLinearGradient(0, 0, 0, 1080);
+        g.addColorStop(0, th['bg-deep']);
+        g.addColorStop(0.6, OM.mix(th['bg-deep'], th.surface, 0.5 * d));
+        g.addColorStop(1, OM.mix(th['bg-deep'], OM.mix(th['border-strong'], ink.mid, 0.3), 0.9 * d));
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, 1920, 1080);
+        // The bar: workspaces, the plane and the clock, status icons.
+        ctx.fillStyle = ink.bg;
+        ctx.fillRect(0, 0, 1920, BAR);
+        ctx.fillStyle = th['border-subtle'];
+        ctx.fillRect(0, BAR - 1, 1920, 1);
+        ctx.font = F_BAR;
+        ctx.textBaseline = 'middle';
+        ctx.textAlign = 'center';
+        for (let i = 0; i < 5; i++) {
+          ctx.fillStyle = i === 0 ? th.text : th['text-muted'];
+          ctx.fillText(String(i + 1), 34 + i * 40, BAR / 2 + 1);
+        }
+        ctx.fillStyle = TN.green;
+        ctx.fillRect(24, BAR - 6, 20, 3);
+        ctx.fillStyle = th.text;
+        ctx.fillText('07:42', 960, BAR / 2 + 1);
+        ctx.fillStyle = th['text-secondary'];
+        ctx.beginPath();
+        ctx.moveTo(880, 23); ctx.lineTo(906, 13); ctx.lineTo(898, 31); ctx.lineTo(893, 25);
+        ctx.closePath();
+        ctx.fill();
+        ctx.textAlign = 'left';
+        icon(ctx, ICONS.cpu, 1704, 12, 3, th['text-secondary']);
+        icon(ctx, ICONS.wifi, 1756, 12, 3, th['text-secondary']);
+        icon(ctx, ICONS.vol, 1808, 12, 3, th['text-secondary']);
+        icon(ctx, ICONS.bat, 1860, 12, 3, TN.green);
+
+        // Windows: the terminal (active, the gradient border turning), nvim and the cpu meter.
+        ctx.fillStyle = th.bg;
+        ctx.fillRect(TX0, TY0, TX1 - TX0, TY1 - TY0);
+        ctx.fillRect(RX0, TY0, RX1 - RX0, RMID - TY0);
+        ctx.fillRect(RX0, RMID + 10, RX1 - RX0, TY1 - RMID - 10);
+        ctx.strokeStyle = th['border-strong'];
+        ctx.lineWidth = 2;
+        ctx.strokeRect(RX0 + 1, TY0 + 1, RX1 - RX0 - 2, RMID - TY0 - 2);
+        ctx.strokeRect(RX0 + 1, RMID + 11, RX1 - RX0 - 2, TY1 - RMID - 12);
+        const a = T * 0.7, cx = (TX0 + TX1) / 2, cy = (TY0 + TY1) / 2, rr = 900;
+        g = ctx.createLinearGradient(cx - Math.cos(a) * rr, cy - Math.sin(a) * rr, cx + Math.cos(a) * rr, cy + Math.sin(a) * rr);
+        g.addColorStop(0, TN.cyan);
+        g.addColorStop(0.5, TN.green);
+        g.addColorStop(1, TN.blue);
+        ctx.strokeStyle = g;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(TX0 + 1.5, TY0 + 1.5, TX1 - TX0 - 3, TY1 - TY0 - 3);
+
+        // nvim: a little scene code, line numbers, a statusline.
+        ctx.font = F_CODE;
+        ctx.textBaseline = 'alphabetic';
+        CODE.forEach((line, i) => {
+          const y = TY0 + 40 + i * 32;
+          ctx.fillStyle = i === 3 ? th.text : '#3b4261';
+          ctx.textAlign = 'right';
+          ctx.fillText(String(i + 1), RX0 + 40, y);
+          ctx.textAlign = 'left';
+          let x = RX0 + 54;
+          for (const [kind, text] of line) {
+            ctx.fillStyle = CODEINK[kind];
+            ctx.fillText(text, x, y);
+            x += ctx.measureText(text).width;
+          }
+        });
+        ctx.fillStyle = TN.green;
+        ctx.fillRect(RX0 + 2, RMID - 36, 104, 34);
+        ctx.fillStyle = th['brand-ink'];
+        ctx.fillText('NORMAL', RX0 + 14, RMID - 12);
+        ctx.fillStyle = th.surface;
+        ctx.fillRect(RX0 + 106, RMID - 36, RX1 - RX0 - 108, 34);
+        ctx.fillStyle = th['text-secondary'];
+        ctx.fillText('x-o1.js', RX0 + 122, RMID - 12);
+
+        // The cpu meter: lattice bars that jump on the kicks.
+        ctx.fillStyle = th['text-secondary'];
+        ctx.fillText('cpu', RX0 + 24, RMID + 50);
+        ctx.fillStyle = TN.green;
+        ctx.fillText(Math.round(18 + 60 * OM.pulse(KICKS, T, 0.15)) + '%', RX0 + 290, RMID + 50);
+        const kick = OM.pulse(KICKS, T, 0.13), kn = OM.hitCount(KICKS, T);
+        for (let i = 0; i < 10; i++) {
+          const lv = OM.clamp(0.15 + 0.25 * (0.5 + 0.5 * Math.sin(T * 1.3 + i * 1.7)) + 0.6 * kick * (0.4 + 0.6 * OM.hash(i, kn, 9)));
+          const n = Math.round(lv * 26);
+          for (let k = 0; k < n; k++) {
+            const f = k / 26;
+            ctx.fillStyle = f > 0.85 ? ink.crest : f > 0.65 ? ink.hover : f > 0.4 ? ink.lit : f > 0.2 ? ink.mid : ink.dim;
+            ctx.fillRect(RX0 + 24 + i * 32, TY1 - 30 - k * 16, 26, 13);
+          }
+        }
+
+        // The terminal.
+        if (textA > 0) {
+          ctx.save();
+          ctx.globalAlpha = textA;
+          ctx.font = F_TERM;
+          const ADV = ctx.measureText('M').width;
+          const prompt = (y) => {
+            ctx.font = F_BOLD;
+            ctx.fillStyle = TN.blue;
+            ctx.fillText('~', PX, y);
+            ctx.fillStyle = TN.green;
+            ctx.fillText('❯', PX + 2 * ADV, y);
+            ctx.font = F_TERM;
+            return PX + 4 * ADV;
+          };
+          const block = (x, y, color) => {
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y - 30, ADV, 38);
+          };
+          // The command, a character per hi-hat.
+          let x = prompt(rowBase(0));
+          const n = Math.max(0, Math.min(CMD.length, Math.floor((T - TYPE0) / 0.067) + 1));
+          ctx.fillStyle = th.text;
+          ctx.fillText(CMD.slice(0, n), x, rowBase(0));
+          if (T < ENTER) block(x + n * ADV, rowBase(0), th.text);
+          // The info, a line per hit; each flashes crest as it prints.
+          const stop = OM.lastHit(STOPS, T), sk = OM.hitCount(STOPS, T);
+          const jolt = stop !== null && T - stop < 0.07;
+          let ki = 0;
+          INFO.forEach((ln, i) => {
+            if (T < ln.t) return;
+            const y = rowBase(2 + i);
+            const fresh = T - ln.t < 0.08;
+            if (ln.kind === 'head') {
+              ctx.font = F_BOLD;
+              ctx.fillStyle = fresh ? ink.crest : TN.blue;
+              ctx.fillText('tripleu', IX, y);
+              ctx.fillStyle = th.text;
+              ctx.fillText('@', IX + 7 * ADV, y);
+              ctx.fillStyle = fresh ? ink.crest : TN.blue;
+              ctx.fillText('omarchy', IX + 8 * ADV, y);
+              ctx.font = F_TERM;
+            } else if (ln.kind === 'sep') {
+              ctx.fillStyle = th['text-muted'];
+              ctx.fillText('-'.repeat(15), IX, y);
+            } else if (ln.kind === 'swatch') {
+              // fastfetch's palette row; it jumps with the cursor on the hard stops.
+              const dx = jolt ? Math.round((OM.hash(sk, 1, 4) - 0.5) * 2) * ADV : 0, dy = jolt ? (OM.hash(sk, 2, 4) - 0.5) * 16 : 0;
+              Object.values(TN).forEach((col, q) => {
+                if (T < ln.t + q * 0.025) return;
+                ctx.fillStyle = jolt && q === sk % 8 ? ink.crest : col;
+                ctx.fillRect(IX + dx + q * 3 * ADV, y - 30 + dy, 3 * ADV, 38);
+              });
+            } else if (ln.made) {
+              // The maker: the brightest line, on a lit selection band.
+              ctx.font = F_MADE;
+              const w = ctx.measureText(ln.k + ': ' + ln.v).width;
+              ctx.fillStyle = rgba(ink.lit, 0.16);
+              ctx.fillRect(IX - 14, y - 34, w + 28, LH);
+              ctx.fillStyle = ink.lit;
+              ctx.fillRect(IX - 14, y - 34, 5, LH);
+              ctx.fillStyle = ink.crest;
+              ctx.fillText(ln.k + ': ' + ln.v, IX, y);
+              ctx.font = F_TERM;
+              ki++;
+            } else {
+              ctx.font = F_BOLD;
+              ctx.fillStyle = fresh ? ink.crest : KEYINK[ki++ % KEYINK.length];
+              ctx.fillText(ln.k, IX, y);
+              const kw = ctx.measureText(ln.k).width;
+              ctx.font = F_TERM;
+              ctx.fillStyle = th.text;
+              ctx.fillText(': ' + ln.v, IX + kw, y);
+            }
+          });
+          // A fresh prompt; on each hard stop its cursor jumps to a new column and strikes crest.
+          if (T >= PROMPT2) {
+            const y = rowBase(2 + INFO.length + 1);
+            const px = prompt(y);
+            const col = sk ? Math.floor(OM.hash(sk, 3, 4) * 8) : 0;
+            block(px + col * ADV, y + (jolt ? (OM.hash(sk, 5, 4) - 0.5) * 12 : 0), jolt ? ink.crest : th.text);
+          }
+          ctx.restore();
+        }
+      };
+
+      /** The name's cells: at the wordmark, in flight, or packed into the mark. */
+      const drawCells = (ctx, T, dpr) => {
+        const sn = (v) => Math.round(v * dpr) / dpr;
+        for (const f of FLY) {
+          const ei = OM.ease.inOutCubic(OM.prog(T, FLY0 + 0.15 * f.s, FLY0 + 0.15 * f.s + 0.38));
+          const eo = OM.ease.inOutCubic(OM.prog(T, BACK0 + 0.15 * (1 - f.s), BACK0 + 0.15 * (1 - f.s) + 0.42));
+          const e = ei * (1 - eo);
+          ctx.fillStyle = e <= 0 ? f.a : e >= 1 ? f.b : OM.mix(f.a, f.b, e);
+          if (e <= 0) { OM.cell(ctx, L, f.col, f.row, dpr); continue; }
+          const arc = -70 * Math.sin(Math.PI * e) * (0.5 + f.s);
+          const x = OM.lerp(f.x0, f.x1, e), y = OM.lerp(f.y0, f.y1, e) + arc;
+          const w = OM.lerp(L.cw, LSUB, e), h = OM.lerp(L.ch, LSUB, e);
+          ctx.fillRect(sn(x), sn(y), sn(x + w) - sn(x), sn(y + h) - sn(y));
+        }
       };
 
       return {
@@ -515,32 +551,27 @@ vec4 effect(vec2 uv) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           ctx.globalAlpha = 1;
-          // The whole-frame dolly: out to 1.04 as the room arrives, settling back to rest before the push.
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          // The whole-frame dolly: out to 1.04 as the desktop arrives, settling back to rest before the exit.
           const dolly = OM.smooth(OM.prog(T, 281.6, 282.9)) * (1 - OM.ease.inOutSine(OM.prog(T, 282.9, 287.6)));
           const post = () => fx.apply(T, {
-            amount: OM.post.envelope(T, start, end, { ramp: 0.6 }) * (0.35 + 0.65 * dawnOf(T)),
+            amount: OM.post.envelope(T, start, end, { ramp: 0.6 }) * (0.35 + 0.65 * OM.smooth(OM.prog(T, 280.9, 289.3))) * (1 - OM.smooth(OM.prog(T, 288.6, 289.3))),
             cam: { zoom: 1 + 0.04 * dolly, x: -18 * dolly, y: 6 * dolly },
             p0: [OM.prog(T, 281.4, 289.2), 0, 0, 0],
           });
-          if (T < PULL0 || T >= LAND || T >= end - 0.07) {
+          if (T < IN0 || T >= DONE || T >= end - 0.07) {
             OM.handoff('word', ctx, T, dpr);
             return post();
           }
-          const k = zoom(T);
-          // Room space through the camera.
-          ctx.setTransform(dpr * k, 0, 0, dpr * k, dpr * P.x * (1 - k), dpr * P.y * (1 - k));
-          drawRoom(ctx, T);
-          // Screen space: the homepage (the word handoff itself), and over it the terminal.
-          const sk = k * S1;
-          ctx.save();
-          ctx.setTransform(dpr * sk, 0, 0, dpr * sk, dpr * (P.x * (1 - k) + k * SX), dpr * (P.y * (1 - k) + k * SY));
-          ctx.beginPath();
-          ctx.rect(0, 0, 1920, 1080);
-          ctx.clip();
-          OM.handoff('word', ctx, T, dpr * sk);
-          if (T >= OPEN) drawTerminal(ctx, T);
-          ctx.restore();
-          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          drawDesktop(ctx, T, 1 - OM.smooth(OM.prog(T, DIM0, DIM1)));
+          if (T < IN1) {
+            const p = OM.smooth(OM.prog(T, IN0, IN1));
+            fieldOver(ctx, T, dpr, (col, row) => OM.threshold(col, row) >= p);
+          } else if (T >= OUT0) {
+            const p = OM.smooth(OM.prog(T, OUT0, OUT1));
+            fieldOver(ctx, T, dpr, (col, row) => OM.threshold(col, row) < p);
+          }
+          drawCells(ctx, T, dpr);
           post();
         },
         release: () => {

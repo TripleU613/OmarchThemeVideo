@@ -5,9 +5,66 @@
 // front reaching the word exactly on its onset and flooding its letters, so
 // the line is written in light that left the machine. The key word lands on
 // the downbeat with the biggest flood; the kicks send pulses down every
-// channel. On the riser the light swells past the letters and the machine until
-// it is one wide glow, the surge.
+// channel. Over the end of the riser the letters melt like wax and pour into
+// the next line's candles, the channels drain back into the pool, the glass
+// empties and the machine folds shut, and the pool condenses into one drop
+// that rises on the kick to light the first wick.
 OM.ownWords.add('b-05');
+// The b-05 -> b-06 cut, shared by both scenes: the next line's row of unlit
+// candles (measured from b-06's own words) and the condensed drop of light,
+// which leaves the pool on the 213.95 kick and lands on the first wick on b-06's first onset.
+(() => {
+  const B = OM.bridge;
+  const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
+  B.WAX = OM.mix(th['surface-2'], th['text-secondary'], 0.22);
+  B.CANDLE_SET = { weight: 800, cap: 92, minCap: 60, maxW: 1640, cy: 560, lead: 2.6, maxRows: 2 };
+  B.candleRow = B.lazy(() => {
+    const set = B.set(OM.sung('b-06'), B.CANDLE_SET);
+    const row = [];
+    set.words.forEach((w) => {
+      for (let j = 0; j < w.text.length; j++)
+        row.push({ k: w.k, j, x: w.x + (j + 0.5) * set.adv, top: w.y + set.size * 0.36, bw: Math.max(14, set.adv * 0.34), bh: set.cap * 0.95 });
+    });
+    return { set, row };
+  });
+  B.POOL_AT = { x: 960, y: 452 };
+  B.LAUNCH = 213.95;
+  /** Where the drop of light is at T (null once it has landed on the first wick). */
+  B.dropAt = (T) => {
+    const { row } = B.candleRow();
+    const first = row[0];
+    const land = B.land(OM.sung('b-06')[0].t0, 214.018);
+    if (!first || T >= land) return null;
+    const u = OM.prog(T, B.LAUNCH, land);
+    return { x: OM.lerp(B.POOL_AT.x, first.x, OM.smooth(u)), y: OM.lerp(B.POOL_AT.y, first.top - 12, u) - 240 * Math.sin(Math.PI * u) };
+  };
+  B.drawDrop = (ctx, T) => {
+    const d = B.dropAt(T);
+    if (!d) return;
+    B.pool(ctx, d.x, d.y, 34, ink.hover, 0.55);
+    ctx.fillStyle = ink.crest;
+    ctx.fillRect(d.x - 5, d.y - 5, 10, 10);
+  };
+  /** Unlit candle bodies, with `fill` 0..1 of each body poured from the bottom up. */
+  B.drawCandles = (ctx, fill = 1) => {
+    for (const cd of B.candleRow().row) {
+      const h = cd.bh * fill;
+      ctx.fillStyle = B.WAX;
+      ctx.fillRect(cd.x - cd.bw / 2, cd.top + cd.bh - h, cd.bw, h);
+      if (fill >= 1) {
+        ctx.fillStyle = th['border-strong'];
+        ctx.fillRect(cd.x - 1, cd.top - 8, 2, 8);
+      }
+    }
+  };
+  /** The cut frame itself. */
+  B.waxCut = (ctx, T) => {
+    ctx.fillStyle = ink.bg;
+    ctx.fillRect(0, 0, 1920, 1080);
+    B.drawCandles(ctx, 1);
+    B.drawDrop(ctx, T);
+  };
+})();
 OM.scene({
   id: 'b-05',
   build(el, { start, duration }) {
@@ -37,7 +94,7 @@ OM.scene({
     const on = sung.map((w) => B.land(w.t0, start));
     const K = 3; // the key word, on the 210.257 downbeat
     const KICKS = [209.816, 211.278, 212.904];
-    const SWELL = 212.75;
+    const MELT = 213.0, ASSEMBLED = 213.9; // the melt over the end of the riser, from the 212.97 snare
     const S1 = 0.36, CX = 960, CY = 222; // the machine's screen at rest: scale and centre
     const POUR = start + 0.08, IMPACT = { x: 960, y: 452 };
 
@@ -68,12 +125,33 @@ OM.scene({
         for (let r = rg; r < rt; r++) add(qe, r);
         return { cells, q0, q1, pts, w };
       });
-      return { set, words };
+      // Each lit cell's place in the next line's candles: cells spread across the candles in reading order.
+      const { row } = B.candleRow();
+      const all = words.flatMap((w) => w.cells.map((cl) => ({ w, cl })));
+      const melt = new Map();
+      all.forEach(({ w, cl }, i) => {
+        const cd = row[Math.min(row.length - 1, Math.floor((i / all.length) * row.length))];
+        if (!cd) return;
+        const r0 = Math.min(...w.cells.map((q) => q[1])), r1 = Math.max(...w.cells.map((q) => q[1]));
+        const rr = (cl[1] - r0) / Math.max(1, r1 - r0);
+        melt.set(cl, {
+          at: MELT + 0.28 * (1 - rr) + 0.17 * OM.hash(cl[0], cl[1], 21),
+          tx: cd.x - cd.bw / 2 + OM.hash(cl[0], cl[1], 22) * Math.max(1, cd.bw - H.cw),
+          ty: cd.top + OM.hash(cl[0], cl[1], 23) * Math.max(1, cd.bh - H.ch),
+        });
+      });
+      return { set, words, melt };
     });
     // The machine at camera scale s: screen rect and deck.
-    const machine = (ctx, s, glow, alphaDeck) => {
-      const w = 1280 * s, h = 800 * s;
-      const x = OM.lerp(320, CX - w / 2, (1 - s) / (1 - S1)), y = OM.lerp(140, CY - h / 2, (1 - s) / (1 - S1));
+    const machine = (ctx, s, glow, alphaDeck, lid = 0, drain = 0, fold = 0) => {
+      if (fold >= 1) return { x: 960, y: 400, w: 0, h: 0 };
+      ctx.save();
+      ctx.translate(960, 400);
+      ctx.scale(1 - fold, 1);
+      ctx.translate(-960, -400);
+      const w = 1280 * s, hf = 800 * s;
+      const x = OM.lerp(320, CX - w / 2, (1 - s) / (1 - S1)), yf = OM.lerp(140, CY - hf / 2, (1 - s) / (1 - S1));
+      const h = hf * (1 - lid), y = yf + hf * lid;
       if (alphaDeck > 0) {
         ctx.globalAlpha = alphaDeck;
         ctx.fillStyle = th['surface-2'];
@@ -96,12 +174,14 @@ OM.scene({
         g.addColorStop(0, B.rgba(ink.lit, 0.35));
         g.addColorStop(1, B.rgba(ink.hover, 0.95));
         ctx.fillStyle = g;
-        ctx.fillRect(x, y, w, h);
+        // The light runs out of the glass from the top down, into the pour.
+        ctx.fillRect(x, y + h * drain, w, h * (1 - drain));
         ctx.globalAlpha = 1;
       }
       ctx.strokeStyle = ink.mid;
       ctx.lineWidth = 2;
-      ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+      if (h > 2) ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+      ctx.restore();
       return { x, y, w, h };
     };
 
@@ -109,20 +189,23 @@ OM.scene({
       draw(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (T < start + 0.05 || T >= END - 0.1) return OM.handoff(T < start + 0.05 ? 'screen' : 'glow', ctx, T, dpr);
+        if (T < start + 0.05) return OM.handoff('screen', ctx, T, dpr);
+        if (T >= ASSEMBLED) return B.waxCut(ctx, T);
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
         const { set, words } = lay();
-        const swell = OM.ease.inOutCubic(OM.prog(T, SWELL, END - 0.12));
-        // The surge's glow grows underneath everything else.
-        B.pool(ctx, 960, 540, 620, ink.lit, 0.5 * swell);
-        const keep = 1 - swell;
+        const keep = 1;
+        const drainG = OM.prog(T, 213.1, 213.55), lid = OM.ease.inOutCubic(OM.prog(T, 213.5, 213.72)), fold = OM.ease.inCubic(OM.prog(T, 213.68, 213.86));
+        const drainC = OM.prog(T, MELT + 0.02, 213.45), shrink = OM.prog(T, 213.55, ASSEMBLED - 0.02);
+        const { melt } = lay();
+        // The wax gathers: the next line's candles fill from the bottom up as the melted cells pour in.
+        if (T >= MELT + 0.2) B.drawCandles(ctx, OM.smooth(OM.prog(T, MELT + 0.2, ASSEMBLED)) * 0.999);
         ctx.globalAlpha = keep;
 
         const pull = OM.ease.inOutCubic(OM.prog(T, start + 0.05, start + 0.55));
         const s = OM.lerp(1, S1, pull);
         const fill = OM.smooth(OM.prog(T, start + 0.05, start + 0.65));
-        const scr = machine(ctx, s, fill * keep, pull * keep);
+        const scr = machine(ctx, s, fill * keep, pull * keep, lid, drainG, fold);
         ctx.globalAlpha = keep;
         const kick = OM.pulse(KICKS, T, 0.1);
 
@@ -132,16 +215,19 @@ OM.scene({
           const q0 = Math.floor((960 - 70 - H.x0) / H.cw), q1 = Math.floor((960 + 70 - H.x0) / H.cw);
           const r0 = Math.floor((scr.y + scr.h + 40 * s / S1 - H.y0) / H.ch), r1 = Math.floor((IMPACT.y - H.y0) / H.ch);
           const reach = r0 + (r1 - r0) * OM.ease.inCubic(pourA);
+          const tail = r0 + (r1 - r0) * OM.ease.inCubic(OM.prog(T, 213.5, 213.68)); // the last of the light falls through
           for (let q = q0; q <= q1; q++)
-            for (let r = r0; r <= reach; r++) {
+            for (let r = Math.ceil(tail); r <= reach; r++) {
               const f = OM.hash(q, Math.floor(r - T * 40), 2);
               if (f < 0.35) continue;
               ctx.fillStyle = f > 0.85 ? ink.crest : f > 0.6 ? ink.hover : ink.lit;
               OM.cell(ctx, H, q, r, dpr);
             }
-          B.pool(ctx, IMPACT.x, IMPACT.y, 160 + 90 * pourA, ink.lit, keep * (0.3 * pourA + 0.12 * kick));
+          B.pool(ctx, IMPACT.x, IMPACT.y, (160 + 90 * pourA) * (1 - 0.8 * shrink), ink.lit, keep * (0.3 * pourA + 0.12 * kick) * (1 - 0.4 * shrink));
           // The pool on the floor.
-          const pr = 10 * pourA + 4 * kick;
+          // The pool condenses into one drop, waiting to rise.
+          const pr = (10 * pourA + 4 * kick) * (1 - shrink);
+          if (shrink > 0) { ctx.fillStyle = ink.crest; const z = 4 + 6 * shrink; ctx.fillRect(IMPACT.x - z / 2, IMPACT.y - z / 2, z, z); }
           ctx.fillStyle = ink.hover;
           for (let q = -pr; q <= pr; q++) {
             const qq = Math.floor((IMPACT.x - H.x0) / H.cw) + Math.round(q);
@@ -155,11 +241,11 @@ OM.scene({
           const o = on[w.w.k], run = w.pts.length;
           const go = w.w.k ? Math.max(on[w.w.k - 1], o - 0.3) : POUR;
           const f = OM.ease.inCubic(OM.prog(T, go, o));
-          const n = Math.floor(f * run);
+          const n = Math.floor(f * run * (1 - drainC)); // after the melt starts, the light runs back to the pool
           for (let i = 0; i < n; i++) {
             const [q, r] = w.pts[i];
             const pulse = KICKS.reduce((m, kk) => (T >= kk ? Math.max(m, Math.exp(-Math.abs((T - kk) * 90 - i) / 3) * Math.exp(-(T - kk) / 0.5)) : m), 0);
-            ctx.fillStyle = i >= n - 2 && f < 1 ? ink.crest : OM.mix(ink.mid, ink.crest, pulse);
+            ctx.fillStyle = i >= n - 2 && (f < 1 || drainC > 0) ? ink.crest : OM.mix(ink.mid, ink.crest, pulse);
             OM.cell(ctx, H, q, r, dpr);
           }
           // The flood: the letters fill left to right from the onset, crest cooling to their ink.
@@ -167,8 +253,20 @@ OM.scene({
           const key = w.w.k === K;
           const sweep = OM.prog(T, o, o + (key ? 0.2 : 0.14));
           const a = T - o;
-          if (key) B.pool(ctx, w.w.x + w.w.w / 2, w.w.y - set.cap / 2, Math.max(260, w.w.w), ink.lit, keep * (0.3 * Math.exp(-a / 0.4) + 0.08));
-          for (const [q, r] of w.cells) {
+          if (key) B.pool(ctx, w.w.x + w.w.w / 2, w.w.y - set.cap / 2, Math.max(260, w.w.w), ink.lit, keep * (0.3 * Math.exp(-a / 0.4) + 0.08 * (1 - OM.prog(T, MELT, 213.45))));
+          for (const cl of w.cells) {
+            const [q, r] = cl;
+            const m = melt.get(cl);
+            if (m && T >= m.at) {
+              // Melting: the cell drips down out of its letter, then runs to its place in a candle, cooling to wax.
+              const p = OM.prog(T, m.at, m.at + 0.45);
+              const x0 = H.x0 + q * H.cw, y0 = H.y0 + r * H.ch;
+              const drip = OM.ease.inCubic(OM.prog(p, 0, 0.35)) * 50;
+              const fl = OM.ease.inOutCubic(OM.prog(p, 0.25, 1));
+              ctx.fillStyle = OM.mix(ink.hover, B.WAX, OM.prog(p, 0.5, 1));
+              ctx.fillRect(OM.lerp(x0, m.tx, fl), OM.lerp(y0 + drip, m.ty, fl), H.cw, H.ch);
+              continue;
+            }
             const u = (q - w.q0) / Math.max(1, w.q1 - w.q0);
             if (u > sweep + 1e-6) continue;
             const age = a - u * (key ? 0.2 : 0.14);

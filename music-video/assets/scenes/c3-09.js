@@ -22,7 +22,7 @@ OM.scene({
     const on = words.map((w) => w.t0);
     const n = words.length;
     const NAME = C.nameIndex(words);
-    const PULL = on[NAME], LOCK = 278.547, BOOM = 278.802, REST = 279.95;
+    const PULL = on[NAME], LOCK = 278.547, BOOM = 278.802, REST = 279.4;
     const home = OM.cellAt(L, 960, 540);
     // The mark: the 15x15 logo, each logo pixel a 2x2 block of home cells, centred.
     const mark = [];
@@ -71,14 +71,44 @@ OM.scene({
         const dpr = c.dpr;
         if (C.seam(ctx, T, dpr, start, END, 'grid', 'word')) return;
         if (T >= REST) {
-          // Field heartbeat: on the two last kicks the field and the wordmark glow out from the name, then settle.
-          const hb = (C.decay(T, 280.149, 0.09) + C.decay(T, 280.497, 0.09)) * (1 - C.sm(T, 280.55, END - 0.08));
+          // The reborn wordmark performs on the last four kicks (event times), the last the biggest, then lands
+          // back exactly on the field with the wordmark at home before the cut.
+          const KK = [279.429, 279.615, 280.149, 280.497], KS = [0.55, 0.7, 0.85, 1.25];
+          const gate = 1 - C.sm(T, 280.58, END - 0.08);
+          // Field heartbeat: the field glows out from the name on every kick.
+          let hb = 0;
+          KK.forEach((k, i) => (hb = Math.max(hb, KS[i] * C.decay(T, k, 0.09))));
+          hb *= gate;
           if (hb < 0.003) return OM.handoff('word', ctx, T, dpr);
+          // Letter punch: the wordmark jumps up a cell on each kick (two on the last), and a crest wave sweeps its letters.
+          let lift = 0;
+          KK.forEach((k, i) => { const a = T - k; if (a >= 0 && a < 0.09 && gate > 0.5) lift = Math.max(lift, i === 3 ? 2 : 1); });
           ctx.fillStyle = ink.bg;
           ctx.fillRect(0, 0, 1920, 1080);
-          const g = [{ x: 960, y: 540, strength: 0.6 * hb, reach: 380 + 700 * hb }];
+          const g = [{ x: 960, y: 540, strength: 0.45 * hb, reach: 380 + 700 * hb }];
           OM.hero(ctx, T, dpr, { inks: ink, L, word: false, gain: 0.8, bg: false, glows: g });
-          OM.paintWord(ctx, L, dpr, ink, { glows: g });
+          // Lattice rings: each kick throws a ring of lit cells out through the field.
+          KK.forEach((k, i) => {
+            const age = T - k, life = i === 3 ? 0.18 : 0.3;
+            if (age < 0 || age >= life) return;
+            const r = 140 + age * (i === 3 ? 3800 : 2600), f = (1 - age / life) * gate, w = L.cw * (i === 3 ? 2 : 1.2);
+            ctx.fillStyle = f > 0.5 ? ink.hover : ink.lit;
+            for (let row = L.rMin; row < L.rMin + L.rows; row++)
+              for (let col = L.cMin; col < L.cMin + L.cols; col++) {
+                const d = Math.hypot(L.x0 + (col + 0.5) * L.cw - 960, (L.y0 + (row + 0.5) * L.ch - 540) * 1.7);
+                if (Math.abs(d - r) < w && OM.hash(col, row, 0x909) < 0.35 + 0.5 * f) OM.cell(ctx, L, col, row, dpr);
+              }
+          });
+          const sweep = (col) => KK.some((k, i) => {
+            const a = T - k, dur = i === 3 ? 0.18 : 0.25;
+            return a >= 0 && a < dur && gate > 0.3 && Math.abs(col - (-5 + (a / dur) * 91)) < (i === 3 ? 6 : 4);
+          });
+          // The beat's glow stays out of the letters: the field inside the wordmark's box (empty at rest, the hero
+          // clears it) is held dark, so only the letters light.
+          ctx.fillStyle = ink.bg;
+          ctx.fillRect(L.x0 - L.cw, L.y0 - 3 * L.ch, 83 * L.cw, 24 * L.ch);
+          const Lw = lift ? Object.assign({}, L, { y0: L.y0 - lift * L.ch }) : L;
+          OM.paintWord(ctx, Lw, dpr, ink, { glows: g, wordInk: (row, col) => (sweep(col) ? ink.crest : null) });
           return;
         }
         const { cells } = type();

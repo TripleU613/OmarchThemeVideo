@@ -282,8 +282,12 @@ OM.ownWords.add('c3-01');
   return vec4(c + uAmount * max(g - 0.12, 0.0) * vec3(0.5, 1.0, 0.45) * (0.5 + uP0.x), 1.0);
 }`;
       const fxAt = (T) => ({
-        amount: 0.8, p0: [0.8 * C.decay(T, on[K], 0.2), 0, 0, 0],
-        cam: { zoom: 1.06, rot: 0.012 * Math.sin((T - start) * 0.8), y: 26 * Math.sin((T - start) * 0.9) },
+        amount: 0.8, p0: [0.8 * C.decay(T, on[K], 0.2) + 1.2 * C.decay(T, on[K], 0.07), 0, 0, 0],
+        // The key word's explosion punches the camera in and shakes it.
+        cam: {
+          zoom: 1.06 + 0.06 * C.decay(T, on[K], 0.08), rot: 0.012 * Math.sin((T - start) * 0.8),
+          x: 12 * C.decay(T, on[K], 0.07) * Math.sin(T * 97), y: 26 * Math.sin((T - start) * 0.9) + 9 * C.decay(T, on[K], 0.07) * Math.cos(T * 83),
+        },
       });
       return OM.c3.withFx(el, c, start, END, FX, fxAt)({
         render(t, T) {
@@ -331,7 +335,7 @@ OM.ownWords.add('c3-01');
             if (!p || T < on[k] || fold >= 1) return;
             const age = T - on[k];
             const hit = C.decay(T, on[k], 0.13) * (k === K ? 1.4 : 1);
-            const open = 0.35 + 0.65 * OM.ease.outExpo(OM.clamp(age / 0.13)); // the curtain sweeps open left to right
+            const open = k === K ? 1 : 0.35 + 0.65 * OM.ease.outExpo(OM.clamp(age / 0.13)); // the curtain sweeps open left to right (the key word explodes in whole)
             const edge = p.x + open * (p.w + p.px * 0.2);
             const sink = (y) => OM.lerp(y, LINE_Y, fall); // the hem falls onto the horizon line
             const ray = (k === K ? 420 : 290) * (1 - fall);
@@ -350,7 +354,7 @@ OM.ownWords.add('c3-01');
                 const n = OM.heroNoise(x * 0.012 + T * 0.55, k * 13 + T * 0.2);
                 const base = ray * (0.35 + 0.85 * n * n + 0.6 * hit + 0.5 * ripple(x));
                 // Curtain surge on the pause snares; the key word's surge stops short of the row above so it stays clear.
-                let len = base * (1 + 0.7 * surge);
+                let len = base * (1 + 0.7 * surge) * (k === K ? 1 + 1.4 * C.decay(T, on[K], 0.1) : 1); // the explosion throws the rays to full height
                 if (k === K && place[0] && surge > 0) len = Math.max(base, Math.min(len, top - place[0].base - 30));
                 const y1 = sink(top);
                 const rw = Math.max(2, Math.round(s * (0.4 + 0.35 * surge)));
@@ -360,12 +364,14 @@ OM.ownWords.add('c3-01');
             if (pass === 0) return;
             // The hem: the letters themselves, bright where the curtain folds.
             const P = pts[k], z = s - 1;
+            // The key word's cells blast out of a burst point at its centre and land in ~0.15 s.
+            const blast = k === K ? OM.ease.outExpo(OM.clamp(age / 0.15)) : 1;
             for (let i = 0; i < P.length; i += 2) {
-              const x = P[i];
+              const x = OM.lerp(p.cx, P[i], blast);
               if (x > edge) continue;
-              const y = sink(P[i + 1]);
+              const y = sink(OM.lerp(p.cy, P[i + 1], blast));
               const fold2 = 0.5 + 0.5 * Math.sin(x * 0.018 - T * 3.1 + k);
-              const v = hit + 0.25 + 0.4 * fold2 + ripple(x) + (x > edge - 40 ? 0.8 : 0);
+              const v = hit + 0.25 + 0.4 * fold2 + ripple(x) + (x > edge - 40 ? 0.8 : 0) + (k === K ? 0.3 : 0); // the key curtain holds bright
               ctx.fillStyle = v > 1 ? ink.crest : v > 0.45 ? ink.hover : ink.lit;
               ctx.fillRect(Math.round(x - z / 2), Math.round(y - z / 2), z, z);
             }
@@ -410,6 +416,32 @@ OM.ownWords.add('c3-01');
               const b = i / 16;
               ctx.fillStyle = C.rgba(ink.crest, (1 - b) * (1 - ss * 0.6));
               ctx.fillRect(Math.round(x + b * 120), Math.round(y - b * 34), 4, 3);
+            }
+          }
+          // The explosion: a crest flash, a square shockwave of cells across the sky and ridge, and debris cells.
+          const kp = place[K];
+          if (kp && T >= on[K] && T < on[K] + 0.9 && fold < 1) {
+            const age = T - on[K];
+            C.pool(ctx, kp.cx, kp.cy, 260 + 900 * age, ink.crest, 0.55 * C.decay(T, on[K], 0.06));
+            if (age < 0.5) {
+              const r = 60 + age * 3200, f = 1 - age / 0.5;
+              ctx.fillStyle = f > 0.55 ? ink.crest : f > 0.25 ? ink.hover : ink.lit;
+              for (let row = HL.rMin; row < HL.rMin + HL.rows; row++)
+                for (let col = HL.cMin; col < HL.cMin + HL.cols; col++) {
+                  const x = HL.x0 + (col + 0.5) * HL.cw, y = HL.y0 + (row + 0.5) * HL.ch;
+                  const d = Math.max(Math.abs(x - kp.cx), Math.abs(y - kp.cy) * 1.8);
+                  if (Math.abs(d - r) >= HL.cw * 1.3 || OM.hash(col, row, 0x301) >= 0.3 + 0.6 * f) continue;
+                  if (place.some((q) => q && x > q.x - 12 && x < q.x + q.w + 12 && y > q.base - q.cap - 14 && y < q.base + q.cap * 0.35)) continue; // the shock passes behind the words
+                  OM.cell(ctx, HL, col, row, dpr);
+                }
+            }
+            for (let j = 0; j < 160; j++) {
+              const a = OM.hash(j, 1, 0x302) * Math.PI * 2, sp = 300 + 900 * OM.hash(j, 2, 0x302);
+              const u = OM.ease.outCubic(OM.clamp(age / 0.7));
+              const x = kp.cx + Math.cos(a) * sp * u, y = kp.cy + Math.sin(a) * sp * 0.6 * u + 160 * age * age;
+              ctx.fillStyle = C.rgba(j % 3 ? ink.hover : ink.crest, 1 - age / 0.9);
+              const z = j % 4 ? 6 : 9;
+              ctx.fillRect(Math.round(x - z / 2), Math.round(y - z / 2), z, z);
             }
           }
           // The fold: one crest line grows out of the fallen hems across the frame.
