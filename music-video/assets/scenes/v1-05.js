@@ -1,0 +1,144 @@
+// v1-05 · Rain on the window. Late, black glass: rain streaks down it, the
+// city is soft bokeh behind, code from the screen is faintly reflected in it,
+// and the one glow [line] is the monitor below. The words are
+// condensation: on each onset a drop runs down every letter of the word at
+// once, tracing it in beads on the glass, and the written words slowly weep
+// trails. The downbeat on the key word makes the glow breathe and the beads
+// catch it. Then the words run off the glass and the monitor's glow rises to
+// fill the frame: the glow the forge in v1-06 opens on.
+OM.ownWords.add('v1-05');
+(() => {
+  const V = OM.v1;
+  const WEIGHT = 800;
+  const PROBE = V.ready('v1-05-type', WEIGHT);
+  OM.scene({
+    id: 'v1-05',
+    build(el, { start, duration }) {
+      const cv = document.createElement('canvas');
+      cv.className = 'om-fill';
+      el.appendChild(cv);
+      const c = OM.canvas(cv, { alpha: false });
+      const END = start + duration, H = V.HOLD;
+      const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
+      const on = OM.sung('v1-05').map((w) => w.t0);
+      const HM = OM.HOME, G = { x0: HM.x0, y0: HM.y0, cw: HM.cw / 2, ch: HM.ch / 2 };
+      const BEAT = 56.564, KICK = 55.774, TRACE = 0.2;
+      const RUN0 = 58.3, RUN1 = 58.56, RISE0 = 58.26, RISE1 = END - H - 0.01;
+
+      const get = V.lazy(PROBE, () => {
+        const L = V.layout('v1-05', { weight: 800, cap: 116, maxW: 1740 });
+        const lh = L.cap * 1.6;
+        return L.words.map((wd) => {
+          const base = 520 + (wd.row - (L.rows - 1) / 2) * lh + L.cap / 2;
+          const cells = V.raster(wd.text, L.font, L.size, wd.x, base, G, L.A);
+          // Each letter traced by its own drop, top to bottom.
+          const letters = [];
+          for (const cl of cells) (letters[cl[2]] = letters[cl[2]] || []).push(cl);
+          for (const l of letters) if (l) l.sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+          return { ...wd, base, letters: letters.filter(Boolean), cap: L.cap };
+        });
+      });
+      const pool = (ctx, x, y, rx, ry, hex, a) => {
+        if (a <= 0.002) return;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.scale(1, ry / rx);
+        const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
+        g.addColorStop(0, V.rgba(hex, a));
+        g.addColorStop(1, V.rgba(hex, 0));
+        ctx.fillStyle = g;
+        ctx.fillRect(-rx, -rx, 2 * rx, 2 * rx);
+        ctx.restore();
+      };
+      const BOKEH = Array.from({ length: 18 }, (_, i) => ({
+        x: OM.hash(i, 1, 51) * 1920, y: 120 + OM.hash(i, 2, 51) * 640, r: 50 + OM.hash(i, 3, 51) * 140,
+        hex: [th['border-strong'], th['text-muted'], th.brand, th['text-secondary']][Math.floor(OM.hash(i, 4, 51) * 4)], a: 0.07 + 0.12 * OM.hash(i, 5, 51),
+      }));
+      const RAIN = Array.from({ length: 150 }, (_, i) => ({
+        x: OM.hash(i, 1, 52) * 1920, v: 900 + 700 * OM.hash(i, 2, 52), len: 40 + 90 * OM.hash(i, 3, 52), ph: OM.hash(i, 4, 52) * 1400, a: 0.08 + 0.2 * OM.hash(i, 5, 52),
+      }));
+
+      return {
+        render(t, T) {
+          const ctx = c.ensure();
+          const dpr = c.dpr;
+          if (T < start + H) return OM.handoff('night', ctx, T, dpr);
+          if (T >= END - H) return OM.handoff('glow', ctx, T, dpr);
+          const words = get();
+          const rise = OM.smooth(OM.prog(T, RISE0, RISE1));
+          const scene = OM.prog(T, start + H, start + 0.3) * (1 - rise); // everything but the glow
+          ctx.fillStyle = ink.bg;
+          ctx.fillRect(0, 0, 1920, 1080);
+          // The city behind the glass.
+          for (const b of BOKEH) pool(ctx, b.x + Math.sin(T * 0.3 + b.r) * 20, b.y, b.r, b.r, b.hex, b.a * scene);
+          // The one glow: the monitor below, breathing on the kick and the downbeat, rising to the handoff at the end.
+          const breath = 0.12 * OM.pulse([KICK], T, 0.25) + 0.22 * OM.pulse([BEAT], T, 0.35);
+          pool(ctx, 960, OM.lerp(1010, 540, rise), OM.lerp(760, 620, rise), OM.lerp(240, 620, rise), ink.lit,
+            OM.lerp(0.2 + breath, 0.5, rise) * OM.prog(T, start + H, start + 0.35));
+          // The screen's code, reflected faintly in the glass.
+          ctx.fillStyle = V.rgba(th['text-muted'], 0.07 * scene);
+          for (let i = 0; i < 26; i++) {
+            const y = 150 + ((i * 34 - T * 18) % 884 + 884) % 884;
+            const ind = Math.floor(OM.hash(i, 7, 53) * 4) * 36, len = 120 + OM.hash(i, 8, 53) * 380;
+            ctx.fillRect(1260 + ind, y, len, 10);
+          }
+          // The rain.
+          ctx.lineWidth = 1.5;
+          for (const r of RAIN) {
+            const y = ((T * r.v + r.ph) % 1400) - 200;
+            ctx.strokeStyle = V.rgba(th.text, r.a * scene);
+            ctx.beginPath();
+            ctx.moveTo(r.x, y);
+            ctx.lineTo(r.x - r.len * 0.06, y + r.len);
+            ctx.stroke();
+          }
+          // The words, traced in beads on the glass.
+          const flash = OM.pulse([BEAT], T, 0.12);
+          const run = OM.prog(T, RUN0, RUN1);
+          for (const wd of words) {
+            const t0 = on[wd.k];
+            if (T < t0) continue;
+            const u = OM.ease.outCubic(OM.prog(T, t0, t0 + TRACE));
+            for (let j = 0; j < wd.letters.length; j++) {
+              const l = wd.letters[j];
+              const n = Math.ceil(u * l.length);
+              // The weep: a thin trail running down from the letter's foot.
+              const foot = l[l.length - 1];
+              const weep = OM.prog(T, t0 + 0.3 + OM.hash(j, wd.k, 54) * 0.6, t0 + 2.2);
+              if (weep > 0 && OM.hash(j, wd.k, 55) < 0.6) {
+                const x = G.x0 + (foot[0] + 0.5) * G.cw, y = G.y0 + (foot[1] + 1) * G.ch;
+                ctx.fillStyle = V.rgba(th.text, 0.35 * scene);
+                ctx.fillRect(x - 1, y, 2, 260 * weep);
+                ctx.fillRect(x - 3, y + 260 * weep - 4, 6, 6);
+              }
+              for (let i = 0; i < n; i++) {
+                const [q, r] = l[i];
+                const fall = run > 0 ? 900 * Math.pow(OM.clamp(run * 1.4 - OM.hash(q, 3, 56) * 0.4), 2) : 0;
+                const a = 1 - OM.clamp(fall / 500);
+                if (a <= 0) continue;
+                const x = G.x0 + q * G.cw, y = G.y0 + r * G.ch + fall;
+                const hot = flash > 0.2 && OM.threshold(q, r) < flash;
+                ctx.globalAlpha = a;
+                ctx.fillStyle = hot ? ink.crest : th.text;
+                ctx.fillRect(x + 0.6, y + 0.6, G.cw - 1.2, G.ch - 1.2);
+                ctx.fillStyle = ink.crest;
+                if (OM.threshold(q, r) > 0.7) ctx.fillRect(x + 1, y + 1, 2, 2);
+              }
+              // The drop at the head of the trace.
+              if (u < 1 && n > 0) {
+                const [q, r] = l[n - 1];
+                ctx.globalAlpha = 1;
+                ctx.fillStyle = ink.crest;
+                ctx.beginPath();
+                ctx.roundRect(G.x0 + (q + 0.5) * G.cw - 8, G.y0 + (r + 0.5) * G.ch - 8, 16, 18, 8);
+                ctx.fill();
+              }
+            }
+            ctx.globalAlpha = 1;
+          }
+        },
+        release: () => c.release(),
+      };
+    },
+  });
+})();

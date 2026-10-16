@@ -1,0 +1,178 @@
+// b-07 · One desk, a lifetime. The lamp's spot falls on a desk, and the same
+// desk lives three lives: a kid beside a deep-bezelled box screen, a teen with
+// a notebook, an adult at a wide monitor. The line is typed onto that screen as
+// it is sung, each word slamming in on its onset; on the onsets where life
+// moves on, the machine and the person change in one cut and the words carry
+// over, reflowed onto the bigger glass, so the whole line reads on the last
+// screen. The cursor beats with the kick train. On the snare the screen powers
+// off into one bright point, which settles at the centre as the spark.
+OM.ownWords.add('b-07');
+OM.scene({
+  id: 'b-07',
+  build(el, { start, duration }) {
+    const B = OM.bridge;
+    const cv = document.createElement('canvas');
+    cv.className = 'om-fill';
+    el.appendChild(cv);
+    const c = OM.canvas(cv, { alpha: false });
+    const END = start + duration;
+    const ink = OM.fieldInks('tokyo-night');
+    const th = OM.theme('tokyo-night');
+    const sung = OM.sung('b-07');
+    const on = sung.map((w) => B.land(w.t0, start));
+    const n = on.length;
+    // Life stages: where each begins (word index), the glass, its bezel and the person's height.
+    const STAGES = [
+      { from: 0, w: 960, bez: 30, tall: 250, stand: 14 },
+      { from: Math.min(3, n - 1), w: 1240, bez: 12, tall: 380, stand: 6 },
+      { from: Math.min(5, n - 1), w: 1500, bez: 10, tall: 470, stand: 56 },
+    ];
+    const KICKS = [218.686, 218.802, 219.057, 219.336, 219.591, 219.87, 220.125, 220.381, 220.822, 220.938, 221.077];
+    const OFF = 221.17, DESK = 800;
+
+    const lay = B.lazy(() =>
+      STAGES.map((s, i) => {
+        const last = i + 1 < STAGES.length ? STAGES[i + 1].from - 1 : n - 1;
+        const set = B.set(sung.slice(0, last + 1), { weight: 700, cap: 84, minCap: 66, maxW: s.w - 2 * s.bez - 60, cx: 960, cy: 0, lead: 1.55, maxRows: 4 });
+        const h = Math.max(300, set.rows.length * set.lineH + 110);
+        const y = DESK - s.stand - h;
+        return { ...s, set, h, x: 960 - s.w / 2, y, cy: y + h / 2 };
+      }), 700);
+    const stageAt = (T) => {
+      let i = 0;
+      STAGES.forEach((s, k) => { if (T >= on[s.from] && k > 0 && s.from > STAGES[k - 1].from) i = k; });
+      return i;
+    };
+    const spot = (ctx, a) => {
+      ctx.globalAlpha = a;
+      const g = ctx.createLinearGradient(0, 0, 0, 880);
+      g.addColorStop(0, B.rgba(ink.lit, 0.1));
+      g.addColorStop(1, B.rgba(ink.lit, 0.03));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(900, 0); ctx.lineTo(1020, 0); ctx.lineTo(1400, 880); ctx.lineTo(520, 880);
+      ctx.closePath();
+      ctx.fill();
+      ctx.save();
+      ctx.translate(960, 880);
+      ctx.scale(1, 0.25);
+      const p = ctx.createRadialGradient(0, 0, 0, 0, 0, 440);
+      p.addColorStop(0, B.rgba(ink.lit, 0.42));
+      p.addColorStop(1, B.rgba(ink.lit, 0));
+      ctx.fillStyle = p;
+      ctx.fillRect(-440, -440, 880, 880);
+      ctx.restore();
+      ctx.globalAlpha = 1;
+    };
+    /** A person seen side-on, standing at the desk's end: square head, shoulders, body. */
+    const person = (ctx, x, tall, flash) => {
+      const head = tall * 0.17, body = tall * 0.45, legs = tall - head - body - 8;
+      const top = 1000 - tall;
+      ctx.fillStyle = OM.mix(th['surface-2'], ink.crest, flash * 0.4);
+      ctx.fillRect(x - head / 2, top, head, head);
+      ctx.fillRect(x - tall * 0.11, top + head + 8, tall * 0.22, body);
+      ctx.fillRect(x - tall * 0.09, top + head + 8 + body, tall * 0.07, legs);
+      ctx.fillRect(x + tall * 0.02, top + head + 8 + body, tall * 0.07, legs);
+      // The screen's light on the face side.
+      ctx.fillStyle = B.rgba(ink.lit, 0.55);
+      ctx.fillRect(x - head / 2, top, 3, head);
+      ctx.fillRect(x - tall * 0.11, top + head + 8, 3, body);
+      // An arm reaching for the keys.
+      ctx.fillStyle = OM.mix(th['surface-2'], ink.crest, flash * 0.4);
+      ctx.fillRect(x - tall * 0.11 - tall * 0.1, top + head + 8 + body * 0.35, tall * 0.1, tall * 0.05);
+    };
+
+    return {
+      render(t, T) {
+        const ctx = c.ensure();
+        const dpr = c.dpr;
+        if (T < start + 0.05 || T >= END - 0.1) return OM.handoff(T < start + 0.05 ? 'spot' : 'spark', ctx, T, dpr);
+        ctx.fillStyle = ink.bg;
+        ctx.fillRect(0, 0, 1920, 1080);
+        const stages = lay();
+        const si = stageAt(T);
+        const S = stages[si];
+        const off = OM.prog(T, OFF, OFF + 0.35);
+        const room = 1 - OM.prog(T, OFF + 0.05, OFF + 0.5);
+        spot(ctx, room);
+        const cut = OM.pulse([on[STAGES[1].from], on[STAGES[2].from]], T, 0.1) * (si > 0 ? 1 : 0);
+        const appear = OM.ease.outCubic(OM.prog(T, start + 0.05, on[0]));
+
+        ctx.globalAlpha = room * appear;
+        // The desk.
+        ctx.fillStyle = th['surface-2'];
+        ctx.fillRect(160, DESK, 1600, 22);
+        ctx.fillStyle = th.surface;
+        ctx.fillRect(200, DESK + 22, 22, 1000 - DESK - 22);
+        ctx.fillRect(1698, DESK + 22, 22, 1000 - DESK - 22);
+        ctx.fillStyle = th['border-strong'];
+        ctx.fillRect(160, DESK, 1600, 2);
+        person(ctx, 1830 - (2 - si) * 10, S.tall, cut);
+
+        // The machine of this life.
+        ctx.fillStyle = th['surface-2'];
+        if (si === 0) ctx.fillRect(S.x + 60, DESK - S.stand, S.w - 120, S.stand);
+        if (si === 1) { ctx.fillRect(S.x - 40, DESK - 8, S.w + 80, 8); ctx.fillStyle = th['border-strong']; ctx.fillRect(S.x - 40, DESK - 8, S.w + 80, 2); }
+        if (si === 2) { ctx.fillRect(950, DESK - S.stand, 20, S.stand); ctx.fillRect(860, DESK - 8, 200, 8); ctx.fillStyle = th.surface; ctx.fillRect(700, DESK - 6, 520, 6); }
+        ctx.fillStyle = OM.mix(th['surface-2'], ink.crest, cut * 0.5);
+        ctx.fillRect(S.x, S.y, S.w, S.h);
+        ctx.globalAlpha = room * appear;
+
+        // The glass, and its light on the room.
+        const gx = S.x + S.bez, gy = S.y + S.bez, gw = S.w - 2 * S.bez, gh = S.h - 2 * S.bez;
+        ctx.globalAlpha = appear;
+        B.pool(ctx, 960, S.cy, S.w * 0.75, ink.lit, 0.12 * room);
+        // Powering off: the glass collapses to a line, then to a point.
+        const vy = 1 - OM.ease.inCubic(OM.prog(off, 0, 0.5)), vx = 1 - OM.ease.inCubic(OM.prog(off, 0.4, 1));
+        const ph = Math.max(2, gh * vy), pw = Math.max(8, gw * vx);
+        ctx.fillStyle = off > 0 ? OM.mix(th.bg, ink.crest, OM.prog(off, 0, 0.3)) : th.bg;
+        ctx.fillRect(960 - pw / 2, S.cy - ph / 2, pw, ph);
+        ctx.strokeStyle = ink.mid;
+        ctx.lineWidth = 2;
+        if (off === 0) ctx.strokeRect(gx + 1, gy + 1, gw - 2, gh - 2);
+
+        if (off === 0) {
+          // The line so far, typed on this life's glass: each word slams in on its onset.
+          const set = S.set;
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'alphabetic';
+          let cx = 0, cyy = 0;
+          set.words.forEach((w) => {
+            const o = on[w.k];
+            if (T < o) return;
+            const a = T - o;
+            const slam = Math.exp(-a / 0.08);
+            const k = 1 + 0.3 * slam;
+            const y = S.cy + w.y;
+            ctx.save();
+            ctx.translate(w.x + w.w / 2, y - set.cap / 2);
+            ctx.scale(k, k);
+            ctx.font = set.font;
+            ctx.fillStyle = OM.mix(w.k === n - 1 ? ink.hover : th.text, ink.crest, Math.exp(-a / 0.2));
+            ctx.fillText(w.text, -w.w / 2, set.cap / 2);
+            ctx.restore();
+            cx = w.x + w.w + set.adv * 0.3; cyy = y;
+          });
+          // The cursor, beating with the kicks.
+          if (cyy) {
+            const beat = OM.pulse(KICKS, T, 0.06);
+            ctx.fillStyle = B.rgba(ink.lit, 0.4 + 0.6 * beat);
+            ctx.fillRect(cx, cyy - set.cap, set.adv * 0.6, set.cap);
+          }
+        }
+        ctx.globalAlpha = 1;
+
+        // The point left on the glass drifts to the centre and becomes the spark.
+        if (off >= 1) {
+          const u = OM.ease.inOutCubic(OM.prog(T, OFF + 0.35, END - 0.14));
+          const x = OM.lerp(960, B.SPARK.x, u), y = OM.lerp(S.cy, B.SPARK.y, u);
+          B.pool(ctx, x, y, 72, ink.lit, 0.4);
+          ctx.fillStyle = ink.crest;
+          const L = OM.HOME;
+          ctx.fillRect(x - L.cw / 2, y - L.ch / 2, L.cw, L.ch);
+        }
+      },
+      release: () => c.release(),
+    };
+  },
+});

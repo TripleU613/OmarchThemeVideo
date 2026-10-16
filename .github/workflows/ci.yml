@@ -1,0 +1,38 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: music-video
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Every script parses
+        run: for f in assets/scenes/*.js assets/lib/*.js assets/dev/*.js scripts/*.mjs; do node --check "$f"; done
+
+      # The real lyrics never live in the repo; a placeholder gives every scene its timed words.
+      - name: Placeholder lyrics
+        run: node scripts/build-lyrics.mjs --placeholder
+
+      - name: Pages are assembled from the storyboard and in sync
+        run: node scripts/assemble.mjs && git diff --exit-code -- index.html dev.html STORYBOARD.md
+
+      - name: Repo hygiene (no song audio, no lyric text, no stray scenes, no big files)
+        run: node scripts/verify.mjs
+
+      # Static checks of the composition. HyperFrames is pinned so results match local runs.
+      - name: HyperFrames lint
+        run: npx --yes hyperframes@0.8.162 lint

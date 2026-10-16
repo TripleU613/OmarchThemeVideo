@@ -1,0 +1,27 @@
+{
+  "name": "music-video",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "serve": "python3 scripts/serve.py 3123",
+    "assemble": "node scripts/assemble.mjs",
+    "facts": "node scripts/scene-facts.mjs",
+    "lyrics:from": "node scripts/lyrics-from-lrc.mjs",
+    "lyrics:build": "node scripts/build-lyrics.mjs",
+    "lyrics:placeholder": "node scripts/build-lyrics.mjs --placeholder",
+    "verify": "node scripts/verify.mjs",
+    "snapshot": "npx --yes hyperframes@0.8.162 snapshot --no-end --timeout 60000",
+    "dev": "npx --yes hyperframes@0.8.162 preview",
+    "check": "npx --yes hyperframes@0.8.162 check",
+    "render": "npx --yes hyperframes@0.8.162 render",
+    "render:preview": "npx --yes hyperframes@0.8.162 render --quality draft --fps 24 --workers 6 --player-ready-timeout 120000 -o renders/preview.mp4",
+    "render:4k": "npx --yes hyperframes@0.8.162 render --resolution 4k --fps 60 --quality delivery --player-ready-timeout 120000 -o renders/omarchy-4k.mp4",
+    "publish": "npx --yes hyperframes@0.8.162 publish"
+  },
+  "devDependencies": {
+    "animejs": "^4.5.0",
+    "esbuild": "^0.25.10",
+    "gsap": "^3.14.2",
+    "three": "^0.181.2"
+  }
+}

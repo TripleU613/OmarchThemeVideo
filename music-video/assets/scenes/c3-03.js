@@ -1,0 +1,135 @@
+// c3-03 · Drone show. The spark is the lead drone: it bursts into a swarm of
+// thousands of lights hanging dim over the night, and the swarm flies the line.
+// Each word's drones leave the swarm and slam into formation on its onset, in a
+// flash; the name is flown as the wordmark itself, the biggest formation, one
+// drone per bitmap cell, locking on the kick under it. Colour waves run across
+// the name on the downbeat and snares. On the kicks after the line the show
+// breaks formation and the whole swarm pours down into a stage spotlight,
+// becoming the dust in its beam.
+OM.ownWords.add('c3-03');
+OM.scene({
+  id: 'c3-03',
+  build(el, { start, duration }) {
+    const C = OM.c3;
+    const cv = document.createElement('canvas');
+    cv.className = 'om-fill';
+    el.appendChild(cv);
+    const c = OM.canvas(cv, { alpha: false });
+    const END = start + duration;
+    const ink = C.ink, th = C.th;
+    const words = OM.sung('c3-03');
+    const on = words.map((w) => w.t0);
+    const NAME = C.nameIndex(words);
+    const DOWN = 252.981, SNARES = [253.167, 253.469], BREAK = 253.887, POUR = 254.073;
+    const HL = OM.HOME, hc = OM.cellAt(HL, 960, 540);
+    const SX = HL.x0 + (hc.col + 0.5) * HL.cw, SY = HL.y0 + (hc.row + 0.5) * HL.ch;
+    const EXTRA = 700;
+
+    const swarm = C.lazy(() => {
+      const others = words.map((_, k) => k).filter((k) => k !== NAME);
+      const place = C.layout(words, [{ ks: others, cap: 92, cy: 250 }]);
+      const pts = C.wordPts(words, place, 800, 10);
+      // The name: the wordmark bitmap, one drone per lit cell, 1500px wide.
+      const cell = 1500 / OM.WORDMARK.w, nx = 960 - 750, ny = 650 - (OM.WORDMARK.h * cell) / 2;
+      pts[NAME] = Float32Array.from(OM.cells(OM.WORDMARK).flatMap(([col, row]) => [nx + (col + 0.5) * cell, ny + (row + 0.5) * cell]));
+      const D = [];
+      const rng = OM.rng(0xc303);
+      const home = () => [40 + rng() * 1840, 60 + rng() * 820];
+      words.forEach((_, k) => {
+        const P = pts[k];
+        for (let i = 0; i < P.length; i += 2) D.push({ k, tx: P[i], ty: P[i + 1], h: home(), r: rng(), big: k === NAME });
+      });
+      for (let i = 0; i < EXTRA; i++) D.push({ k: -1, tx: 0, ty: 0, h: home(), r: rng() });
+      // Where each drone ends: drifting down inside the spotlight's beam.
+      for (const d of D) {
+        const y = 140 + 720 * Math.sqrt(rng());
+        const f = y / 880, half = 60 + 380 * f;
+        d.sx = 960 + (rng() * 2 - 1) * half * 0.9;
+        d.sy = y;
+      }
+      return { D, cell };
+    });
+
+    return {
+      render(t, T) {
+        const ctx = c.ensure();
+        const dpr = c.dpr;
+        if (C.seam(ctx, T, dpr, start, END, 'spark', 'spot')) return;
+        const { D, cell } = swarm();
+        const burst = OM.ease.outExpo(OM.prog(T, start + 0.03, start + 0.45));
+        const pour = OM.ease.inOutCubic(OM.prog(T, POUR, END - 0.25));
+        const brk = OM.ease.outCubic(OM.prog(T, BREAK, BREAK + 0.4));
+        const spotA = C.sm(T, POUR + 0.2, END - 0.1);
+        const fade = C.sm(T, END - 0.6, END - 0.1);
+
+        ctx.fillStyle = ink.bg;
+        ctx.fillRect(0, 0, 1920, 1080);
+        C.stars(ctx, T, 0.6 * C.sm(T, start, start + 0.5) * (1 - spotA));
+        // The spotlight comes up under the pour.
+        if (spotA > 0) {
+          ctx.globalAlpha = spotA;
+          OM.handoff('spot', ctx, T, dpr);
+          ctx.globalAlpha = 1;
+        }
+        const nameHit = C.decay(T, on[NAME], 0.16);
+        if (T >= on[NAME]) C.pool(ctx, 960, 650, 900, ink.lit, (0.1 + 0.25 * nameHit) * (1 - pour));
+        // Colour waves across the name: the downbeat sweeps crest left to right, the snares sweep back.
+        const wave = (x) => {
+          let v = 0;
+          for (const [h, dir] of [[DOWN, 1], [SNARES[0], -1], [SNARES[1], 1]]) {
+            const a = T - h;
+            if (a < 0 || a > 0.4) continue;
+            const front = dir > 0 ? 160 + a * 4000 : 1760 - a * 4000;
+            const d = Math.abs(x - front);
+            if (d < 140) v = Math.max(v, 1 - d / 140);
+          }
+          return v;
+        };
+        for (let i = 0; i < D.length; i++) {
+          const d = D[i];
+          // The swarm: out of the spark to its hover, bobbing.
+          const bob = 6 * Math.sin(T * 1.7 + d.r * 40);
+          let x = OM.lerp(SX, d.h[0], burst), y = OM.lerp(SY, d.h[1], burst) + bob;
+          let v = 0.12 + 0.18 * (0.5 + 0.5 * Math.sin(T * 3 + d.r * 60)), sz = 3;
+          if (d.k >= 0) {
+            const t0 = on[d.k];
+            const lead = Math.min(d.big ? 0.4 : 0.32, t0 - (start + 0.08)) * (0.85 + 0.15 * d.r);
+            const a = C.arrive(T, t0, Math.max(0.05, lead));
+            if (a > 0) {
+              const lift = Math.sin(a * Math.PI) * (40 + 90 * d.r);
+              x = OM.lerp(x, d.tx, a);
+              y = OM.lerp(y, d.ty, a) - lift;
+              v = OM.lerp(v, 0.82, a) + C.decay(T, t0, 0.12) * 1.2 + (d.big ? 0.6 * wave(d.tx) : 0);
+              sz = d.big ? 8 : 6;
+              if (T >= t0 && d.big) v += 0.2;
+            }
+          }
+          // Breaking formation: scatter a little, then pour into the beam.
+          if (brk > 0) {
+            x += (d.r - 0.5) * 120 * brk * (1 - pour);
+            y += (OM.hash(i, 3) - 0.5) * 80 * brk * (1 - pour);
+            v *= 1 - 0.4 * brk;
+          }
+          if (pour > 0) {
+            const p = OM.clamp(pour * 1.15 - d.r * 0.15);
+            x = OM.lerp(x, d.sx, p);
+            y = OM.lerp(y, d.sy + 20 * Math.sin(T * 2 + d.r * 9), p);
+            sz = OM.lerp(sz, 3, p);
+            v = OM.lerp(v, 0.3, p);
+          }
+          const a = 1 - fade;
+          if (a <= 0) continue;
+          ctx.globalAlpha = a;
+          if (v > 0.5) {
+            ctx.fillStyle = C.rgba(ink.lit, 0.16);
+            ctx.fillRect(Math.round(x - sz * 1.4), Math.round(y - sz * 1.4), Math.round(sz * 2.8), Math.round(sz * 2.8));
+          }
+          ctx.fillStyle = v > 1.1 ? ink.crest : v > 0.6 ? ink.hover : v > 0.35 ? ink.lit : v > 0.2 ? ink.mid : ink.dim;
+          ctx.fillRect(Math.round(x - sz / 2), Math.round(y - sz / 2), Math.round(sz), Math.round(sz));
+        }
+        ctx.globalAlpha = 1;
+      },
+      release: () => c.release(),
+    };
+  },
+});

@@ -1,0 +1,185 @@
+// c3-02 · Orbital ring. The line of light the aurora folded into is a ring in
+// orbit seen edge on; it tilts open over a planet's limb and the machine
+// assembles: each word is one segment of the ring, its letters standing on the
+// band, flying in along the orbit and locking into place on its onset with a
+// flash of its rails and two bolts at its seams. The back arc carries the first
+// half of the line, the front arc the rest. The downbeat word locks hardest;
+// the last segment closes the ring and power runs round it on the kicks. On the
+// next downbeat the whole ring is drawn into its core, which is the spark.
+OM.ownWords.add('c3-02');
+OM.scene({
+  id: 'c3-02',
+  build(el, { start, duration }) {
+    const C = OM.c3;
+    const cv = document.createElement('canvas');
+    cv.className = 'om-fill';
+    el.appendChild(cv);
+    const c = OM.canvas(cv, { alpha: false });
+    const END = start + duration;
+    const ink = C.ink, th = C.th;
+    const words = OM.sung('c3-02');
+    const on = words.map((w) => w.t0);
+    const n = words.length;
+    const DOWN = 248.709, KICKS = [249.754, 250.032], COLLAPSE = 250.845;
+    const KEY = words.reduce((b, w, k) => (Math.abs(w.t0 - DOWN) < Math.abs(words[b].t0 - DOWN) ? k : b), 0);
+    const LAST = n - 1;
+    const HL = OM.HOME, hc = OM.cellAt(HL, 960, 540);
+    const CX = HL.x0 + (hc.col + 0.5) * HL.cw, CY = HL.y0 + (hc.row + 0.5) * HL.ch;
+    const RX = 910, RY = 300, BAND = 58;
+    const back = Math.ceil(n / 2); // words 0..back-1 ride the back arc
+
+    // A point on the orbit at x offset dx, back (upper) or front (lower), as an angle so segments can fly along it.
+    const angOf = (dx, up) => {
+      const a = Math.acos(OM.clamp(dx / RX, -1, 1));
+      return up ? -a : a;
+    };
+    const type = C.lazy(() => {
+      const rows = [{ ks: [...Array(back).keys()], cap: 88, cy: 0, maxW: 1620 }, { ks: [...Array(n - back).keys()].map((i) => i + back), cap: 88, cy: 0, maxW: 1620 }];
+      const place = C.layout(words, rows);
+      const step = 7;
+      // Letters one by one, each standing upright on the band at its own angle.
+      const segs = words.map((wd, k) => {
+        const p = place[k];
+        if (!p || !wd.text) return null;
+        const up = k < back;
+        const adv = C.measure('M', 800, p.px);
+        const letters = [...wd.text].map((ch, i) => {
+          const x = p.x + i * adv;
+          return { ang: angOf(x + adv / 2 - 960, up), w: adv, d: C.dots(ch, 800, p.px, step).pts };
+        });
+        const a0 = angOf(p.x - 22 - 960, up), a1 = angOf(p.x + p.w + 22 - 960, up);
+        return { up, letters, a0: Math.min(a0, a1), a1: Math.max(a0, a1), cap: p.cap };
+      });
+      return { segs };
+    });
+
+    const R = (s) => ({ rx: RX * s, ry: RY * s });
+    return {
+      render(t, T) {
+        const ctx = c.ensure();
+        const dpr = c.dpr;
+        if (C.seam(ctx, T, dpr, start, END, 'line', 'spark')) return;
+        const { segs } = type();
+        const open = OM.ease.outCubic(OM.prog(T, start + 0.02, start + 0.3)); // the line tilts open into the ring
+        const shrink = 1 - OM.ease.inCubic(OM.prog(T, COLLAPSE, END - 0.12)); // drawn into the core
+        const s = shrink, ry = RY * open * s, rx = RX * s;
+        const wordsA = 1 - C.sm(T, COLLAPSE, COLLAPSE + 0.22);
+        const power = C.sm(T, on[LAST], on[LAST] + 0.25);
+        const P = (a, dy = 0) => [CX + rx * Math.cos(a), CY + ry * Math.sin(a) + dy * open * s];
+
+        ctx.fillStyle = ink.bg;
+        ctx.fillRect(0, 0, 1920, 1080);
+        C.stars(ctx, T, C.sm(T, start, start + 0.4) * shrink);
+        // The line's ends beyond the ring burn off as it tilts open.
+        const tail = 1 - C.sm(T, start + 0.02, start + 0.2);
+        if (tail > 0) {
+          ctx.globalAlpha = tail;
+          ctx.fillStyle = ink.crest;
+          for (let col = HL.cMin; col < HL.cMin + HL.cols; col++) OM.cell(ctx, HL, col, hc.row, dpr);
+          ctx.globalAlpha = 1;
+        }
+        // The planet's limb below, lit green along its edge.
+        const planetA = C.sm(T, start + 0.05, start + 0.5) * (1 - C.sm(T, COLLAPSE, COLLAPSE + 0.3));
+        if (planetA > 0.01) {
+          ctx.globalAlpha = planetA;
+          const pr = 1250, py = 760 + pr;
+          ctx.fillStyle = th['bg-deep'] || '#111';
+          ctx.beginPath();
+          ctx.arc(960, py, pr, 0, Math.PI * 2);
+          ctx.fill();
+          for (let x = 0; x < 1920; x += 6) {
+            const dx = x + 3 - 960, y = py - Math.sqrt(pr * pr - dx * dx);
+            const v = 1 - Math.abs(dx) / 1100;
+            ctx.fillStyle = v > 0.7 ? ink.lit : v > 0.35 ? ink.mid : ink.dim;
+            ctx.fillRect(x, Math.round(y), 5, 3);
+            if (v > 0.5) { ctx.fillStyle = ink.dim; ctx.fillRect(x, Math.round(y) + 6, 5, 2); }
+          }
+          ctx.globalAlpha = 1;
+        }
+
+        // Each segment's state: how far along the orbit it still has to fly, and its lock flash.
+        const st = segs.map((sg, k) => {
+          if (!sg) return null;
+          const lead = Math.min(0.42, on[k] - (start + 0.06));
+          const arr = C.arrive(T, on[k], Math.max(0.05, lead));
+          if (arr <= 0) return null;
+          const big = k === KEY ? 1.6 : k === LAST ? 1.3 : 1;
+          return { off: (1 - arr) * (sg.up ? 1.1 : -1.1), a: arr, hit: C.decay(T, on[k], 0.12) * big, locked: T >= on[k] };
+        });
+        // Power running round the closed ring on the kicks.
+        const runner = (a) => {
+          let v = 0;
+          for (const kk of [on[LAST], ...KICKS]) {
+            const age = T - kk;
+            if (age < 0 || age > 0.7) continue;
+            const head = -Math.PI / 2 + age * 11;
+            for (const sgn of [1, -1]) {
+              let d = Math.abs(((a - sgn * head) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI);
+              if (d < 0.5) v = Math.max(v, (1 - d / 0.5) * (1 - age / 0.7));
+            }
+          }
+          return v;
+        };
+        const rails = (up) => {
+          // Bare rails where no segment has locked; the locked segments' rails lit.
+          for (let i = 0; i < 260; i++) {
+            const a = (up ? -Math.PI : 0) + (i / 260) * Math.PI;
+            let v = 0.15 * open + 0.55 * power + runner(a);
+            for (let k = 0; k < n; k++) {
+              const sg = segs[k], q = st[k];
+              if (!sg || !q || sg.up !== up) continue;
+              const aa = a - q.off;
+              if (aa >= sg.a0 && aa <= sg.a1) v = Math.max(v, (q.locked ? 0.55 : 0.3 * q.a) + q.hit);
+            }
+            const col = v > 1 ? ink.crest : v > 0.6 ? ink.hover : v > 0.35 ? ink.lit : v > 0.16 ? ink.mid : ink.dim;
+            ctx.fillStyle = col;
+            for (const dy of [-BAND, BAND]) {
+              const [x, y] = P(a, dy);
+              ctx.fillRect(Math.round(x - 2), Math.round(y - 2), 5, 4);
+            }
+          }
+        };
+        const letters = (up) => {
+          if (wordsA <= 0) return;
+          ctx.globalAlpha = wordsA;
+          for (let k = 0; k < n; k++) {
+            const sg = segs[k], q = st[k];
+            if (!sg || !q || sg.up !== up) continue;
+            for (const L of sg.letters) {
+              const [lx, ly] = P(L.ang + q.off);
+              const v = q.hit + (q.locked ? 0.55 : 0.2) + 0.3 * power + runner(L.ang);
+              ctx.fillStyle = v > 1.05 ? ink.crest : v > 0.5 ? ink.hover : ink.lit;
+              const x0 = lx - L.w / 2, y0 = ly + sg.cap / 2;
+              for (let i = 0; i < L.d.length; i += 2) ctx.fillRect(Math.round(x0 + L.d[i] - 3), Math.round(y0 + L.d[i + 1] - 3), 6, 6);
+            }
+            // Bolts at the seams on the lock.
+            if (q.hit > 0.05) {
+              for (const a of [sg.a0, sg.a1]) {
+                const [x, y] = P(a);
+                C.pool(ctx, x, y, 90 * q.hit + 20, ink.hover, 0.6 * q.hit);
+                ctx.fillStyle = ink.crest;
+                ctx.fillRect(Math.round(x - 4), Math.round(y - BAND), 8, 2 * BAND);
+              }
+            }
+          }
+          ctx.globalAlpha = 1;
+        };
+
+        if (open > 0.02 && s > 0.02) {
+          rails(true);
+          letters(true);
+        }
+        // The core: the machine's heart, lit when the ring closes.
+        const coreA = 0.25 * open + 0.5 * power + 0.5 * C.decay(T, on[KEY], 0.2) + 0.3 * OM.pulse(KICKS, T, 0.1);
+        C.pool(ctx, CX, CY, OM.lerp(72, 70 + 200 * power, shrink), ink.lit, OM.lerp(0.4, 0.4 * Math.min(1.5, coreA), shrink));
+        ctx.fillStyle = ink.crest;
+        OM.cell(ctx, HL, hc.col, hc.row, dpr);
+        if (open > 0.02 && s > 0.02) {
+          rails(false);
+          letters(false);
+        }
+      },
+      release: () => c.release(),
+    };
+  },
+});

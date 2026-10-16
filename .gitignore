@@ -1,0 +1,34 @@
+# What stays on your machine, and why.
+
+# The song and its lyrics are someone else's copyrighted work: bring your own.
+# Audio goes in music-video/assets/audio/song.wav; lyrics are built locally with
+#   cd music-video && npm run lyrics:from <your-words.lrc> && npm run lyrics:build
+source/
+music-video/assets/audio/*
+!music-video/assets/audio/.gitkeep
+music-video/lyrics.txt
+music-video/assets/lib/lyrics.js
+music-video/storyboard/*.jpg
+
+# Generated or heavy: renders, snapshot caches, separated stems, model caches, environments.
+music-video/renders/
+music-video/.hyperframes/
+# HyperFrames Studio caches: preview thumbnails (frames, words included) and the song's waveform.
+music-video/.thumbnails/
+music-video/.waveform-cache/
+analysis/stems/
+analysis/*.npz
+.venv*/
+node_modules/
+__pycache__/
+
+# Neighbouring projects in the same folder, not part of this one.
+omarchy-site/
+reference-jtech-lyric-video/
+
+# Editor and OS noise.
+.DS_Store
+*.swp
+
+# An early speech-to-text attempt: transcripts can hold sung words.
+analysis/whisper/
