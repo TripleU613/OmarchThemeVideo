@@ -15,6 +15,21 @@ OM.scene({
     cv.className = 'om-fill';
     el.appendChild(cv);
     const c = OM.canvas(cv, { alpha: false });
+    const fx = OM.post(el, c, { effect: `vec4 effect(vec2 uv) {
+  vec2 q = cam(uv);
+  vec4 base = src(q);
+  vec3 b = vec3(0.0);
+  for (int i = 0; i < 10; i++) {
+    float a = float(i) * 0.6283;
+    vec2 o = vec2(cos(a) / 1920.0, sin(a) / 1080.0) * (6.0 + 6.0 * float(i % 2));
+    b += max(src(q + o).rgb - 0.42, 0.0);
+  }
+  b /= 10.0;
+  vec2 cell = floor(q * vec2(131.0, 75.5));
+  float fl = 0.55 + 0.9 * hash(cell + floor(uTime * 14.0));
+  vec3 glow = b * vec3(0.62, 0.81, 0.42) * 1.8 * fl;
+  return mix(base, vec4(base.rgb + glow, 1.0), uAmount);
+}` });
     const END = start + duration;
     const L = OM.HOME;
     const ink = OM.fieldInks('tokyo-night');
@@ -27,7 +42,7 @@ OM.scene({
     const C0 = L.cMin, C1 = L.cMin + L.cols;
 
     const lay = B.lazy(() => {
-      const set = B.set(sung, { weight: 800, cap: 136, minCap: 96, maxW: 1820, cy: 530, lead: 1.3 });
+      const set = B.set(sung, { weight: 800, cap: 136, minCap: 96, maxW: 1600, cy: 530, lead: 1.3 });
       const taken = new Set();
       const screens = [];
       set.words.forEach((w) => {
@@ -65,7 +80,7 @@ OM.scene({
     };
 
     return {
-      render(t, T) {
+      draw(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
         if (T >= END - 0.1) return OM.handoff('line', ctx, T, dpr);
@@ -108,7 +123,36 @@ OM.scene({
           for (let col = C0; col < C1; col++) if (Math.abs(col - SC) <= reach) OM.cell(ctx, L, col, SR, dpr);
         }
       },
-      release: () => c.release(),
+      render(t, T) {
+          this.draw(t, T);
+          const e = B.env(T, start, END);
+          const ctx = c.ensure();
+          ctx.globalAlpha = 1;
+          if (e > 0) {
+
+            const { screens } = lay();
+            const ik = OM.fieldInks('tokyo-night');
+            const L = OM.HOME;
+            // Power-on sparkles: a four-point glint on every few booting word screens.
+            ctx.fillStyle = ik.crest;
+            for (let i = 0; i < screens.length; i += 7) {
+              const s = screens[i];
+              const a = T - s.at;
+              if (!s.word || a < 0 || a > 0.22) continue;
+              const x = L.x0 + (s.col + 0.5) * L.cw, y = L.y0 + (s.row + 0.5) * L.ch;
+              const z = 14 * (1 - a / 0.22);
+              ctx.globalAlpha = e * (1 - a / 0.22);
+              ctx.fillRect(x - z, y - 1, 2 * z, 2);
+              ctx.fillRect(x - 1, y - z, 2, 2 * z);
+            }
+          }
+          ctx.globalAlpha = 1;
+          fx.apply(T, {
+            amount: e * 0.9,
+            cam: { zoom: 1 + e * (0.025 + 0.045 * (1 - OM.smooth(OM.prog(T, start + 0.4, END - 0.6)))), x: e * 14 * Math.sin(T * 1.3), y: e * 10 * Math.sin(T * 0.9 + 1) },
+          });
+        },
+        release: () => { fx.release(); c.release(); },
     };
   },
 });

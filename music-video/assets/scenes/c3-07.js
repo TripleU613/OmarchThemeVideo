@@ -55,14 +55,34 @@ OM.scene({
     });
     const tearAt = (place, k, x) => on[k] + TEAR * OM.clamp((x - place[k].x) / place[k].w);
 
-    return {
+    // Camera: a tilt up as the clouds part, with flash shakes on the thunder. Effect: lightning exposure
+    // flashes and cloud shadows sweeping over the deck; the lit letters are masked out of both.
+    const FL = [269.746, 270.095, 270.536];
+    const flashAt = (T) => FL.reduce((m, f) => Math.max(m, C.decay(T, f, 0.06)), 0);
+    const FX = C.GLSL_LUM + `vec4 effect(vec2 uv) {
+  vec2 p = cam(uv);
+  vec3 c = src(p).rgb;
+  float keep = smoothstep(0.35, 0.55, lum(c));
+  float sh = vnoise(vec2(p.x * 5.0 - uTime * 0.6, p.y * 3.0 + uTime * 0.15));
+  c *= 1.0 - 0.35 * uAmount * smoothstep(0.4, 0.8, sh) * (1.0 - keep);
+  c += uAmount * uP0.x * (1.0 - keep) * (vec3(0.75, 0.79, 0.96) * 0.09 + c * 0.3);
+  return vec4(c, 1.0);
+}`;
+    const fxAt = (T) => {
+      const f = flashAt(T);
+      return {
+        amount: 1, p0: [f, 0, 0, 0],
+        cam: { zoom: 1.06, y: -30 + 60 * OM.ease.inOutCubic(OM.prog(T, start, END)), x: 9 * f * Math.sin(T * 91), rot: 0.004 * f * Math.cos(T * 73) },
+      };
+    };
+    return OM.c3.withFx(el, c, start, END, FX, fxAt)({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
         if (C.seam(ctx, T, dpr, start, END, 'spark', 'glow')) return;
         const { place, M, near, nk, rays, B } = type();
         const { GW, GH, of } = M, buf = B.buf;
-        const roll = OM.ease.outCubic(OM.prog(T, start + 0.03, start + 0.24)); // the deck rolls in over the sun
+        const roll = OM.ease.inOutCubic(OM.prog(T, start + 0.03, start + 0.45)); // the deck rolls in over the sun
         const part = OM.ease.inOutCubic(OM.prog(T, PART, END - 0.12)); // and parts from the sun outward
         const flood = C.sm(T, PART, END - 0.08);
         const wordsA = 1 - C.sm(T, 271.0, END - 0.12);
@@ -89,14 +109,15 @@ OM.scene({
             // The deck rolls in cell by cell; the parting opens from the sun.
             const h = OM.hash(i, j, 0x77);
             if (h > roll * 1.1) continue;
-            const dist = Math.hypot(x - SX, (y - SY) * 1.5) / 1150;
-            if (dist < part * 1.25 - 0.12 * h) continue;
-            if (k >= 0 && T >= tearAt(place, k, x) && wordsA > 0) {
+            if (k >= 0 && T >= tearAt(place, k, x) && h < wordsA) {
               const age = T - tearAt(place, k, x);
               const v = (age < 0.08 ? 1.3 : 0.7) + 0.4 * C.decay(T, on[k], 0.16) - 0.5 * (1 - wordsA) + (h > 0.8 ? 0.2 : 0);
               buf[idx] = v > 1 ? P.crest : v > 0.45 ? P.hover : P.lit;
               continue;
             }
+            // The parting clears the cloud round the letters; the letters themselves hold until they fade.
+            const dist = Math.hypot(x - SX, (y - SY) * 1.5) / 1150;
+            if (dist < part * 1.25 - 0.12 * h) continue;
             const nd = near[idx], q = nk[idx];
             if (q >= 0 && nd <= 2 && T >= on[q] && wordsA > 0.3) {
               buf[idx] = nd === 1 ? P.lit : P.mid; // the silver lining
@@ -109,6 +130,26 @@ OM.scene({
         }
         B.draw(ctx, 0, 0, GW * CELL, GH * CELL);
 
+        // Lightning: a jagged bolt down the sky's edge on each thunder hit.
+        FL.forEach((f, b) => {
+          const age = T - f;
+          if (age < 0 || age > 0.13) return;
+          const a = 1 - age / 0.13;
+          let x = b % 2 ? 1700 : 230, y = 0;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          for (let s = 1; s <= 12; s++) {
+            x += (OM.hash(b, s, 77) - 0.5) * 90;
+            y = s * 46;
+            ctx.lineTo(x, y);
+          }
+          ctx.strokeStyle = C.rgba(ink.hover, 0.3 * a);
+          ctx.lineWidth = 10;
+          ctx.stroke();
+          ctx.strokeStyle = C.rgba(ink.crest, a);
+          ctx.lineWidth = 3;
+          ctx.stroke();
+        });
         // Rays down out of each break, slanting away from the sun.
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
@@ -131,7 +172,7 @@ OM.scene({
 
         // The rain: falling, then frozen in mid-air on the first onset, glinting in the light and burning off.
         const Tr = Math.min(T, on[0]);
-        const rainA = C.sm(T, start + 0.05, start + 0.2) * (1 - C.sm(T, PART + 0.1, END - 0.15));
+        const rainA = C.sm(T, start + 0.05, start + 0.45) * (1 - C.sm(T, PART + 0.1, END - 0.15));
         if (rainA > 0.01) {
           ctx.globalAlpha = rainA;
           for (const d of rain) {
@@ -147,6 +188,6 @@ OM.scene({
         }
       },
       release: () => c.release(),
-    };
+    });
   },
 });

@@ -11,6 +11,17 @@ OM.ownWords.add('c2-03');
   OM.c2.ready('c2-03', W);
   const { pool, sm, decay, rgba } = OM.c2;
 
+  const FX = `vec4 effect(vec2 uv) {
+    vec2 p = cam(uv);
+    if (uAmount <= 0.0) return src(p);
+    // Water shimmer along the waterline at the foot of the hull.
+    float w = smoothstep(0.085, 0.0, p.y);
+    float r = sin(p.y * uRes.y * 0.06 + uTime * 7.0 + vnoise(p * vec2(40.0, 8.0)) * 4.0);
+    vec4 c = src(p + vec2(r * 0.003 * w * uAmount, 0.0));
+    c.rgb += vec3(0.733, 0.867, 0.592) * w * uAmount * 0.1 * smoothstep(0.6, 1.0, r);
+    return c;
+  }`;
+
   OM.scene({
     id: 'c2-03',
     build(el, { start, duration }) {
@@ -18,6 +29,7 @@ OM.ownWords.add('c2-03');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      const fx = OM.post(el, c, { effect: FX });
       const END = start + duration;
       const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
       const words = OM.sung('c2-03');
@@ -70,7 +82,7 @@ OM.ownWords.add('c2-03');
       const BOTTLE = ['..##..', '..##..', '..##..', '.####.', '######', '######', '######', '######', '######', '######', '######', '.####.'];
 
       return {
-        render(t, T) {
+        draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + 0.05) return OM.handoff('line', ctx, T, dpr);
@@ -187,8 +199,29 @@ OM.ownWords.add('c2-03');
           }
           ctx.restore();
         },
+        render(t, T) {
+          this.draw(t, T);
+          const ctx = c.ensure();
+          if (OM.c2.live(T, start, END)) {
+          // Foam drifting at the waterline after the smash.
+          if (T > on[K]) {
+            const a = T - on[K];
+            for (let n = 0; n < 40; n++) {
+              const x = (OM.hash(n, 1, 31) * 2100 - 100 + a * (40 + 60 * OM.hash(n, 2, 31))) % 2000, y = 1040 + 36 * OM.hash(n, 3, 31) - 10 * Math.sin(a * 3 + n);
+              ctx.fillStyle = OM.c2.rgba(n % 3 ? ink.hover : th.text, 0.6 * OM.clamp(a * 3) * (1 - sm(T, 169.2, DB2)));
+              ctx.fillRect(x, y, 5, 5);
+            }
+          }
+          }
+          // Low-angle tilt up the hull to the name, a jolt on the smash.
+          const j = decay(T, on[K], 0.08);
+          OM.c2.apply(fx, T, start, END, {
+            amount: 1, y: 36 * (1 - OM.smooth(OM.prog(T, start, on[K]))) + 10 * j * Math.cos(T * 77), x: 14 * j * Math.sin(T * 90), rot: 0.004 * j,
+          });
+        },
         release: () => {
           hull = null;
+          fx.release();
           c.release();
         },
       };

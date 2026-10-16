@@ -14,7 +14,19 @@ OM.scene({
     const cv = document.createElement('canvas');
     cv.className = 'om-fill';
     el.appendChild(cv);
+    // Motion blur around the runner while they run (uP0.xy their position, uP0.z the pace); crisp when still.
+    const FX = `vec4 effect(vec2 uv) {
+      vec2 q = cam(uv);
+      vec4 base = src(q);
+      vec2 d = (q - uP0.xy) * vec2(uRes.x / uRes.y, 1.0);
+      float w = uP0.z * uAmount * exp(-dot(d, d) * 30.0);
+      if (w < 0.01) return base;
+      vec3 acc = vec3(0.0);
+      for (int i = 0; i < 9; i++) acc += src(q + vec2((float(i) - 4.0) * 0.0028 * w, 0.0)).rgb;
+      return vec4(mix(base.rgb, acc / 9.0, clamp(w * 1.4, 0.0, 1.0)), 1.0);
+    }`;
     const c = OM.canvas(cv, { alpha: false });
+    const fx = OM.post(el, c, { effect: FX });
     const ink = V.ink(), th = V.th();
     const sung = OM.sung('v2-07');
     const N = sung.length;
@@ -122,7 +134,7 @@ OM.scene({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (T < start + V.HOLD_IN || T >= END - V.HOLD_OUT) return OM.handoff('line', ctx, T, dpr);
+        if (T < start + V.HOLD_IN || T >= END - V.HOLD_OUT) return fx.apply(T), OM.handoff('line', ctx, T, dpr);
         if (!F || !V.met().ok) plan();
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
@@ -207,8 +219,32 @@ OM.scene({
           sprite(ctx, rows, x, feet, T >= STOP + 0.12 ? 1 : -1, runner);
         }
         ctx.restore();
+        // Kicked-up dust behind the feet while moving, and sparks off each word as it builds.
+        const pace = (T2) => (T2 < STOP ? 1 : OM.clamp((Math.abs(walk(T2 + 0.02).x - walk(T2).x) / 0.02) / 500));
+        for (let j = 0; j < 9; j++) {
+          const ts = (Math.floor(T / 0.05) - j) * 0.05;
+          if (ts < start + V.HOLD_IN || pace(ts) < 0.2) continue;
+          const age = T - ts, P = ts >= STOP ? walk(ts) : { x: RX0, y: TOP };
+          const hx = OM.hash(j, Math.floor(ts * 20), 91);
+          ctx.fillStyle = V.rgba(ink.mid, 0.7 * (1 - age / 0.45) * (1 - fold));
+          const dir = ts < STOP ? 1 : -1;
+          ctx.fillRect(P.x + dir * (20 + 160 * age * (0.6 + hx)), P.y - 6 - 90 * age + 200 * age * age, 6, 6);
+        }
+        sung.forEach((w, k) => {
+          const age = T - w.t0, a = F.at[k];
+          if (age < 0 || age > 0.45) return;
+          for (let i = 0; i < 4; i++) V.burst(ctx, a.x + (a.w * (i + 0.5)) / 4, a.top, age, 2707 + k * 9 + i, { n: 6, sp: 320, life: 0.42, up: 260 });
+        });
+        const ce = V.camEnv(T, start, END), run = pace(T) * (1 - fold);
+        const gait = Math.abs(Math.sin((T - start) * Math.PI * 6));
+        const RW = T >= STOP ? walk(T) : { x: RX0, y: TOP };
+        fx.apply(T, {
+          amount: V.env(T, start, END),
+          cam: { zoom: 1 + ce * 0.03, y: ce * run * 9 * gait, rot: ce * run * 0.006 * Math.sin((T - start) * Math.PI * 6) },
+          p0: [RW.x / 1920, 1 - (RW.y - 80) / 1080, run, 0],
+        });
       },
-      release: () => c.release(),
+      release: () => { fx.release(); c.release(); },
     };
   },
 });

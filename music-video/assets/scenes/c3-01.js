@@ -162,6 +162,33 @@ OM.ownWords.add('c3-01');
     const [r, g, b] = OM.rgb(hex);
     return (255 << 24) | (b << 16) | (g << 8) | r;
   };
+  /**
+   * Wrap a scene in its camera and effect pass. at(T) returns the full-strength
+   * { amount, cam, p0, p1 }; it is scaled by the window envelope, so the effect
+   * is exactly 0 and the camera exactly at rest (with zero speed) at both cuts.
+   */
+  C.withFx = (el, c, start, END, effect, at) => (scene) => {
+    const fx = OM.post(el, c, { effect });
+    const draw = scene.render, rel = scene.release;
+    scene.render = (t, T) => {
+      draw(t, T);
+      const e = OM.post.envelope(T, start, END, { ramp: 0.4, hold: 0.07 });
+      if (e <= 0) return fx.apply(T, {});
+      const p = at(T) || {}, k = p.cam || {};
+      fx.apply(T, {
+        amount: (p.amount ?? 0) * e,
+        cam: { zoom: 1 + ((k.zoom ?? 1) - 1) * e, rot: (k.rot || 0) * e, x: (k.x || 0) * e, y: (k.y || 0) * e },
+        p0: p.p0, p1: p.p1,
+      });
+    };
+    scene.release = () => {
+      fx.release();
+      rel();
+    };
+    return scene;
+  };
+  /** Luminance in GLSL, shared by the chorus 3 effects. */
+  C.GLSL_LUM = 'float lum(vec3 c) { return dot(c, vec3(0.3, 0.59, 0.11)); }\n';
   /** A value built from type, rebuilt once when the font arrives. */
   C.lazy = (build) => {
     let v = null, ok = false;
@@ -243,7 +270,22 @@ OM.ownWords.add('c3-01');
         return { place, pts, cols, steps: place.map((p) => (p ? step(p) : 6)) };
       });
 
-      return {
+      // Camera: a slow tilt across the sky with a sway. Effect: the curtains shimmer (a wave warp in the
+      // sky above the letters only) and glow green; the key word flares it.
+      const FX = C.GLSL_LUM + `vec4 effect(vec2 uv) {
+  vec2 p = cam(uv);
+  float top = smoothstep(0.8, 0.97, p.y);
+  p.x += uAmount * top * 0.004 * sin(p.y * 46.0 + uTime * 3.2);
+  vec3 c = src(p).rgb, g = vec3(0.0);
+  for (int i = 0; i < 8; i++) { float a = float(i) * 0.785; g += src(p + vec2(cos(a), sin(a)) * vec2(16.0 / 1920.0, 16.0 / 1080.0)).rgb; }
+  g /= 8.0;
+  return vec4(c + uAmount * max(g - 0.12, 0.0) * vec3(0.5, 1.0, 0.45) * (0.5 + uP0.x), 1.0);
+}`;
+      const fxAt = (T) => ({
+        amount: 0.8, p0: [0.8 * C.decay(T, on[K], 0.2), 0, 0, 0],
+        cam: { zoom: 1.06, rot: 0.012 * Math.sin((T - start) * 0.8), y: 26 * Math.sin((T - start) * 0.9) },
+      });
+      return OM.c3.withFx(el, c, start, END, FX, fxAt)({
         render(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
@@ -342,6 +384,16 @@ OM.ownWords.add('c3-01');
             ctx.globalAlpha = 1;
           }
 
+          // A shooting star over the curtains.
+          const ss = OM.prog(T, 245.7, 246.15);
+          if (ss > 0 && ss < 1) {
+            const x = OM.lerp(1560, 1080, ss), y = OM.lerp(70, 205, ss);
+            for (let i = 0; i < 16; i++) {
+              const b = i / 16;
+              ctx.fillStyle = C.rgba(ink.crest, (1 - b) * (1 - ss * 0.6));
+              ctx.fillRect(Math.round(x + b * 120), Math.round(y - b * 34), 4, 3);
+            }
+          }
           // The fold: one crest line grows out of the fallen hems across the frame.
           if (fold > 0) {
             const reach = 1100 * OM.ease.outCubic(fold);
@@ -353,7 +405,7 @@ OM.ownWords.add('c3-01');
           }
         },
         release: () => c.release(),
-      };
+      });
     },
   });
 })();

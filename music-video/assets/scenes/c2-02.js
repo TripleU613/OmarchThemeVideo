@@ -12,6 +12,22 @@ OM.ownWords.add('c2-02');
   OM.c2.ready('c2-02', W);
   const { pool, sm, decay, rgba } = OM.c2;
 
+  const FX = `vec4 effect(vec2 uv) {
+    vec2 p = cam(uv);
+    if (uAmount <= 0.0) return src(p);
+    // Factory haze: drifting smoke, with shafts of light slanting down from high windows.
+    vec4 c = src(p);
+    float s = 0.0;
+    for (int i = 0; i < 3; i++) {
+      float fi = float(i);
+      float x = p.x + (1.0 - p.y) * 0.35 - (0.18 + 0.3 * fi) - 0.02 * sin(uTime * 0.5 + fi);
+      s += smoothstep(0.045, 0.0, abs(x)) * (0.6 + 0.4 * vnoise(vec2(p.y * 6.0 + fi, uTime * 0.3)));
+    }
+    float haze = vnoise(p * vec2(6.0, 3.0) + vec2(uTime * 0.08, 0.0));
+    c.rgb += (vec3(0.62, 0.81, 0.42) * s * 0.09 * smoothstep(0.15, 1.0, p.y) + vec3(0.14, 0.16, 0.23) * haze * 0.22) * uAmount;
+    return c;
+  }`;
+
   OM.scene({
     id: 'c2-02',
     build(el, { start, duration }) {
@@ -19,6 +35,7 @@ OM.ownWords.add('c2-02');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      const fx = OM.post(el, c, { effect: FX });
       const END = start + duration;
       const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
       const words = OM.sung('c2-02');
@@ -99,7 +116,7 @@ OM.ownWords.add('c2-02');
       };
 
       return {
-        render(t, T) {
+        draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + 0.05) return OM.handoff('screen', ctx, T, dpr);
@@ -179,7 +196,29 @@ OM.ownWords.add('c2-02');
             }
           });
         },
-        release: () => c.release(),
+        render(t, T) {
+          this.draw(t, T);
+          const ctx = c.ensure();
+          if (OM.c2.live(T, start, END)) {
+          const { ms } = get();
+          // High windows along the top, where the shafts come from.
+          ctx.fillStyle = OM.c2.rgba(th['surface-2'], 0.9 * OM.post.envelope(T, start, END, { ramp: 0.4 }));
+          for (let x = 140; x < 1920; x += 380) ctx.fillRect(x, 16, 120, 40);
+          // Welding flashes at each landing.
+          ms.forEach((mc, k) => {
+            const a = T - on[k];
+            if (!mc || k === 0 || a < 0 || a > 0.4) return;
+            const fl = (0.5 + 0.5 * OM.hash(Math.floor(T * 40), k, 9)) * (1 - a / 0.4);
+            pool(ctx, mc.sx + mc.sw / 2 + OM.ease.inCubic(OM.prog(T, RUN, DB2)) * 2300, mc.by, 120, 50, ink.crest, 0.4 * fl);
+          });
+          }
+          // Steady industrial tracking along the line, a push as the belt runs.
+          OM.c2.apply(fx, T, start, END, { amount: 0.9, x: -34 + 68 * OM.prog(T, start, END), zoom: 1 + 0.06 * sm(T, 164.9, 165.5), ramp: 0.45 });
+        },
+        release: () => {
+          fx.release();
+          c.release();
+        },
       };
     },
   });

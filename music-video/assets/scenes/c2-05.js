@@ -12,6 +12,19 @@ OM.ownWords.add('c2-05');
   OM.c2.ready('c2-05', W);
   const { sm, decay, rgba } = OM.c2;
 
+  const FX = `vec4 effect(vec2 uv) {
+    vec2 p = cam(uv);
+    if (uAmount <= 0.0) return src(p);
+    // Wet-glass streaks: just behind the blade the fresh water film runs and refracts.
+    float behind = clamp((uP0.x - p.x) / 0.07, 0.0, 1.0) * step(p.x, uP0.x);
+    float inb = step(uP0.y, p.y) * step(p.y, uP0.z) * uP0.w;
+    float m = behind * (1.0 - behind) * 4.0 * inb;
+    float n = vnoise(vec2(p.x * 220.0, p.y * 6.0 - uTime * 1.5)) - 0.5;
+    vec4 c = src(p + vec2(n * 0.0025 * m * uAmount, 0.0));
+    c.rgb += vec3(0.733, 0.867, 0.592) * m * uAmount * 0.07 * (n + 0.5);
+    return c;
+  }`;
+
   OM.scene({
     id: 'c2-05',
     build(el, { start, duration }) {
@@ -19,6 +32,7 @@ OM.ownWords.add('c2-05');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      const fx = OM.post(el, c, { effect: FX });
       const END = start + duration;
       const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
       const words = OM.sung('c2-05');
@@ -55,7 +69,7 @@ OM.ownWords.add('c2-05');
       const wipeBand = (i) => [i * 360 - 20, (i + 1) * 360 + 20];
 
       return {
-        render(t, T) {
+        draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + 0.05) return OM.handoff('grid', ctx, T, dpr);
@@ -88,7 +102,7 @@ OM.ownWords.add('c2-05');
           }
 
           // The grime: condensing over the panes in dither order, wiped where a stroke has been.
-          const cond = OM.prog(T, start + 0.02, on[0] - 0.02);
+          const cond = OM.smooth(OM.prog(T, start + 0.02, on[0] + 0.45));
           for (let row = HM.rMin; row < HM.rMin + HM.rows; row++) {
             const y = HM.y0 + (row + 0.5) * HM.ch;
             for (let col = HM.cMin; col < HM.cMin + HM.cols; col++) {
@@ -155,7 +169,39 @@ OM.ownWords.add('c2-05');
             if (a > 0) blade(wipeX(i, T), y0 + 20, y1 - 20, a);
           }
         },
-        release: () => c.release(),
+        render(t, T) {
+          this.draw(t, T);
+          const ctx = c.ensure();
+          if (OM.c2.live(T, start, END)) {
+          // Drips running off the bottom of each wiped band.
+          const { strokes } = get();
+          for (const s of strokes) {
+            const a = T - s.t0 - 0.15;
+            if (a < 0) continue;
+            for (let n = 0; n < 7; n++) {
+              const x = OM.lerp(s.xa + 30, s.xb - 30, OM.hash(n, s.k, 51)), y = s.y1 + 2 + 140 * Math.pow(Math.max(0, a - 0.2 * OM.hash(s.k, n, 52)), 1.6);
+              const al = 0.7 * (1 - OM.prog(T, FADE, CLEAR));
+              if (y > 1080 || al <= 0) continue;
+              ctx.fillStyle = OM.c2.rgba(ink.hover, al);
+              ctx.fillRect(x, s.y1, 2, y - s.y1);
+              ctx.fillRect(x - 2, y, 5, 6);
+            }
+          }
+          }
+          // Snap pans following each stroke, settling back for the clean-up.
+          const { strokes } = get();
+          let cur = 0, p0 = [0, 0, 0, 0];
+          for (const s of strokes) {
+            cur = OM.lerp(cur, -((s.xa + s.xb) / 2 - 960) * 0.06, OM.ease.outCubic(OM.prog(T, s.t0, s.t0 + 0.2)));
+            if (T >= s.t0 && T < s.t0 + s.dur + 0.4) p0 = [bladeX(s, T) / 1920, 1 - s.y1 / 1080, 1 - s.y0 / 1080, 1 - OM.prog(T, s.t0 + s.dur, s.t0 + s.dur + 0.4)];
+          }
+          cur = OM.lerp(cur, 0, OM.smooth(OM.prog(T, WIPES[0], WIPES[0] + 0.35)));
+          OM.c2.apply(fx, T, start, END, { amount: 1, x: cur, p0 });
+        },
+        release: () => {
+          fx.release();
+          c.release();
+        },
       };
     },
   });

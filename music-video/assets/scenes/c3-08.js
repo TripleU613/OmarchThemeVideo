@@ -21,7 +21,7 @@ OM.scene({
     const words = OM.sung('c3-08');
     const on = words.map((w) => w.t0);
     const n = words.length;
-    const DOWN = 272.161, PUSH = 274.297, GROUND = 1000, FH = 168, CELL = 8;
+    const DOWN = 272.161, PUSH = 274.297, GROUND = 925, FH = 168, CELL = 8;
     const KEY = words.reduce((b, w, k) => (Math.abs(w.t0 - DOWN) < Math.abs(words[b].t0 - DOWN) ? k : b), 0);
     // Every storey and when it lands: the words, then a bare one on each beat until the push.
     const bare = OM.beatsIn(words[n - 1].t1 + 0.05, PUSH + 0.6);
@@ -35,7 +35,22 @@ OM.scene({
       return { place, pts, W };
     });
 
-    return {
+    // Camera: a vertical crane riding up with the tower. Effect: height fog, a drifting band of it low
+    // over the site, thinning with height; the lit girders cut through it.
+    const FX = C.GLSL_LUM + `vec4 effect(vec2 uv) {
+  vec2 p = cam(uv);
+  vec3 c = src(p).rgb;
+  float fog = smoothstep(0.5, 0.0, p.y) * (0.65 + 0.35 * vnoise(vec2(p.x * 4.0 + uTime * 0.25, p.y * 6.0)));
+  vec3 fc = mix(vec3(0.055, 0.055, 0.08), vec3(0.62, 0.81, 0.42), 0.14);
+  return vec4(mix(c, fc, fog * uAmount * 0.6 * (1.0 - smoothstep(0.35, 0.6, lum(c)))), 1.0);
+}`;
+    // The camera eases to rest while the whole line reads, then moves on.
+    const readAt = (T) => C.sm(T, on[n - 1] - 0.3, on[n - 1]) * (1 - C.sm(T, on[n - 1] + 0.65, on[n - 1] + 1.0));
+    const fxAt = (T) => {
+      const k = 1 - readAt(T);
+      return { amount: 1 - 0.6 * readAt(T), cam: { zoom: 1 + 0.05 * k, y: 32 * k * Math.sin(Math.PI * OM.prog(T, start, END)) } };
+    };
+    return OM.c3.withFx(el, c, start, END, FX, fxAt)({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
@@ -46,7 +61,7 @@ OM.scene({
         // The camera climbs to keep the top storey in view; then pushes in.
         const topWorld = (count) => GROUND - count * FH;
         let climb = 0;
-        lands.forEach((x, i) => (climb += OM.ease.inOutCubic(OM.prog(T, x, x + 0.45)) * (i >= 2 ? FH : 0)));
+        lands.forEach((x, i) => (climb += OM.ease.inOutCubic(OM.prog(T, x, x + 0.45)) * (i >= n ? FH : 0))); // the camera holds through the line, then climbs with the bare storeys
         const push = OM.ease.inCubic(OM.prog(T, PUSH, END - 0.1));
         const z = 1 + 7 * push;
         const gridA = C.sm(T, PUSH + 0.6, END - 0.1);
@@ -111,6 +126,15 @@ OM.scene({
               ctx.fillRect(Math.round(lx + P[q] - CELL / 2), Math.round(ly + P[q + 1] - CELL / 2), CELL - 1, CELL - 1);
             }
           }
+          // Welding sparks: a shower off both lower corners when it lands.
+          if (s.landed && T - lands[i] < 0.9) {
+            const age = T - lands[i];
+            for (let d = 0; d < 24; d++) {
+              const side = d % 2 ? 1 : -1, vx = side * (80 + 260 * OM.hash(i, d, 88)), vy = -180 - 260 * OM.hash(d, i, 89);
+              ctx.fillStyle = C.rgba(d % 3 ? ink.hover : ink.crest, 1 - age / 0.9);
+              ctx.fillRect(Math.round(960 + side * (W / 2 - 6) + vx * age), Math.round(y1 + vy * age + 700 * age * age), 3, 3);
+            }
+          }
           // Dust where it lands.
           if (s.hit > 0.05) {
             ctx.fillStyle = C.rgba(ink.hover, 0.5 * s.hit);
@@ -120,6 +144,20 @@ OM.scene({
               ctx.fillRect(Math.round(960 + side * (W / 2 + age * (200 + 300 * r))), Math.round(y1 - age * 120 * r - 4), 6, 6);
             }
           }
+        }
+        // Beacons blinking on the top corners, and a welder at work on the newest joint.
+        if ((T * 1.5) % 1 < 0.35) {
+          for (const x of [X0 + 2, X0 + W - 10]) {
+            C.pool(ctx, x + 4, craneY - 6, 30, th.brand || ink.hover, 0.5);
+            ctx.fillStyle = ink.crest;
+            ctx.fillRect(Math.round(x), Math.round(craneY - 10), 8, 8);
+          }
+        }
+        for (let d = 0; d < 10; d++) {
+          const ph = T * 2.2 + d * 0.1, age = (ph - Math.floor(ph)) * 0.5;
+          const wx = X0 + W * 0.7, vx = (OM.hash(Math.floor(ph), d, 90) - 0.5) * 300;
+          ctx.fillStyle = C.rgba(ink.crest, 1 - age / 0.5);
+          ctx.fillRect(Math.round(wx + vx * age), Math.round(craneY + 4 - 120 * age + 600 * age * age), 2, 2);
         }
         // The crane on top: mast, swinging jib, cable and hook (carrying the next storey down).
         {
@@ -151,6 +189,6 @@ OM.scene({
         }
       },
       release: () => c.release(),
-    };
+    });
   },
 });

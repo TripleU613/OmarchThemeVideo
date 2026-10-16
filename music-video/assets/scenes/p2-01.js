@@ -54,6 +54,28 @@ OM.ownWords.add('p2-01');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      // Neon jukebox glow: bright greens bloom, and sheen arcs sweep round the key record's grooves.
+      const fx = OM.post(el, c, {
+        effect: `vec4 effect(vec2 uv) {
+  vec2 q = cam(uv);
+  vec3 c = src(q).rgb;
+  if (uAmount <= 0.0) return vec4(c, 1.0);
+  vec2 px = 1.0 / uRes * (uRes.y / 1080.0);
+  vec3 g = vec3(0.0);
+  for (int i = 0; i < 12; i++) {
+    float a = float(i) * 0.5236;
+    for (int r = 1; r <= 3; r++) g += max(src(q + vec2(cos(a), sin(a)) * float(r) * 7.0 * px).rgb - 0.42, 0.0);
+  }
+  g /= 36.0;
+  vec2 d = (q - uP0.xy) * vec2(uRes.x / uRes.y, 1.0);
+  float r = length(d) / uP0.z, ang = atan(d.y, d.x);
+  float band = pow(max(0.0, cos(2.0 * (ang + uP0.w))), 18.0);
+  float ring = smoothstep(0.4, 0.48, r) * (1.0 - smoothstep(0.94, 1.0, r));
+  float lum = dot(c, vec3(0.3, 0.59, 0.11));
+  vec3 sheen = vec3(0.62, 0.81, 0.42) * band * ring * (1.0 - smoothstep(0.25, 0.5, lum)) * 0.32 * uP1.x;
+  return vec4(c + uAmount * (g * vec3(0.8, 1.0, 0.62) * 1.7 + sheen), 1.0);
+}`,
+      });
       const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
       const L = OM.HOME, P = OM.p2;
       const END = start + duration;
@@ -196,7 +218,7 @@ OM.ownWords.add('p2-01');
         render(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
-          if (P.cut(ctx, T, dpr, start, END, 'line', 'line')) return;
+          if (P.cut(ctx, T, dpr, start, END, 'line', 'line')) return void fx.apply(T, {});
           if (!lay || (!lay.ok && P.ready())) lay = layout();
           ctx.fillStyle = ink.bg;
           ctx.fillRect(0, 0, 1920, 1080);
@@ -216,8 +238,46 @@ OM.ownWords.add('p2-01');
           for (let col = L.cMin; col < L.cMin + L.cols; col++) OM.cell(ctx, L, col, h.row, dpr);
 
           lay.recs.forEach((r, i) => record(ctx, dpr, Object.assign(r, { i }), T));
+
+          // Needle sparkles: a tonearm swings onto the key record on the downbeat and throws sparks.
+          const spun = T > DB ? 7 * (T - DB) + 2 * Math.pow(T - DB, 2) : 0;
+          const armIn = OM.ease.outBack(OM.prog(T, DB - 0.05, DB + 0.15)) * (1 - OM.ease.inCubic(OM.prog(T, EXIT - 0.1, EXIT + 0.05)));
+          if (key && armIn > 0) {
+            const na = -0.75, nx = key.x + Math.cos(na) * key.R * 0.78, ny = YC + Math.sin(na) * key.R * 0.78;
+            const px = key.x + key.R * 1.05, py = YC - key.R * 1.02;
+            ctx.globalAlpha = OM.clamp(armIn);
+            ctx.strokeStyle = th['border-strong'];
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.moveTo(px, py);
+            ctx.lineTo(OM.lerp(px, nx, armIn), OM.lerp(py, ny, armIn));
+            ctx.stroke();
+            ctx.fillStyle = ink.crest;
+            ctx.fillRect(OM.lerp(px, nx, armIn) - 5, OM.lerp(py, ny, armIn) - 5, 10, 10);
+            for (let i = 0; i < 40; i++) {
+              const born = DB + i * 0.022, age = T - born;
+              if (age < 0 || age > 0.45) continue;
+              const a = OM.hash(i, 1, 9) * 6.283, v = 140 + 260 * OM.hash(i, 2, 9);
+              const x = nx + Math.cos(a) * v * age, y = ny + Math.sin(a) * v * age + 300 * age * age;
+              const s = (1 - age / 0.45) * 7;
+              ctx.fillStyle = i % 3 ? ink.hover : ink.crest;
+              ctx.fillRect(x - s / 2, y - 1, s, 2);
+              ctx.fillRect(x - 1, y - s / 2, 2, s);
+            }
+            ctx.globalAlpha = 1;
+          }
+
+          // Camera: a slow orbit round the turntable; the glow eases in and out of the cuts.
+          const env = OM.post.envelope(T, start, END, { ramp: 0.35 });
+          const ph = (T - start) * 2.2;
+          fx.apply(T, {
+            amount: env * (0.55 + 0.45 * (T > DB ? Math.exp(-(T - DB) / 0.5) : 0)),
+            cam: { zoom: 1 + 0.05 * env, rot: 0.022 * env * Math.sin(ph), x: 20 * env * Math.cos(ph), y: 12 * env * Math.sin(ph) },
+            p0: key ? [key.x / 1920, 1 - YC / 1080, key.R / 1080, spun] : [0, 0, 1, 0],
+            p1: [T > DB ? 1 : 0.35, 0, 0, 0],
+          });
         },
-        release: () => c.release(),
+        release: () => { fx.release(); c.release(); },
       };
     },
   });

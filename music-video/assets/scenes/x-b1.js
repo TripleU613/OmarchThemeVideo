@@ -126,7 +126,23 @@
     ctx.fillRect(0, 0, 1920, 1080);
     rings(ctx, dpr, T);
   };
-  OM.xb = { C, MW, MH, motifs, Zc, focal, rings, frame, KICKS, DOWN };
+  // ---------- the section's camera: one function of T for both scenes ----------
+  // x-b1 spins and zooms in with the vortex; it carries through the 233.80 cut,
+  // punches on every x-b2 downbeat (the first one on the cut itself, as a lunge
+  // forward), banks down the tunnel and comes to rest exactly as the spark lands.
+  const BEGIN = 227.65, STOP = 243.153; // rest before x-b1's field cut and from x-b2's spark cut
+  const punch = (t) => (t < 0 ? 0 : t < 0.05 ? OM.smooth(t / 0.05) : Math.exp(-(t - 0.05) / 0.25));
+  const camAt = (T) => {
+    const out = 1 - OM.smooth(OM.prog(T, 242.32, STOP));
+    if (T <= BEGIN || out <= 0) return { zoom: 1, rot: 0, x: 0, y: 0 };
+    const tilt = 0.09 * OM.smooth(OM.prog(T, BEGIN, 233.3)) - 0.06 * OM.smooth(OM.prog(T, 233.3, 235.6));
+    const bank = 0.024 * Math.sin((2 * Math.PI * (T - 233.3)) / 4.272) * OM.smooth(OM.prog(T, 233.3, 234.4));
+    const rot = (tilt + bank) * out;
+    let rush = 0.07 * OM.smooth(OM.prog(T, BEGIN, 233.8));
+    for (const d of DOWN) rush += (d === DOWN[4] ? 0.06 : 0.035) * punch(T - d);
+    return { zoom: 1 + 1.9 * Math.abs(rot) + rush * out, rot, x: 0, y: 0 }; // 1.9|rot| covers the corners
+  };
+  OM.xb = { C, MW, MH, motifs, Zc, focal, rings, frame, KICKS, DOWN, camAt };
 
   // ---------- x-b1 ----------
   OM.scene({
@@ -136,6 +152,19 @@
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      // Gravitational lensing: an Einstein ring around the eye, the vortex bent into it.
+      const fx = OM.post(el, c, {
+        effect: `vec4 effect(vec2 uv) {
+          vec2 R = vec2(1920.0, 1080.0), px = uv * R, d = px - uP0.xy;
+          float r = max(length(d), 1.0), Re = uP0.z;
+          float bend = min(Re * Re / r, 1.6 * r) * uAmount;
+          vec4 c = src(cam((px - d / r * bend) / R));
+          float ring = exp(-pow((r - Re) / (8.0 + 0.1 * Re), 2.0)) * uAmount * uP0.w;
+          c.rgb += ring * vec3(0.733, 0.867, 0.592) * 0.45;
+          c.rgb *= 1.0 - 0.55 * uAmount * smoothstep(0.42 * Re, 0.12 * Re, r);
+          return c;
+        }`,
+      });
       const END = start + duration;
       const BARS = [229.529, 231.665]; // downbeats: the vortex doubles its speed
       const SNARES = [227.904, 229.227, 231.224, 231.712, 233.361];
@@ -219,8 +248,23 @@
         }
       };
 
-      return {
-        render(t, T) {
+      // Debris: shards spiralling in on accelerating log spirals, pure in T.
+      const debris = (ctx, dpr, T, S0) => {
+        const age = T - (start + 0.3);
+        if (age <= 0) return;
+        for (let n = 0; n < 48; n++) {
+          const life = 1.1 + 0.9 * OM.hash(n, 5, 3), u = ((age / life + OM.hash(n, 6, 3)) % 1);
+          const r = 1250 * Math.pow(1 - u, 1.8);
+          if (r < 20) continue;
+          const a = OM.hash(n, 7, 3) * 6.283 + S0 * 1.3 + 4 * u;
+          const q = OM.cellAt(L, C.x + r * Math.cos(a), C.y + r * Math.sin(a) * 0.62);
+          ctx.fillStyle = u > 0.7 ? ink.crest : n % 3 ? ink.lit : ink.hover;
+          const big = n % 4 === 0 ? 1 : 0;
+          for (let dr = 0; dr <= big; dr++) for (let dc = 0; dc <= big; dc++) OM.cell(ctx, L, q.col + dc, q.row + dr, dpr);
+        }
+      };
+      const lensHits = [...FORM, ...BARS, ...EAT, POP];
+      const draw = (t, T) => {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + 0.1) return OM.handoff('field', ctx, T, dpr);
@@ -282,6 +326,7 @@
             }
           }
 
+          debris(ctx, dpr, T, S0);
           for (const i of near) drawMotif(ctx, dpr, i, T);
 
           // The eye: a hot core that grows with what it has swallowed, flaring on every hit.
@@ -309,8 +354,16 @@
             ctx.fillRect(0, 0, 1920, 1080);
             rings(ctx, dpr, T, { open: OM.ease.outExpo(u), flash: flash * 0.8 });
           }
+      };
+      return {
+        render(t, T) {
+          draw(t, T);
+          const hit = OM.pulse(lensHits.filter((x) => x <= T), T, 0.12);
+          const grow = OM.prog(T, start, POP);
+          const amount = OM.post.envelope(T, start, END, { ramp: 0.4, hold: 0.07 }) * (0.45 + 0.55 * grow);
+          fx.apply(T, { amount, cam: camAt(T), p0: [C.x, 1080 - C.y, 55 + 150 * grow * grow + 70 * hit, 0.5 + 1.2 * hit] });
         },
-        release: () => c.release(),
+        release: () => { fx.release(); c.release(); },
       };
     },
   });

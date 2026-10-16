@@ -43,7 +43,29 @@ OM.scene({
       return { place, cells };
     });
 
-    return {
+    // Camera: a crash zoom into the collapse, an explosive pull back on the rebirth. Effect: a
+    // shockwave ring that refracts the frame as it runs out, riding the drawn ring.
+    const FX = `vec4 effect(vec2 uv) {
+  vec2 p = cam(uv);
+  vec2 px = vec2(p.x * 1920.0, (1.0 - p.y) * 1080.0) - vec2(960.0, 540.0);
+  vec2 e = px * vec2(1.0, 1.7);
+  float d = length(e) - uP0.x;
+  float ring = exp(-d * d / 2400.0) * uAmount;
+  vec2 dir = normalize(e + 1e-4) / vec2(1.0, 1.7);
+  vec2 q = px - dir * ring * 26.0;
+  vec3 c = src((q + vec2(960.0, 540.0)) / vec2(1920.0, -1080.0) + vec2(0.0, 1.0)).rgb;
+  return vec4(c + ring * 0.25 * vec3(0.73, 0.87, 0.59), 1.0);
+}`;
+    const fxAt = (T) => {
+      const out = OM.ease.outExpo(OM.clamp((T - BOOM) / 1.0));
+      const back = OM.ease.outExpo(OM.clamp((T - BOOM) / 0.7));
+      const shake = C.decay(T, BOOM, 0.08);
+      return {
+        amount: T >= BOOM && T < BOOM + 1 ? 1 - out : 0, p0: [out * 1500, 0, 0, 0],
+        cam: { zoom: 1 + 0.22 * OM.ease.inCubic(OM.prog(T, PULL - 0.05, PULL + 0.32)) * (1 - back), x: 14 * shake * Math.sin(T * 97), y: 10 * shake * Math.cos(T * 83) },
+      };
+    };
+    return OM.c3.withFx(el, c, start, END, FX, fxAt)({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
@@ -99,6 +121,16 @@ OM.scene({
           ctx.fillStyle = fresh ? ink.crest : settle < 0.5 && (1 - settle) * OM.hash(col, row, 5) > 0.4 ? ink.hover : ink[OM.BANDS[row]];
           OM.cell(ctx, L, col, row, dpr);
         }
+        // Particles blown out of the mark.
+        for (let j = 0; j < 300; j++) {
+          const age = T - BOOM;
+          if (age > 1.2) break;
+          const a = OM.hash(j, 1, 99) * Math.PI * 2, sp = 500 + 900 * OM.hash(j, 2, 99);
+          const r = sp * OM.ease.outCubic(age / 1.2);
+          ctx.fillStyle = C.rgba(j % 3 ? ink.hover : ink.crest, 1 - age / 1.2);
+          const s = OM.lerp(5, 2, age / 1.2);
+          ctx.fillRect(Math.round(960 + Math.cos(a) * r - s / 2), Math.round(540 + Math.sin(a) * r * 0.6 - s / 2), Math.round(s), Math.round(s));
+        }
         // The mark burning off at the centre, and the ring.
         const mA = 1 - C.sm(T, BOOM, BOOM + 0.25);
         if (mA > 0) {
@@ -116,6 +148,6 @@ OM.scene({
         }
       },
       release: () => c.release(),
-    };
+    });
   },
 });

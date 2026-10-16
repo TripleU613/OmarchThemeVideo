@@ -15,6 +15,25 @@ OM.scene({
     cv.className = 'om-fill';
     el.appendChild(cv);
     const c = OM.canvas(cv, { alpha: false });
+    const fx = OM.post(el, c, { effect: `vec4 effect(vec2 uv) {
+  vec2 q = cam(uv);
+  vec4 base = src(q);
+  vec4 R = uP0;
+  vec2 lc = (q - R.xy) / (R.zw - R.xy);
+  vec4 col = base;
+  if (lc.x > 0.0 && lc.x < 1.0 && lc.y > 0.0 && lc.y < 1.0) {
+    vec2 c = lc - 0.5;
+    vec2 l2 = 0.5 + c * (1.0 - uP1.x * 0.16 * dot(c, c));
+    vec4 s = src(R.xy + l2 * (R.zw - R.xy));
+    float rows = (R.w - R.y) * 1080.0 / 3.0;
+    float scan = 1.0 - uP1.x * 0.16 * (0.5 + 0.5 * sin(lc.y * rows * 6.2832));
+    float vig = 1.0 - uP1.x * 0.35 * pow(length(c) * 1.4, 3.0);
+    vec3 sc = s.rgb * scan * vig;
+    sc += vec3(0.75, 0.79, 0.96) * uP1.y * 0.05 * clamp(1.0 - abs(lc.x + lc.y - 1.2) * 3.0, 0.0, 1.0);
+    col = vec4(sc, 1.0);
+  }
+  return mix(base, col, uAmount);
+}` });
     const END = start + duration;
     const ink = OM.fieldInks('tokyo-night');
     const th = OM.theme('tokyo-night');
@@ -83,7 +102,7 @@ OM.scene({
     };
 
     return {
-      render(t, T) {
+      draw(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
         if (T < start + 0.05 || T >= END - 0.1) return OM.handoff(T < start + 0.05 ? 'spot' : 'spark', ctx, T, dpr);
@@ -172,7 +191,31 @@ OM.scene({
           ctx.fillRect(x - L.cw / 2, y - L.ch / 2, L.cw, L.ch);
         }
       },
-      release: () => c.release(),
+      render(t, T) {
+          this.draw(t, T);
+          const e = B.env(T, start, END);
+          const ctx = c.ensure();
+          ctx.globalAlpha = 1;
+          if (e > 0) {
+
+            // Dust turning in the lamp's light.
+            B.motes(ctx, T, { seed: 707, n: 50, color: OM.fieldInks('tokyo-night').hover, alpha: 0.35 * e * (1 - OM.prog(T, OFF, OFF + 0.4)), x: 600, y: 0, w: 720, h: 860, vx: 8, vy: 6, size: 3 });
+          }
+          ctx.globalAlpha = 1;
+          fx.apply(T, (() => {
+            const S = lay()[stageAt(T)];
+            const gx = S.x + S.bez, gy = S.y + S.bez, gw = S.w - 2 * S.bez, gh = S.h - 2 * S.bez;
+            const si = stageAt(T);
+            const step = [STAGES[1], STAGES[2]].reduce((s, st) => s + 0.045 * OM.smooth(OM.prog(T, on[st.from], on[st.from] + 0.35)), 0);
+            return {
+              amount: e * (1 - OM.prog(T, OFF - 0.05, OFF + 0.1)),
+              cam: { zoom: 1 + e * (0.02 + step + 0.02 * OM.prog(T, start, END)) },
+              p0: [gx / 1920, 1 - (gy + gh) / 1080, (gx + gw) / 1920, 1 - gy / 1080],
+              p1: [si === 0 ? 1 : 0, si === 0 ? 0 : 1, 0, 0],
+            };
+          })());
+        },
+        release: () => { fx.release(); c.release(); },
     };
   },
 });

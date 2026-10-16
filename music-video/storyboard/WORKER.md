@@ -8,7 +8,7 @@ lyric line (or an instrumental beat) with ONE signature idea that appears nowher
 Project: `/home/tripleu/Omarchy Video/music-video` (HyperFrames). Read before writing:
 - `storyboard/scenes.json`: your scenes' `idea`, `device`, `theme`, `tech`, `sync`. The spec is the brief; make it great.
 - `assets/lib/om.js`, `assets/lib/kit.js`, `assets/lib/stage.js`, `assets/lib/ttfx-player.js`: the shared kit (read them; do not edit them; ask in your report if you need a kit change).
-- Reference scenes: `assets/scenes/i-01.js`, `i-02.js`, `c1-03.js`; Three.js reference `lab/proto-three.js`; DOM + GSAP + anime.js reference `lab/proto-dom.js`.
+- Reference scenes: `assets/scenes/i-01.js`, `i-02.js`, `c1-03.js`; Three.js reference `lab/proto-three.js`; DOM + GSAP reference `lab/proto-dom.js`.
 - Site source for faithful details: `/home/tripleu/Omarchy Video/omarchy-site` (src/components, src/styles.css, src/data).
 
 ## Hard rules (a scene that breaks one is rejected)
@@ -43,7 +43,6 @@ OM.scene({
 - Desktop: `OM.desktop(ctx, x, y, w, h, theme, { windows, active, s, seed, contents, bar })`, `OM.dwindle(...)`.
 - Three.js: `const gl = OM.three(el)` -> `{ renderer, canvas, release }`; global `THREE` (r181). Render in `render()`; dispose geometries/materials in `release()`. Keep it lean: instancing, no shadow maps over 2048, no post-processing passes.
 - DOM + GSAP: build a scene-local `gsap.timeline({ paused: true })` in `build()` and call `tl.seek(t, false)` in render. Use `fromTo` with every from-property also in to. Never register timelines on `window.__timelines`. Style with a `<style>` element you append inside `el`, with selectors prefixed by your scene id (e.g. `.v201-...`). Use `el.querySelector`, not `document`.
-- anime.js v4: global `anime` (namespace: `anime.animate`, `anime.createTimeline`, `autoplay: false`), seek with `.seek(t * 1000)`.
 - Fonts in canvas: `ctx.font = "500 40px 'JetBrains Mono'"` (fonts are loaded before render starts).
 
 ## Quality bar

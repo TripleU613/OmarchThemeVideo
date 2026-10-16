@@ -12,6 +12,13 @@ OM.ownWords.add('v1-06');
   const V = OM.v1;
   const WEIGHT = 800;
   const PROBE = V.ready('v1-06-type', WEIGHT);
+  const GLSL = V.TEXTMASK + `
+vec4 effect(vec2 uv) {
+  vec2 u = cam(uv);
+  float m = smoothstep(0.26, 0.34, uv.y) * (1.0 - smoothstep(0.6, 0.9, uv.y)) * uAmount * offText(uv); // heat rising off the anvil
+  vec2 n = vec2(vnoise(uv * vec2(28.0, 9.0) - vec2(0.0, uTime * 2.2)), vnoise(uv * vec2(19.0, 7.0) - vec2(3.0, uTime * 1.7))) - 0.5;
+  return src(u + n * 0.007 * m);
+}`;
   OM.scene({
     id: 'v1-06',
     build(el, { start, duration }) {
@@ -19,6 +26,7 @@ OM.ownWords.add('v1-06');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      const fx = V.post(el, c, GLSL);
       const END = start + duration, H = V.HOLD;
       const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
       const on = OM.sung('v1-06').map((w) => w.t0);
@@ -80,8 +88,39 @@ OM.ownWords.add('v1-06');
         return p;
       })();
 
+      // Camera: a slow push, punched on every hammer strike. Embers drift up off the fire.
+      const FXP = (ctx, dpr, T) => {
+        const e = V.env(T, start, END);
+        const words = get();
+        let x0 = 1920, x1 = 0, y0 = 1080, y1 = 0;
+        for (const wd of words) { x0 = Math.min(x0, wd.x); x1 = Math.max(x1, wd.x + wd.w); y0 = Math.min(y0, wd.top); y1 = Math.max(y1, wd.base); }
+        let punch = 0, jolt = 0;
+        for (const s of strikes) {
+          const age = T - s.t;
+          if (age < 0) continue;
+          punch += 0.035 * s.p * Math.exp(-age / 0.09);
+          jolt += 10 * s.p * Math.exp(-age / 0.07) * Math.cos(age * 60);
+        }
+        const world = OM.smooth(OM.prog(T, start + H, start + 0.3)) * (1 - OM.prog(T, FLARE + 0.05, DRAW1));
+        if (world > 0) {
+          for (let i = 0; i < 36; i++) {
+            const h = OM.hash(i, 1, 66), h2 = OM.hash(i, 2, 66);
+            const rise = (T * (35 + 45 * h) + h2 * 640) % 640;
+            const x = 520 + OM.hash(i, 3, 66) * 880 + 22 * Math.sin(T * 1.3 + i), y = FACE - 10 - rise;
+            ctx.globalAlpha = world * (1 - rise / 640) * (0.5 + 0.5 * Math.sin(T * 9 + i));
+            ctx.fillStyle = h > 0.6 ? ink.hover : ink.lit;
+            ctx.fillRect(x, y, 4, 4);
+          }
+          ctx.globalAlpha = 1;
+        }
+        return { amount: e, cam: { zoom: 1 + (0.012 + 0.04 * OM.smooth(OM.prog(T, start, END)) + punch) * e, y: jolt * e }, p1: V.rect(x0 - 40, y0 - 50, x1 + 40, y1 + 40) };
+      };
       return {
         render(t, T) {
+          this.draw(t, T);
+          fx.apply(T, FXP(c.ensure(), c.dpr, T));
+        },
+        draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + H) return OM.handoff('glow', ctx, T, dpr);
@@ -199,7 +238,10 @@ OM.ownWords.add('v1-06');
           }
           ctx.globalAlpha = 1;
         },
-        release: () => c.release(),
+        release: () => {
+          fx.release();
+          c.release();
+        },
       };
     },
   });

@@ -132,7 +132,8 @@ OM.intro = (() => {
     flush(ctx, dpr);
   };
 
-  return { L, ink, INKS, home, HR, C0, C1, R0, R1, level, buf, at, flush, wake, dawn, FREEZE };
+  const sunRow = (T) => OM.lerp(HR + 2, 8, OM.ease.outCubic(OM.prog(Math.min(T, FREEZE), DAWN0, 16.5)));
+  return { sunRow, DAWN0, KICK, L, ink, INKS, home, HR, C0, C1, R0, R1, level, buf, at, flush, wake, dawn, FREEZE };
 })();
 
 OM.scene({
@@ -142,6 +143,24 @@ OM.scene({
     cv.className = 'om-fill';
     el.appendChild(cv);
     const c = OM.canvas(cv, { alpha: false });
+    // Dark-room halation: bright light blooms into a soft green haze, strongest round the LED.
+    const fx = OM.post(el, c, { effect: `
+vec4 effect(vec2 uv) {
+  vec2 p = cam(uv);
+  vec4 c = src(p);
+  if (uAmount <= 0.0) return c;
+  vec3 b = vec3(0.0);
+  vec2 asp = vec2(uRes.y / uRes.x, 1.0);
+  for (int i = 0; i < 20; i++) {
+    float a = float(i) * 2.39996, r = sqrt(float(i) + 0.5) / 4.5 * uP0.x;
+    b += max(src(p + vec2(cos(a), sin(a)) * r * asp).rgb - 0.22, 0.0);
+  }
+  b /= 20.0;
+  vec2 d = (p - uP1.xy) / asp;
+  float led = exp(-length(d) / 0.07) * uP1.z;
+  vec3 lit = vec3(0.62, 0.81, 0.42);
+  return vec4(c.rgb + (b * uP0.y * vec3(0.8, 1.0, 0.65) + lit * led * 0.35) * uAmount, 1.0);
+}` });
     const { L, ink, home, HR, C0, C1, R0, R1, level, buf, at, flush, wake } = OM.intro;
     const END = 7.94;
     const DB = [2.902, 5.062, 7.221];
@@ -160,6 +179,12 @@ OM.scene({
     /** Undithered ink for edges, so the silhouette reads as a clean line. */
     const solid = (lum) => (lum > 1 ? 3 : lum > 0.6 ? 2 : lum > 0.3 ? 1 : lum > 0.08 ? 0 : -1);
     const bins = [[], [], [], [], []];
+    const ledX = LM.x0 + (LED.col + 0.5) * LM.cw, ledY = LM.y0 + (LED.row + 0.5) * LM.ch;
+    // Dust motes drifting through the LED's light: fixed seeds, positions straight from time.
+    const MOTES = Array.from({ length: 46 }, (_, i) => ({
+      x: ledX - 420 + 760 * OM.hash(i, 1, 31), y: ledY - 330 + 560 * OM.hash(i, 2, 31),
+      vx: -6 - 10 * OM.hash(i, 3, 31), vy: 4 + 8 * OM.hash(i, 4, 31), ph: 6.283 * OM.hash(i, 5, 31), s: 2 + 2 * OM.hash(i, 6, 31),
+    }));
 
     /** Fan speed in revolutions since the wake (spin-up through the roll), and its blades' visible contrast. */
     const revs = (t) => {
@@ -172,7 +197,10 @@ OM.scene({
       render(t) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (t >= END - 0.1) return wake(ctx, dpr);
+        if (t >= END - 0.1) {
+          wake(ctx, dpr);
+          return fx.apply(t);
+        }
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
         buf.fill(-1);
@@ -259,8 +287,32 @@ OM.scene({
           buf[at(home.col, HR)] = 4;
         }
         flush(ctx, dpr);
+
+        // Motes: lit only by the LED, so they show as it breathes, and go with the machine.
+        for (const m of MOTES) {
+          const x = m.x + m.vx * t + 14 * Math.sin(t * 0.7 + m.ph), y = m.y + m.vy * t + 9 * Math.sin(t * 0.5 + 2 * m.ph);
+          const a = 0.85 * Math.min(B, 1) * sink * Math.exp(-Math.hypot(x - ledX, (y - ledY) * 1.3) / 190);
+          if (a < 0.03) continue;
+          ctx.globalAlpha = a;
+          ctx.fillStyle = ink.hover;
+          ctx.fillRect(x, y, m.s, m.s);
+        }
+        ctx.globalAlpha = 1;
+
+        // Camera: a very slow push-in with a faint breath, released as the machine sinks, at rest for the cut.
+        const settle = 1 - OM.smooth(OM.prog(t, SOLID, END - 0.16));
+        const zoom = 1 + (0.06 * OM.smooth(OM.prog(t, 0.3, SOLID)) + 0.004 * env * Math.sin((2 * Math.PI * (t - DB[0])) / BREATH)) * settle;
+        fx.apply(t, {
+          amount: OM.post.envelope(t, 0, END, { ramp: 0.6, hold: 0.1 }) * (0.35 + 0.65 * Math.min(B, 1)) * Math.max(sink, 0),
+          cam: { zoom: Math.max(1, zoom) },
+          p0: [0.045, 1.6 + 1.2 * F, 0, 0],
+          p1: [ledX / 1920, 1 - ledY / 1080, Math.min(B, 1.1), 0],
+        });
       },
-      release: () => c.release(),
+      release: () => {
+        fx.release();
+        c.release();
+      },
     };
   },
 });

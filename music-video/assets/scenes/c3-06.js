@@ -66,14 +66,33 @@ OM.scene({
       return [cx + x * Math.cos(th) - y * Math.sin(th), cy + x * Math.sin(th) + y * Math.cos(th)];
     };
 
-    return {
+    // Camera: gliding arcs with the flock. Effect: a sky-gradient haze (the theme's blue above, green
+    // low) and motion streaks smeared off the birds along the flock's heading; the bright word birds stay crisp.
+    const FX = C.GLSL_LUM + `vec4 effect(vec2 uv) {
+  vec2 p = cam(uv);
+  vec3 c = src(p).rgb, s = vec3(0.0);
+  vec2 dir = uP0.xy * vec2(1.0 / 1920.0, 1.0 / 1080.0) * 5.0 * uP0.z * uAmount;
+  for (int i = 1; i <= 6; i++) s += src(p - dir * float(i)).rgb;
+  s /= 6.0;
+  vec3 o = mix(max(c, s * 0.8), c, smoothstep(0.3, 0.55, lum(c)));
+  vec3 haze = mix(vec3(0.62, 0.81, 0.42) * 0.05, vec3(0.48, 0.64, 0.97) * 0.07, p.y);
+  return vec4(o + uAmount * haze, 1.0);
+}`;
+    const fxAt = (T) => {
+      const dx = Math.cos(T * 0.9), dy = 0.45 * Math.cos(T * 1.3 + 1), l = Math.hypot(dx, dy) || 1;
+      return {
+        amount: 1, p0: [dx / l, -dy / l, 0.5 + C.sm(T, WILD, WILD + 0.5), 0],
+        cam: { zoom: 1.09, rot: 0.025 * Math.sin((T - start) * 0.9), x: 45 * Math.sin((T - start) * 0.6) },
+      };
+    };
+    return OM.c3.withFx(el, c, start, END, FX, fxAt)({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
         if (C.seam(ctx, T, dpr, start, END, 'field', 'spark')) return;
         const { F, B } = flock();
         const lift = OM.ease.inOutCubic(OM.prog(T, start + 0.05, start + 0.7));
-        const pour = OM.ease.inCubic(OM.prog(T, POUR, END - 0.1));
+        const pour = OM.ease.inOutCubic(OM.prog(T, POUR, END - 0.32)); // settles before the cut, so the spark is still
         const down = OM.pulse(DOWNS, T, 0.14);
 
         ctx.fillStyle = ink.bg;
@@ -113,6 +132,15 @@ OM.scene({
           ctx.fillStyle = inForm < 0 && lift < 0.15 ? ink.dim : v > 1.2 ? ink.crest : v > 0.7 ? ink.hover : v > 0.42 ? ink.lit : ink.mid;
           ctx.fillRect(Math.round(x - sz / 2), Math.round(y - sz / 2), Math.round(sz), Math.round(sz));
         }
+        // Specks shed off the flock, drifting behind it and fading.
+        const spA = lift * (1 - pour);
+        for (let j = 0; spA > 0.01 && j < 180; j++) {
+          const ph = T * 1.2 + OM.hash(j, 1, 66), age = (ph - Math.floor(ph)) * 1.3;
+          const b = B[Math.floor(OM.hash(j, Math.floor(ph), 67) * B.length)];
+          const [fx0, fy0] = flockAt(b, T - age);
+          ctx.fillStyle = C.rgba(ink.mid, spA * (1 - age / 1.3));
+          ctx.fillRect(Math.round(fx0 - 30 * age), Math.round(fy0 + 40 * age * age), 2, 2);
+        }
         // The point it pours into.
         if (pour > 0) {
           C.pool(ctx, SX, SY, 72, ink.lit, 0.4 * pour);
@@ -121,6 +149,6 @@ OM.scene({
         }
       },
       release: () => c.release(),
-    };
+    });
   },
 });

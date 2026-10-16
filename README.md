@@ -45,6 +45,10 @@ ideas    ──► storyboard/        one idea per line              IDEAS.md, s
    exactly on its incoming handoff and ends exactly on its outgoing one. That
    lets scenes built separately, even by different agents at the same time, cut
    together invisibly.
+   Each scene also has its own whole-frame camera move and its own GLSL shader
+   (`assets/lib/post.js`, planned per scene in `storyboard/FX.md`). The canvas
+   runs through that shader on the GPU. At the cuts both ease to rest and the
+   pass switches itself off, so the handoff frames stay pixel exact.
 6. **Watch and check.** `npm run serve` opens the live player at
    `http://localhost:3123/dev.html`. Snapshots render exact frames, and seams are
    checked by comparing the frames either side of every cut.
@@ -111,6 +115,7 @@ invisible cuts, Tokyo Night, the frame budget) and the working rules for agents.
 
 ## Credits
 
-Song: *We Can Fix Everything (The Ultimate Machine)* by Kevin Koontz /
-REARRANGED (not included). Omarchy by DHH. Built with HyperFrames, Three.js and
-GSAP. Type is JetBrains Mono and Geist, both under the SIL Open Font License.
+Made by [TripleU613](https://github.com/TripleU613). Song: *We Can Fix Everything
+(The Ultimate Machine)* by Kevin Koontz / REARRANGED (not included). Omarchy by
+DHH. Built with HyperFrames, Three.js and GSAP. Type is JetBrains Mono and Geist,
+both under the SIL Open Font License.

@@ -15,6 +15,16 @@ OM.scene({
     cv.className = 'om-fill';
     el.appendChild(cv);
     const c = OM.canvas(cv, { alpha: false });
+    const fx = OM.post(el, c, { effect: `vec4 effect(vec2 uv) {
+  vec2 q = cam(uv);
+  vec4 base = src(q);
+  float n = vnoise(vec2(q.x * 40.0, q.y * 14.0 - uTime * 3.0)) - 0.5;
+  float m = vnoise(vec2(q.x * 90.0 + 3.0, q.y * 30.0 - uTime * 5.0)) - 0.5;
+  vec2 off = vec2(n * 0.0024 + m * 0.001, m * 0.0014);
+  vec4 h = src(q + off);
+  h.rgb += vec3(0.24, 0.31, 0.16) * 0.05 * (n + 0.5) * smoothstep(0.2, 0.5, 1.0 - abs(uv.y - 0.5) * 2.0);
+  return mix(base, h, uAmount);
+}` });
     const END = start + duration;
     const ink = OM.fieldInks('tokyo-night');
     const th = OM.theme('tokyo-night');
@@ -84,7 +94,7 @@ OM.scene({
     };
 
     return {
-      render(t, T) {
+      draw(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
         if (T < on[0] || T >= END - 0.1) return OM.handoff(T < on[0] ? 'line' : 'grid', ctx, T, dpr);
@@ -96,7 +106,7 @@ OM.scene({
         const fade = 1 - settle;
 
         // The curbs: the crest line splits outward to every lane's edges on the first word, then cools.
-        const split = OM.ease.outExpo(OM.prog(T, on[0], on[0] + 0.22));
+        const split = OM.ease.inOutCubic(OM.prog(T, on[0] - 0.01, start + 0.5));
         ctx.globalAlpha = fade;
         ctx.fillStyle = OM.mix(ink.crest, ink.mid, OM.prog(T, on[0], on[0] + 0.6));
         for (const ln of lanes)
@@ -152,7 +162,49 @@ OM.scene({
         });
         ctx.globalAlpha = 1;
       },
-      release: () => c.release(),
+      render(t, T) {
+          this.draw(t, T);
+          const e = B.env(T, start, END);
+          const ctx = c.ensure();
+          ctx.globalAlpha = 1;
+          if (e > 0) {
+
+            const { lanes, spans } = lay();
+            const ink2 = OM.fieldInks('tokyo-night'), th2 = OM.theme('tokyo-night');
+            const H2 = B.sub(2);
+            // Steam off each drum: soft puffs rising from where the drum was when they left it.
+            lanes.forEach((ln, li) => {
+              const y0 = H2.y0 + (ln.rTop - 3) * H2.ch;
+              for (let i = 0; i < 14; i++) {
+                const a = ((T * 1.4 + i / 14) % 1 + 1) % 1, born = T - a / 1.4;
+                if (born < on[ln.ks[0]]) continue;
+                const x = rollerX(born, ln, spans) - 27 + (OM.hash(i, li, 5) - 0.5) * 30 - a * 60;
+                if (x > 1990) continue;
+                B.pool(ctx, x, y0 - a * 150, 18 + a * 40, th2['text-muted'], 0.22 * e * (1 - a));
+              }
+              // Gravel bits ticking off the road surface ahead of the drum.
+              const x = rollerX(T, ln, spans);
+              ctx.fillStyle = ink2.mid;
+              for (let i = 0; i < 8; i++) {
+                const a = ((T * 3 + OM.hash(i, li, 9)) % 1 + 1) % 1;
+                ctx.globalAlpha = e * (1 - a);
+                ctx.fillRect(x + 6 + a * 70 * OM.hash(i, 2, li), H2.y0 + OM.lerp(ln.rTop, ln.rBot, OM.hash(i, 3, li)) * H2.ch - Math.sin(a * Math.PI) * 26, 3, 3);
+              }
+              ctx.globalAlpha = 1;
+            });
+          }
+          ctx.globalAlpha = 1;
+          fx.apply(T, {
+            amount: e * (1 - 0.7 * OM.pulse(on, T, 0.2)),
+            cam: (() => {
+              const L0 = lay().lanes[0];
+              const kick = OM.pulse(KICKS, T, 0.08);
+              const x = OM.clamp(-(rollerX(T, L0, lay().spans) - 960) * 0.12, -110, 110);
+              return { zoom: 1 + e * (0.12 + 0.012 * kick), x: e * x, y: e * (18 - 7 * kick) };
+            })(),
+          });
+        },
+        release: () => { fx.release(); c.release(); },
     };
   },
 });

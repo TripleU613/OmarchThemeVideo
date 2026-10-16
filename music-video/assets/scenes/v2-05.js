@@ -72,7 +72,7 @@ OM.scene({
     };
     const space = keys.find((k) => k.label === 'Space');
     const camera = new THREE.PerspectiveCamera(30, 1920 / 1080, 10, 4000);
-    camera.setViewOffset(1920, 1080, 0, -170, 1920, 1080); // the board sits low, the line above it
+    camera.setViewOffset(1920, 1080, 0, -250, 1920, 1080); // the board sits low, the line above it
 
     // The overlay: typed letters, beams, the fade [line] closing spark.
     const ov = document.createElement('canvas');
@@ -80,20 +80,42 @@ OM.scene({
     ov.style.position = 'absolute';
     ov.style.inset = '0';
     el.appendChild(ov);
+    // Macro depth of field across the keys: a disc blur growing away from a focus band that racks
+    // along the board; the typed line above the board is always outside it, crisp.
+    const FX = `vec4 effect(vec2 uv) {
+      vec2 q = cam(uv);
+      vec4 base = src(q);
+      float crisp = smoothstep(0.4, 0.48, q.y);
+      float r = uAmount * (1.0 - crisp) * clamp(abs(q.y - uP0.x) * 3.2, 0.0, 1.0) * 9.0;
+      if (r < 0.05) return base;
+      vec2 px = r / uRes * (uRes.x / 1920.0) * 2.0;
+      vec3 acc = base.rgb;
+      for (int i = 0; i < 12; i++) {
+        float a = float(i) * 0.5236;
+        acc += src(q + vec2(cos(a), sin(a)) * px).rgb + src(q + vec2(cos(a + 0.26), sin(a + 0.26)) * px * 0.5).rgb;
+      }
+      return vec4(acc / 25.0, 1.0);
+    }`;
     const oc = OM.canvas(ov, { alpha: true });
+    const fx = OM.post(el, oc, { effect: FX });
 
     // Every letter's press time: a run from its word's onset, quick enough to finish inside the word.
     let F = null, P = null;
     const plan = () => {
-      F = V.layout(sung, { cap: 66, maxW: 1640, cx: 960, cy: 205, lead: 1.55 });
+      const probe = V.layout(sung, { cap: 92, maxW: 1680, cx: 960, cy: 0, lead: 1.4 });
+      const block = (probe.rows - 1) * probe.lh + probe.capPx; // the line, its top kept clear of the frame edge
+      F = V.layout(sung, { cap: 92, maxW: 1680, cx: 960, cy: 180 + block / 2, lead: 1.4 });
       P = [];
       sung.forEach((w, k) => {
         const n = Math.max(1, w.text.length);
-        const dt = OM.clamp((w.t1 - w.t0) / n, 0.028, 0.065);
+        const dt = k === sung.length - 1 ? 0 : OM.clamp((w.t1 - w.t0) / n, 0.028, 0.065); // the last word lands as one chord
         [...w.text].forEach((ch, j) => P.push({ k, j, ch, at: w.t0 + j * dt, key: keyFor(ch), x: F.at[k].x + (j + 0.5) * F.A, cy: F.at[k].cy }));
       });
     };
-    const SUCK = Math.min(sung[sung.length - 1].t1, END) - 0.16; // the line collapses into the spark
+    const LAST = sung[sung.length - 1].t0;
+    // The collapse: the board streams into the spark first while the line still reads (0.3 s whole),
+    // then the line follows; the spark is alone two frames before the cut.
+    const KB0 = LAST + 0.13, SUCK = LAST + 0.3, GONE = END - 0.085;
     const SPK = { x: OM.HOME.x0 + (OM.cellAt(OM.HOME, 960, 540).col + 0.5) * OM.HOME.cw, y: OM.HOME.y0 + (OM.cellAt(OM.HOME, 960, 540).row + 0.5) * OM.HOME.ch };
     const v = new THREE.Vector3();
 
@@ -101,8 +123,8 @@ OM.scene({
       render(t, T) {
         const o = oc.ensure();
         o.clearRect(0, 0, 1920, 1080);
-        if (T < start + V.HOLD_IN) return OM.handoff('night', o, T, oc.dpr);
-        if (T >= END - V.HOLD_OUT) return OM.handoff('spark', o, T, oc.dpr);
+        if (T < start + V.HOLD_IN) return fx.apply(T), OM.handoff('night', o, T, oc.dpr);
+        if (T >= END - V.HOLD_OUT) return fx.apply(T), OM.handoff('spark', o, T, oc.dpr);
         if (!P || !V.met().ok) plan();
         // Keys: down for 0.11 s from each press; the space bar on every word after the first.
         const down = new Set();
@@ -119,10 +141,12 @@ OM.scene({
         camera.lookAt(OM.lerp(-160, 140, p), 0, -20);
         camera.updateMatrixWorld();
         gl.renderer.render(scene, camera);
+        o.drawImage(gl.canvas, 0, 0, 1920, 1080); // the board into the overlay, so the post pass sees the whole frame
 
-        const suck = OM.ease.inExpo(OM.prog(T, SUCK, END - V.HOLD_OUT));
+        const suck = OM.ease.inOutCubic(OM.prog(T, SUCK, GONE));
+        const kb = OM.ease.inOutSine(OM.prog(T, KB0, GONE));
         // Dark over the board: fading up from the night, and back down into the spark.
-        const dark = Math.max(1 - OM.ease.outCubic(OM.prog(T, start + V.HOLD_IN, start + 0.3)), OM.ease.inCubic(OM.prog(T, SUCK - 0.1, END - V.HOLD_OUT)));
+        const dark = Math.max(1 - OM.ease.outCubic(OM.prog(T, start + V.HOLD_IN, start + 0.3)), kb);
         if (dark > 0) {
           o.fillStyle = V.rgba(ink.bg, dark);
           o.fillRect(0, 0, 1920, 1080);
@@ -162,13 +186,43 @@ OM.scene({
           o.restore();
         }
         // The spark gathering as the line is pulled in.
-        if (suck > 0) {
-          V.pool(o, SPK.x, SPK.y, 72, 72, ink.lit, 0.4 * suck);
-          o.fillStyle = V.rgba(ink.crest, suck);
+        // The board streaming into the spark: motes lifted off the caps, each on its own delay.
+        if (kb > 0 && kb < 1) {
+          for (let i = 0; i < 70; i++) {
+            const hx = OM.hash(i, 9, 61), hy = OM.hash(i, 9, 62), hd = OM.hash(i, 9, 63);
+            const u = OM.ease.inCubic(OM.clamp((kb - hd * 0.5) / 0.5));
+            if (u <= 0 || u >= 1) continue;
+            const x0 = 160 + hx * 1600, y0 = 560 + hy * 440;
+            o.fillStyle = V.rgba(i % 3 ? ink.lit : ink.crest, 0.9 * (1 - u * 0.6));
+            o.fillRect(OM.lerp(x0, SPK.x, u) - 3, OM.lerp(y0, SPK.y, u) - 3, 6, 6);
+          }
+        }
+        if (kb > 0) {
+          V.pool(o, SPK.x, SPK.y, 72, 72, ink.lit, 0.4 * kb);
+          o.fillStyle = V.rgba(ink.crest, kb);
           OM.cell(o, OM.HOME, OM.cellAt(OM.HOME, 960, 540).col, OM.cellAt(OM.HOME, 960, 540).row, oc.dpr);
         }
+        // Backlight bloom under every pressed cap, and dust hanging in the light over the board.
+        if (suck === 0) {
+          for (const k of down) {
+            v.set(k.mesh.position.x, 8, k.mesh.position.z).project(camera);
+            V.pool(o, (v.x + 1) * 960, (1 - v.y) * 540, 90, 46, ink.lit, 0.45);
+          }
+          for (let i = 0; i < 40; i++) {
+            const hx = OM.hash(i, 5, 51), hy = OM.hash(i, 5, 52), hz = OM.hash(i, 5, 53);
+            const x = ((hx * 2000 + (T - start) * (12 + 30 * hz)) % 2000) - 40, y = 430 + hy * 600 + 12 * Math.sin(T * 0.8 + i);
+            o.fillStyle = V.rgba(ink.hover, (0.15 + 0.35 * hz) * (1 - dark));
+            o.fillRect(x, y, 2 + 2 * hz, 2 + 2 * hz);
+          }
+        }
+        const ce = V.camEnv(T, start, END);
+        fx.apply(T, {
+          amount: V.env(T, start, END) * (1 - suck),
+          cam: { zoom: 1 + ce * (0.012 + 0.025 * p), x: ce * -10 * Math.sin(p * 3.1) },
+          p0: [OM.lerp(0.5, 0.18, p), 0, 0, 0],
+        });
       },
-      release: () => { disposables.forEach((x) => x.dispose()); gl.release(); oc.release(); },
+      release: () => { disposables.forEach((x) => x.dispose()); gl.release(); fx.release(); oc.release(); },
     };
   },
 });

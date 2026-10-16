@@ -40,6 +40,10 @@ the pipeline works; this file is what you must not break.
 7. **Hit the music.** `npm run facts <id>` lists each scene's beats; the key word
    gets the biggest moment.
 8. **Budget:** 12 ms per frame or less at 1080p in the dev player.
+9. **Camera and effects belong to the scene.** Each scene runs its own camera
+   move and shader through `OM.post` (its row in `storyboard/FX.md`). There's
+   never a shared overlay. Effect amount is 0 on the cut frames, the camera is at
+   rest at section boundaries, and the words stay readable.
 
 ## Working rules
 

@@ -15,6 +15,24 @@ OM.scene({
     cv.className = 'om-fill';
     el.appendChild(cv);
     const c = OM.canvas(cv, { alpha: false });
+    const fx = OM.post(el, c, { effect: `vec2 ripple(vec2 q, vec4 P) {
+  vec2 d = q - P.xy;
+  d.x *= 1.7778;
+  float r = length(d);
+  float front = P.z * 0.8;
+  float band = exp(-pow((r - front) * 16.0, 2.0));
+  float a = P.w * band * exp(-P.z * 2.2) * 0.005;
+  vec2 n = d / max(r, 1e-4);
+  return vec2(n.x / 1.7778, n.y) * a * sin((r - front) * 70.0);
+}
+vec4 effect(vec2 uv) {
+  vec2 q = cam(uv);
+  vec4 base = src(q);
+  vec2 o = ripple(q, uP0) + ripple(q, uP1);
+  vec4 s = src(q + o);
+  s.rgb += vec3(0.62, 0.81, 0.42) * length(o) * 25.0;
+  return mix(base, s, uAmount);
+}` });
     const END = start + duration;
     const L = OM.HOME;
     const ink = OM.fieldInks('tokyo-night');
@@ -107,7 +125,7 @@ OM.scene({
     };
 
     return {
-      render(t, T) {
+      draw(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
         if (T < start + 0.05 || T >= END - 0.1) return OM.handoff(T < start + 0.05 ? 'spark' : 'field', ctx, T, dpr);
@@ -156,7 +174,48 @@ OM.scene({
         const kw = set.words[K];
         if (kw && kw.text && T >= on[K]) B.pool(ctx, kw.x + kw.w / 2, kw.y - set.cap / 2, Math.max(260, kw.w), ink.lit, 0.25 * Math.exp(-(T - on[K]) / 0.5) * (1 - settle));
       },
-      release: () => c.release(),
+      render(t, T) {
+          this.draw(t, T);
+          const e = B.env(T, start, END);
+          const ctx = c.ensure();
+          ctx.globalAlpha = 1;
+          if (e > 0) {
+
+            lay();
+            const ik = OM.fieldInks('tokyo-night');
+            const L = OM.HOME;
+            // Dust puffs: each letter domino kicks up two specks as it lands.
+            ctx.fillStyle = ik.mid;
+            for (let j = 0; j < at.length; j++) {
+              if (kind[j] < 2) continue;
+              const a = T - at[j] - 0.06;
+              if (a < 0 || a > 0.3) continue;
+              const col = (j % CW) + C0, row = Math.floor(j / CW) + R0;
+              const x = L.x0 + (col + 0.5) * L.cw, y = L.y0 + (row + 0.5) * L.ch;
+              ctx.globalAlpha = e * (1 - a / 0.3) * 0.8;
+              const sp = 40 * a;
+              ctx.fillRect(x - sp - 2, y - sp * 0.6, 3, 3);
+              ctx.fillRect(x + sp, y + sp * 0.4, 3, 3);
+            }
+          }
+          ctx.globalAlpha = 1;
+          fx.apply(T, (() => {
+            const { set } = lay();
+            const s = OM.smooth(OM.prog(T, 222.3, 226.6));
+            // The latest word's impact ripples out from its first domino; the flood ripples from the centre.
+            let k = -1;
+            on.forEach((o, i) => { if (T >= o) k = i; });
+            const w = k >= 0 ? set.words[k] : null;
+            const p0 = w ? [(w.x + 10) / 1920, 1 - (w.y - set.cap / 2) / 1080, T - on[k], 1] : [0.5, 0.5, 9, 0];
+            const p1 = T >= FLOOD ? [0.5, 0.5, (T - FLOOD) * 0.7, 1.4] : [0.5, 0.5, 9, 0];
+            return {
+              amount: e,
+              cam: { zoom: 1 + e * (0.06 + 0.08 * s), rot: e * 0.045 * s, y: e * -22 * s },
+              p0, p1,
+            };
+          })());
+        },
+        release: () => { fx.release(); c.release(); },
     };
   },
 });

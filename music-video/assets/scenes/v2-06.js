@@ -13,7 +13,23 @@ OM.scene({
     const cv = document.createElement('canvas');
     cv.className = 'om-fill';
     el.appendChild(cv);
+    // Wind: a radial blur pulling toward the frame centre that leaves the centre (the words) crisp,
+    // and speed lines streaking across the outer rows.
+    const FX = `vec4 effect(vec2 uv) {
+      vec2 q = cam(uv);
+      vec4 base = src(q);
+      vec2 d = q - vec2(0.5);
+      float edge = smoothstep(0.16, 0.42, abs(d.y));
+      vec3 acc = vec3(0.0);
+      for (int i = 0; i < 8; i++) acc += src(q - d * float(i) * 0.005 * uAmount * edge).rgb;
+      acc /= 8.0;
+      float row = floor(q.y * uRes.y / 4.0);
+      float h = hash(vec2(row, 11.0));
+      float sl = step(0.965, h) * step(fract(q.x * 0.8 + uTime * (1.6 + 2.0 * h) + h * 7.0), 0.16) * smoothstep(0.14, 0.3, abs(q.y - 0.5));
+      return vec4(mix(base.rgb, acc + vec3(0.73, 0.87, 0.59) * sl * 0.35, uAmount), 1.0);
+    }`;
     const c = OM.canvas(cv, { alpha: false });
+    const fx = OM.post(el, c, { effect: FX });
     const ink = V.ink(), th = V.th();
     const sung = OM.sung('v2-06');
     const N = sung.length;
@@ -72,8 +88,8 @@ OM.scene({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (T < start + V.HOLD_IN) return OM.handoff('spark', ctx, T, dpr);
-        if (T >= D1) return OM.handoff('line', ctx, T, dpr);
+        if (T < start + V.HOLD_IN) return fx.apply(T), OM.handoff('spark', ctx, T, dpr);
+        if (T >= D1) return fx.apply(T), OM.handoff('line', ctx, T, dpr);
         if (!F || !V.met().ok) plan();
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
@@ -160,8 +176,26 @@ OM.scene({
         V.pool(ctx, lx, ly, 72 + 40 * hit, 72 + 40 * hit, ink.lit, 0.4 + 0.3 * hit);
         ctx.fillStyle = ink.crest;
         ctx.fillRect(lx - OM.HOME.cw / 2, ly - OM.HOME.ch / 2, OM.HOME.cw, OM.HOME.ch);
+        // Cloud wisps sliding past, and sparkles shed off the wingtip.
+        for (let i = 0; i < 4; i++) {
+          const hx = OM.hash(i, 6, 71), hy = OM.hash(i, 6, 72);
+          const x = ((hx * 3200 - d * (900 + 500 * hy)) % 3200 + 3200) % 3200 - 600;
+          const y = hy < 0.5 ? 120 + hy * 300 : 760 + (hy - 0.5) * 400;
+          V.pool(ctx, x, y, 420, 70, th['border-strong'], 0.18 * fadeIn * (1 - dash));
+        }
+        for (let i = 0; i < 12; i++) {
+          const age = ((d * 14 + i * 0.37) % 1) * 0.6;
+          const x = px - PLEN * 0.95 - age * 420, y = py - 66 + age * 40 + 8 * Math.sin(i * 2.1 + d * 9);
+          ctx.fillStyle = V.rgba(ink.crest, (1 - age / 0.6) * fadeIn * (1 - dash));
+          ctx.fillRect(x - 2, y - 2, 4, 4);
+        }
+        const ce = V.camEnv(T, start, END);
+        fx.apply(T, {
+          amount: V.env(T, start, END) * 0.85,
+          cam: { zoom: 1 + ce * 0.055, rot: ce * 0.028 * Math.sin(d * 1.4), y: ce * 12 * Math.sin(d * 2.2) },
+        });
       },
-      release: () => c.release(),
+      release: () => { fx.release(); c.release(); },
     };
   },
 });

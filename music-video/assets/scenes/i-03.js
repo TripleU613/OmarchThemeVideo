@@ -133,10 +133,40 @@ OM.scene({
       return a;
     }
 
-    return {
-      render(t, T) {
-        const ctx = c.ensure();
-        const dpr = c.dpr;
+    // Twist: the frame wrung round the mark's centre, tighter as the field closes on it.
+    const fx = OM.post(el, c, { effect: `
+vec4 effect(vec2 uv) {
+  vec2 p = cam(uv);
+  if (uAmount <= 0.0) return src(p);
+  vec2 asp = vec2(uRes.x / uRes.y, 1.0);
+  vec2 d = (p - uP0.zw) * asp;
+  float k = uAmount * uP0.x * pow(max(0.0, 1.0 - length(d) / uP0.y), 2.0);
+  float cs = cos(k), sn = sin(k);
+  return src(mat2(cs, -sn, sn, cs) * d / asp + uP0.zw);
+}` });
+    // Sparks spiralling in with the field, each on its own clock, gone on the hit.
+    const SPARKS = Array.from({ length: 72 }, (_, i) => ({
+      a: 6.283 * OM.hash(i, 1, 71), r: 520 + 520 * OM.hash(i, 2, 71), t0: T0 + 0.15 + 0.5 * OM.hash(i, 3, 71), spin: 2.6 + 1.6 * OM.hash(i, 4, 71),
+    }));
+    const cX = Cx, cY = Cy;
+    const KICKS = [22.198, 24.358, ...TURNS]; // downbeats, then the four quarter turns (the first on 26.517)
+    const SNARES = [23.081, 25.913, 28.444];
+    const sparks = (ctx, T) => {
+      if (T >= LAND) return;
+      const show = OM.smooth(OM.prog(T, T0 + 0.1, T0 + 0.7));
+      for (const sp of SPARKS) {
+        for (let k = 0; k < 5; k++) {
+          const e = Math.pow(OM.prog(T - k * 0.025, sp.t0, LAND), 2.4);
+          const r = sp.r * (1 - e), a = sp.a + sp.spin * e;
+          ctx.globalAlpha = show * (1 - k / 5) * (r < 12 ? 0 : 1);
+          ctx.fillStyle = k ? ink.hover : ink.crest;
+          const z = k ? 2 : 4;
+          ctx.fillRect(cX + r * Math.cos(a) - z / 2, cY + r * Math.sin(a) - z / 2, z, z);
+        }
+      }
+      ctx.globalAlpha = 1;
+    };
+    const draw = (ctx, dpr, T) => {
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
 
@@ -186,8 +216,43 @@ OM.scene({
           for (const j of targets) if (cellInk[j] === i) ctx.fillRect((j % N) - H - 0.02, ((j / N) | 0) - H - 0.02, 1.04, 1.04);
         }
         ctx.restore();
+    };
+
+    return {
+      render(t, T) {
+        const ctx = c.ensure();
+        draw(ctx, c.dpr, T);
+        sparks(ctx, T);
+        // Camera: a spiral zoom turning against the implosion, locking on the hit with a punch, then at rest.
+        const g = OM.smooth(OM.prog(T, T0, LAND));
+        const pre = T < LAND;
+        const punch = pre ? 0 : 0.035 * Math.exp(-(T - LAND) / 0.1) * (1 - OM.prog(T, LAND, LAND + 0.6));
+        // After the lock: a counter-roll kick (about 1.5 degrees, against the mark's clockwise turns) on each
+        // downbeat and quarter turn, settling firmly; a slow push that swells and returns to rest for the cut,
+        // with a small accent on the snares; zoomed enough to cover the corners while rolled.
+        let rot = 0, accent = 0;
+        for (const b of KICKS) {
+          const x = T - b;
+          if (x < 0 || x > 0.5) continue;
+          rot -= 0.026 * Math.sin(Math.min(x / 0.07, 1) * Math.PI / 2) * Math.exp(-Math.max(0, x - 0.07) / 0.1) * (1 - OM.prog(x, 0, 0.5));
+        }
+        for (const b of SNARES) {
+          const x = T - b;
+          if (x >= 0 && x < 0.4) accent += 0.012 * Math.exp(-x / 0.1) * (1 - x / 0.4);
+        }
+        accent *= 1 - OM.smooth(OM.prog(T, 28.5, 28.6)); // the last snare's accent is spent before the cut
+        const push = 0.045 * Math.sin(Math.PI * OM.smooth(OM.prog(T, LAND + 0.6, 28.5)));
+        const zoom = Math.max(1 + punch + push + accent, 1 + 1.85 * Math.abs(rot));
+        fx.apply(T, {
+          amount: pre ? Math.pow(g, 1.5) : 0,
+          cam: pre ? { zoom: 1 + 0.12 * g, rot: -0.05 * g } : { zoom, rot },
+          p0: [2.4, 0.95 - 0.5 * g, cX / 1920, 1 - cY / 1080],
+        });
       },
-      release: () => c.release(),
+      release: () => {
+        fx.release();
+        c.release();
+      },
     };
   },
 });

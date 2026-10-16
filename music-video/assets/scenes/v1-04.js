@@ -12,6 +12,19 @@ OM.ownWords.add('v1-04');
   const V = OM.v1;
   const WEIGHT = 800;
   const PROBE = V.ready('v1-04-type', WEIGHT);
+  const GLSL = V.TEXTMASK + `
+vec4 effect(vec2 uv) {
+  vec2 u = cam(uv);
+  vec4 c = src(u);
+  if (uAmount <= 0.0) return c;
+  float X = u.x * 1920.0, Y = (1.0 - u.y) * 1080.0;
+  float d = abs(X - (960.0 + (540.0 - Y) * 0.1763));
+  float near = exp(-max(d - uP0.x - 30.0, 0.0) / 40.0);
+  vec2 px = 1.6 / vec2(1920.0, 1080.0);
+  float relief = dot(src(u + px).rgb - src(u - px).rgb, vec3(0.333)) * 1.8 * near; // the torn edge in relief
+  float g = exp(-abs(d - uP0.x) / 22.0) * uP0.y; // green bleeding out along the torn edges
+  return vec4(c.rgb + relief * uAmount * 0.6 + vec3(0.62, 0.81, 0.42) * g * 0.32 * uAmount, 1.0);
+}`;
   OM.scene({
     id: 'v1-04',
     build(el, { start, duration }) {
@@ -19,6 +32,7 @@ OM.ownWords.add('v1-04');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      const fx = V.post(el, c, GLSL);
       const END = start + duration, H = V.HOLD;
       const W = OM.theme('white');
       const ink = OM.fieldInks('tokyo-night');
@@ -85,8 +99,38 @@ OM.ownWords.add('v1-04');
       };
       const spread = (T) => 70 * OM.ease.outExpo(OM.prog(T, RIP, RIP + 0.14)) + 1500 * OM.ease.inCubic(OM.prog(T, PEEL, GONE));
 
+      // Camera: handheld tension building to the rip, a punch on it, then released. Scraps fly off the seam.
+      const FXP = (ctx, dpr, T) => {
+        const e = V.env(T, start, END);
+        const tense = 1.5 + 9 * OM.prog(T, CRACK0, RIP) * (T < RIP ? 1 : Math.exp(-(T - RIP) / 0.3));
+        const punch = T >= RIP ? 0.05 * Math.exp(-(T - RIP) / 0.12) : 0;
+        const x = tense * (Math.sin(T * 13.1) + 0.6 * Math.sin(T * 29.7)), y = tense * (Math.cos(T * 11.3) + 0.5 * Math.sin(T * 23.9));
+        const s = T >= RIP - 0.02 ? spread(T) : 0;
+        const bleed = OM.smooth(OM.prog(T, CRACK0, RIP)) * (1 - OM.prog(T, GONE, GONE + 0.5));
+        if (T >= RIP && T < RIP + 1.3 && e > 0) {
+          const age = T - RIP;
+          for (let i = 0; i < 46; i++) {
+            const h1 = OM.hash(i, 1, 41), h2 = OM.hash(i, 2, 41), h3 = OM.hash(i, 3, 41);
+            const y0 = 80 + h1 * 920, x0 = 960 + (540 - y0) * lean, dir = h2 < 0.5 ? -1 : 1;
+            const px = x0 + dir * (260 + 700 * h3) * age, py = y0 - (220 + 300 * h2) * age + 1100 * age * age;
+            const sz = 5 + 12 * h3;
+            ctx.save();
+            ctx.globalAlpha = (1 - age / 1.3) * e;
+            ctx.translate(px, py);
+            ctx.rotate(age * (6 + 10 * h1) * dir);
+            ctx.fillStyle = h1 > 0.3 ? W.bg : W['border-strong'];
+            ctx.fillRect(-sz / 2, -sz / 3, sz, (sz * 2) / 3);
+            ctx.restore();
+          }
+        }
+        return { amount: e, cam: { zoom: 1 + (0.035 + punch) * e, x: x * e, y: y * e, rot: tense * 0.0005 * Math.sin(T * 7.3) * e }, p0: [s, bleed, 0, 0] };
+      };
       return {
         render(t, T) {
+          this.draw(t, T);
+          fx.apply(T, FXP(c.ensure(), c.dpr, T));
+        },
+        draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + H) return OM.handoff('white', ctx, T, dpr);
@@ -171,6 +215,7 @@ OM.ownWords.add('v1-04');
         },
         release: () => {
           snap = null;
+          fx.release();
           c.release();
         },
       };

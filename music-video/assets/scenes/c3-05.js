@@ -45,7 +45,18 @@ OM.scene({
     };
     const closeAt = (x) => CLOSE + 0.25 * OM.clamp(Math.abs(x - 960) / 960); // the words shut first, the edges last
 
-    return {
+    // Camera: a low dolly forward through the field, rising. Effect: depth of field, the foreground and
+    // the far edge going soft while the word beds in the middle stay sharp.
+    const FX = `vec4 effect(vec2 uv) {
+  vec2 p = cam(uv);
+  vec3 c = src(p).rgb, b = vec3(0.0);
+  float blur = uAmount * (smoothstep(0.3, 0.0, p.y) + 0.6 * smoothstep(0.85, 1.0, p.y));
+  vec2 r = vec2(9.0 / 1920.0, 9.0 / 1080.0) * blur;
+  for (int i = 0; i < 10; i++) { float a = float(i) * 0.628; b += src(p + vec2(cos(a), sin(a)) * r).rgb; }
+  return vec4(mix(c, b / 10.0, min(1.0, blur * 1.5)), 1.0);
+}`;
+    const fxAt = (T) => ({ amount: 1, cam: { zoom: 1.04 + 0.06 * OM.prog(T, start, END), y: 28 * OM.prog(T, start, END) } });
+    return OM.c3.withFx(el, c, start, END, FX, fxAt)({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
@@ -92,8 +103,18 @@ OM.scene({
             flower(ctx, x, y, s, sz * 1.15, heart, age < 0.2 ? ink.crest : ink.hover);
           }
         });
+        // Pollen drifting up through the meadow.
+        const pa = C.sm(T, start + 0.05, start + 0.45) * (1 - C.sm(T, END - 0.45, END - 0.08));
+        for (let j = 0; pa > 0.01 && j < 90; j++) {
+          const h = OM.hash(j, 1, 55);
+          const y = 1100 - ((h * 1200 + (T - start) * 45 * (0.5 + OM.hash(j, 2, 55))) % 1200);
+          const x = OM.hash(j, 3, 55) * 1920 + 30 * Math.sin(T * 0.9 + j);
+          ctx.fillStyle = C.rgba(j % 3 ? ink.hover : ink.crest, pa * (0.4 + 0.5 * OM.hash(j, 4, 55)));
+          const s = j % 4 ? 2 : 3;
+          ctx.fillRect(Math.round(x), Math.round(y), s, s);
+        }
       },
       release: () => c.release(),
-    };
+    });
   },
 });

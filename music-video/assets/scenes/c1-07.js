@@ -118,6 +118,30 @@ OM.ownWords.add('c1-07');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      // Phosphor persistence: when the frame jolts, the green light lingers where the trace just was, as
+      // fading afterglow copies, and the lit phosphor glows faintly into its neighbours. The trace itself
+      // stays exactly as drawn: the afterglow only shows on the dark beside it.
+      const fx = OM.post(el, c, {
+        effect: `vec4 effect(vec2 uv) {
+  vec2 q = cam(uv);
+  vec4 b = src(q);
+  if (uAmount <= 0.0) return b;
+  vec4 s1 = src(q + uP0.xy), s2 = src(q + uP0.zw), s3 = src(q + uP1.xy);
+  float g1 = smoothstep(0.35, 0.8, s1.g) * step(s1.b + 0.05, s1.g);
+  float g2 = smoothstep(0.35, 0.8, s2.g) * step(s2.b + 0.05, s2.g);
+  float g3 = smoothstep(0.35, 0.8, s3.g) * step(s3.b + 0.05, s3.g);
+  vec2 px = (uRes.y / 1080.0) / uRes;
+  float halo = 0.0;
+  for (int i = 0; i < 8; i++) {
+    float a = 0.7854 * float(i);
+    vec4 s = src(q + vec2(cos(a), sin(a)) * 5.0 * px);
+    halo += smoothstep(0.5, 0.85, s.g) * step(s.b + 0.05, s.g);
+  }
+  float glow = max(max(0.6 * g1, 0.38 * g2), max(0.22 * g3, 0.06 * halo)) * uAmount;
+  vec3 after = mix(vec3(0.055, 0.055, 0.078), vec3(0.620, 0.808, 0.416), glow);
+  return vec4(max(b.rgb, after), 1.0);
+}`,
+      });
       const ink = OM.fieldInks('tokyo-night');
       const th = OM.theme('tokyo-night');
       const end = start + duration;
@@ -277,7 +301,7 @@ OM.ownWords.add('c1-07');
           }
           rowAt[col - C0] = prev;
         }
-        return { ok: document.fonts.check(TYPE), cells, colAt, rowAt };
+        return { ok: document.fonts.check(TYPE), cells, colAt, rowAt, words };
       };
 
       // ---- glow: the trace redrawn small, blurred, and added back over itself ----
@@ -287,8 +311,55 @@ OM.ownWords.add('c1-07');
       g0.height = g1.height = BH * BS;
       const b0 = g0.getContext('2d'), b1 = g1.getContext('2d');
 
+      /** Defibrillator thump: the frame jolts on each word, softly on each kick after. [x, y, flash] */
+      const joltAt = (T) => {
+        let jx = 0, jy = 0, flash = 0;
+        const jolt = (t0, amp) => {
+          const a = T - t0;
+          if (a < 0 || a > 0.5) return;
+          const e = Math.exp(-a / 0.07);
+          jy += amp * e * Math.cos(a * 57);
+          jx += amp * 0.4 * e * Math.sin(a * 83);
+          flash = Math.max(flash, (amp / 16) * Math.pow(0.5, a / 0.08));
+        };
+        on.forEach((t0, k) => jolt(t0, JOLT[k]));
+        KICKS.forEach((t0) => jolt(t0, 2.5));
+        return [jx, jy, flash];
+      };
+
+      // ---- camera: a punch and a kick of roll on every thump, a heartbeat swell on every kick after the
+      // key word; then it cranes up off the monitor as the light drains, held high for c1-08 to crane down from ----
+      const CR = OM.c1.crane78;
+      const camAt = (T) => {
+        let zoom = 0, rot = 0;
+        on.forEach((t0, k) => {
+          const a = T - t0;
+          if (a < 0) return;
+          const e = (1 - Math.exp(-a / 0.012)) * Math.exp(-a / 0.11);
+          zoom += 0.0028 * JOLT[k] * e;
+          rot += ((0.05 * JOLT[k] * Math.PI) / 180) * e * Math.cos(a * 41) * (k % 2 ? -1 : 1);
+        });
+        for (const t0 of KICKS) {
+          const a = T - t0;
+          if (a >= 0) zoom += 0.014 * Math.sin(Math.PI * Math.min(1, a / 0.16)) * Math.exp(-a / 0.2);
+        }
+        const up = OM.smooth(OM.prog(T, DRAIN, end - HOLD));
+        const e = OM.post.envelope(T, start, end + 9, { ramp: 0.3, hold: HOLD }) * (1 - up);
+        const y = CR.Y * up;
+        return { zoom: (1 + zoom * e) * OM.c1.cover(rot * e, 0, y), rot: rot * e, x: 0, y };
+      };
+      const look = (T) => {
+        const cam = camAt(T);
+        const J = joltAt(T), uvOf = (d) => {
+          const P = joltAt(T - d);
+          return [(J[0] - P[0]) / 1920, -(J[1] - P[1]) / 1080];
+        };
+        const amount = OM.post.envelope(T, start, end, { ramp: 0.3, hold: HOLD }) * Math.min(1, 0.35 + 1.2 * J[2]) * (1 - OM.smooth(OM.prog(T, DRAIN, DRAIN + 0.3)));
+        return { amount, cam, p0: [...uvOf(0.03), ...uvOf(0.07)], p1: [...uvOf(0.12), 0, 0] };
+      };
+
       let M = null;
-      return {
+      return OM.c1.post({
         render(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
@@ -307,17 +378,7 @@ OM.ownWords.add('c1-07');
           if (mc > 0) spot(ctx, ink, mc, mp);
 
           // Defibrillator thump: the frame jolts on each word, softly on each kick after.
-          let jx = 0, jy = 0, flash = 0;
-          const jolt = (t0, amp) => {
-            const a = T - t0;
-            if (a < 0 || a > 0.5) return;
-            const e = Math.exp(-a / 0.07);
-            jy += amp * e * Math.cos(a * 57);
-            jx += amp * 0.4 * e * Math.sin(a * 83);
-            flash = Math.max(flash, (amp / 16) * Math.pow(0.5, a / 0.08));
-          };
-          on.forEach((t0, k) => jolt(t0, JOLT[k]));
-          KICKS.forEach((t0) => jolt(t0, 2.5));
+          const [jx, jy, flash] = joltAt(T);
           ctx.save();
           ctx.translate(Math.round(jx * dpr) / dpr, Math.round(jy * dpr) / dpr);
 
@@ -442,12 +503,23 @@ OM.ownWords.add('c1-07');
           ctx.restore();
           ctx.globalAlpha = 1;
           ctx.globalCompositeOperation = 'source-over';
+
+          // Blip sparks thrown off the top of each spike as the beam writes it.
+          M.words.forEach((w, k) => {
+            const x = L.x0 + (w.s + (k === 3 ? 1.5 : 1) + 0.5) * L.cw + jx, y = L.y0 + (R0 - AMP[k] + 0.5) * L.ch + jy;
+            OM.c1.burst(T, on[k], k === 3 ? 22 : 10, 0xc107 + k, { x, y, speed: k === 3 ? 560 : 320, spread: Math.PI * 1.2, g: 700, life: k === 3 ? 0.5 : 0.34 }, (px, py, u, i) => {
+              ctx.globalAlpha = 1 - u;
+              ctx.fillStyle = u < 0.3 ? ink.crest : i % 2 ? ink.hover : ink.lit;
+              ctx.fillRect(px - L.cw / 2, py - L.ch / 2, L.cw, L.ch);
+            });
+          });
+          ctx.globalAlpha = 1;
         },
         release: () => {
           c.release();
           g0.width = g1.width = 0;
         },
-      };
+      }, fx, look);
     },
   });
 })();

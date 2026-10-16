@@ -71,8 +71,8 @@ OM.ownWords.add('p1-01');
       const K = words.length - 1;
       const { sm, decay } = OM.p1;
       const KICK = 73.607, DOWN = on[K];
-      const DROP = 74.58; // sleeves fall back into the crate
-      const CLOSE = [74.64, END - 0.08]; // the spot closes to the pen
+      const DROP = 74.42, SINK = END - 0.083; // sleeves shrink and stream into the spot, arriving two frames before the cut
+      const CLOSE = [74.5, SINK]; // the spot closes to the pen
 
       // Crate: front face 660..1260 x 770..950, sitting in the spot's floor pool.
       const CX0 = 640, CX1 = 1280, CY0 = 770, CY1 = 950;
@@ -89,7 +89,7 @@ OM.ownWords.add('p1-01');
             ctx.font = font(800, f);
             tot += Math.max(k === K ? SH * big : SH, ctx.measureText(w.text).width + pad * 2) + gap;
           });
-          if (tot - gap <= 1820) break;
+          if (tot - gap <= 1700) break;
         }
         const out = [];
         let tot = 0;
@@ -128,6 +128,7 @@ OM.ownWords.add('p1-01');
         ctx.beginPath();
         ctx.arc(w * 0.18, vy, vr * 0.3, 0, Math.PI * 2);
         ctx.fill();
+        const disc = [x + w * 0.18, y + vy, vr];
         // The sleeve face.
         ctx.fillStyle = key ? OM.mix(ink.lit, ink.crest, glow) : OM.mix(th['surface-2'], th['border-strong'], glow * 0.6);
         ctx.fillRect(-w / 2, -h / 2, w, h);
@@ -149,17 +150,36 @@ OM.ownWords.add('p1-01');
           ctx.fillText(words[k].text, 0, h / 2 - h * 0.14);
         }
         ctx.restore();
+        return disc;
       };
+      // Groove sheen: a radial highlight sweeping round the key record's vinyl (dark grooves only, never the label or type).
+      const fx = OM.post(el, c, {
+        effect: `vec4 effect(vec2 uv) {
+  vec2 s = cam(uv);
+  vec4 c = src(s);
+  vec2 d = (s - uP0.xy) * vec2(uRes.x / uRes.y, 1.0);
+  float r = length(d) / uP0.z;
+  if (r < 1.0 && r > 0.33) {
+    float a = atan(d.y, d.x);
+    float band = pow(max(0.0, cos(a - uP0.w)), 18.0) + pow(max(0.0, cos(a - uP0.w - 3.14159)), 18.0);
+    float groove = 0.55 + 0.45 * sin(r * 150.0);
+    float lum = dot(c.rgb, vec3(0.3, 0.59, 0.11));
+    float m = (1.0 - smoothstep(0.12, 0.3, lum)) * smoothstep(1.0, 0.92, r);
+    c.rgb += vec3(0.733, 0.867, 0.592) * band * groove * m * uAmount * 0.6;
+  }
+  return c;
+}`,
+      });
 
       return {
         render(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
-          if (T < Math.max(start + 0.045, on[0])) return OM.handoff('spot', ctx, T, dpr);
+          if (T < Math.max(start + 0.045, on[0])) return fx.apply(T), OM.handoff('spot', ctx, T, dpr);
           if (T > END - 0.07) {
             ctx.fillStyle = ink.bg;
             ctx.fillRect(0, 0, 1920, 1080);
-            return OM.p1.pen(ctx, dpr);
+            return fx.apply(T), OM.p1.pen(ctx, dpr);
           }
           ctx.fillStyle = ink.bg;
           ctx.fillRect(0, 0, 1920, 1080);
@@ -184,7 +204,7 @@ OM.ownWords.add('p1-01');
           }
           pool(ctx, 960, 880, OM.lerp(440, 64, cl), OM.lerp(110, 64, cl), ink.lit, OM.lerp(0.42 + 0.25 * flare, 0.45, cl));
 
-          const crateA = 1 - sm(T, CLOSE[0], CLOSE[0] + 0.1);
+          const crateA = 1 - sm(T, DROP, DROP + 0.2);
           const rise = OM.ease.outExpo(OM.prog(T, on[0], on[0] + 0.12)); // the crate is pushed into the light on w0
           const cy = (1 - rise) * 260;
           if (crateA > 0.01) {
@@ -203,19 +223,35 @@ OM.ownWords.add('p1-01');
             }
             ctx.restore();
           }
+          // Dust turning in the beam.
+          if (coneA > 0.003) {
+            for (let i = 0; i < 46; i++) {
+              const y = ((OM.hash(i, 2, 11) + T * (0.03 + 0.05 * OM.hash(i, 3, 11))) % 1) * 870;
+              const half = (60 + (380 * y) / 880) * (1 - cl);
+              const x = 960 + (OM.hash(i, 1, 11) * 2 - 1) * half * 0.92 + 14 * Math.sin(T * 1.3 + i);
+              const a = (0.2 + 0.45 * OM.hash(i, Math.floor(T * 6), 12)) * Math.min(1, coneA) * (0.6 + flare);
+              ctx.fillStyle = rgba(ink.hover, Math.min(0.9, a));
+              const sz = 2 + 2 * OM.hash(i, 4, 11);
+              ctx.fillRect(x, y, sz, sz);
+            }
+          }
+          let keyDisc = null;
           // Pulled sleeves: up out of the crate on the onset, into the row.
           for (let k = 0; k <= K; k++) {
             if (T < on[k] || !S[k]) continue;
             const s = S[k];
             const up = OM.prog(T, on[k], on[k] + (k === K ? 0.16 : 0.13));
-            const back = OM.ease.inCubic(OM.prog(T, DROP + (K - k) * 0.025, DROP + (K - k) * 0.025 + 0.12));
+            const back = OM.ease.inOutCubic(OM.prog(T, DROP + (K - k) * 0.035, SINK));
             const p = OM.ease.outBack(up, 1.4);
-            const x = OM.lerp(960, s.x, OM.ease.outExpo(up));
-            const y = OM.lerp(CY0 + 120, ROW_Y - 10 * kick, p) + back * 620;
-            const sc = OM.lerp(0.6, 1, OM.ease.outExpo(up)) * (k === K ? 1 + 0.08 * flare : 1);
-            const glow = decay(T, on[k], 0.12) + (k === K ? 0 : 0.5 * flare);
+            const x = OM.lerp(OM.lerp(960, s.x, OM.ease.outExpo(up)), OM.p1.PEN.x, back);
+            const y = OM.lerp(OM.lerp(CY0 + 120, ROW_Y - 10 * kick, p), OM.p1.PEN.y, back);
+            const sc = OM.lerp(OM.lerp(0.6, 1, OM.ease.outExpo(up)) * (k === K ? 1 + 0.08 * flare : 1), 0.03, back);
+            const glow = decay(T, on[k], 0.12) + (k === K ? 0 : 0.5 * flare) + back;
+            ctx.globalAlpha = 1 - sm(back, 0.85, 1);
             const vinyl = k === K ? 0.5 * OM.ease.outBack(OM.prog(T, DOWN + 0.05, DOWN + 0.3), 1.6) : 0;
-            sleeve(ctx, s, k, x, y, sc, Math.min(1, glow), vinyl);
+            const disc = sleeve(ctx, s, k, x, y, sc, Math.min(1, glow), vinyl);
+            if (k === K) keyDisc = disc;
+            ctx.globalAlpha = 1;
           }
           // The crate front, over everything that is still inside it.
           if (crateA > 0.01) {
@@ -233,8 +269,17 @@ OM.ownWords.add('p1-01');
             ctx.restore();
           }
           if (cl > 0) OM.p1.pen(ctx, dpr, OM.ease.outBack(OM.prog(T, CLOSE[1] - 0.06, CLOSE[1]), 2));
+          // Camera: a flip-through pan stepping right on each pull, home again as the spot closes.
+          const home = 1 - OM.ease.inOutCubic(OM.prog(T, 74.42, 74.76));
+          let x = 0;
+          for (const o of on) x -= 10 * OM.ease.outBack(OM.prog(T, o, o + 0.2), 1.8);
+          x *= home;
+          const zoom = 1 + 0.0011 * Math.abs(x) + 0.02 * sm(T, on[0], on[0] + 0.3) * home;
+          const sheen = OM.post.envelope(T, start, END, { ramp: 0.3 }) * sm(T, DOWN + 0.05, DOWN + 0.2);
+          const vd = keyDisc || [0, 0, 1];
+          fx.apply(T, { amount: sheen, cam: T < on[0] || home === 0 ? null : { zoom, x }, p0: [vd[0] / 1920, 1 - vd[1] / 1080, vd[2] / 1080, T * 7] });
         },
-        release: () => c.release(),
+        release: () => (fx.release(), c.release()),
       };
     },
   });

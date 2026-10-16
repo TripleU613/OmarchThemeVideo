@@ -11,10 +11,10 @@
 // buttons) and its drain order, so the cuts between those scenes match by
 // construction.
 (() => {
-  const HEAD = "800 100px 'JetBrains Mono'", LABEL = "600 100px 'JetBrains Mono'", TERM = "500 48px 'JetBrains Mono'";
+  const HEAD = "800 100px 'JetBrains Mono'", LABEL = "600 100px 'JetBrains Mono'", TERM = "500 92px 'JetBrains Mono'", MADE = "800 118px 'JetBrains Mono'";
   window.__hf = window.__hf || {};
   window.__hf.buildReady = window.__hf.buildReady || {};
-  window.__hf.buildReady['outro-type'] = Promise.all([HEAD, LABEL, TERM].map((f) => document.fonts.load(f)));
+  window.__hf.buildReady['outro-type'] = Promise.all([HEAD, LABEL, TERM, MADE].map((f) => document.fonts.load(f)));
 
   const O = (OM.outro = {});
   const L = OM.HOME;
@@ -150,7 +150,9 @@
       });
     };
     const labels = [...block(bx, bwA, 'a', labA), ...block(bx + bwA + gap, bwB, 'b', labB)];
-    LAY = { ok, head, centre, btn, labels, LC, count: words.length };
+    const bxs = btn.map((k) => H.x0 + k.q * H.cw), bys = btn.map((k) => H.y0 + k.r * H.ch);
+    const btnBox = { x0: Math.min(...bxs), x1: Math.max(...bxs) + H.cw, y0: Math.min(...bys), y1: Math.max(...bys) + H.ch };
+    LAY = { ok, head, centre, btn, btnBox, labels, LC, count: words.length };
     return LAY;
   };
 
@@ -216,7 +218,8 @@
   const ROWS = [
     ['Song', 'We Can Fix Everything (The Ultimate Machine)'],
     ['Music', 'Kevin Koontz / REARRANGED'],
-    ['Made in code', 'HyperFrames, Three.js, anime.js and GSAP'],
+    ['Made in code', 'HyperFrames, Three.js and GSAP'],
+    ['Made by', 'TripleU613'],
     ['Look', 'Themed after omarchy.org, in Tokyo Night'],
     ['Omarchy', 'by DHH · omarchy.org'],
   ];
@@ -225,6 +228,31 @@
   const S1 = 0.6, SX = 230, SY = 104, SW = 1920 * S1, SH = 1080 * S1;
   const P = { x: SX / (1 - S1), y: SY / (1 - S1) };
   const DESK = 812;
+  // Morning light leak with gentle halation: bright cells bloom softly green, and a soft
+  // blue-white band of dawn sweeps down from the window's corner across the room (uP0.x 0..1).
+  const FX = `
+vec4 effect(vec2 uv) {
+  vec2 p = cam(uv);
+  vec3 c = src(p).rgb;
+  if (uAmount <= 0.0) return vec4(c, 1.0);
+  vec2 px = 1.0 / uRes * (uRes.x / 1920.0);
+  vec3 h = vec3(0.0);
+  for (int i = 0; i < 12; i++) {
+    float a = float(i) * 0.5236;
+    vec2 o = vec2(cos(a), sin(a));
+    for (int j = 1; j <= 2; j++) {
+      vec3 s = src(p + o * px * float(j) * 9.0).rgb;
+      h += s * smoothstep(0.38, 0.85, dot(s, vec3(0.3, 0.55, 0.15)));
+    }
+  }
+  h /= 24.0;
+  float along = dot(uv, normalize(vec2(1.0, 0.75)));
+  float band = exp(-pow((along - mix(1.55, 0.15, uP0.x)) / 0.28, 2.0));
+  float corner = smoothstep(1.25, 0.0, length(uv - vec2(1.0, 0.95)));
+  vec3 leak = vec3(0.663, 0.694, 0.839) * 0.085 * band + vec3(0.62, 0.81, 0.42) * 0.05 * corner;
+  c += uAmount * (h * 0.5 * vec3(0.75, 1.0, 0.7) + leak * (0.7 + 0.3 * vnoise(uv * 3.0 + uTime * 0.1)));
+  return vec4(c, 1.0);
+}`;
 
   OM.scene({
     id: 'x-o1',
@@ -233,12 +261,13 @@
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      const fx = OM.post(el, c, { effect: FX });
       const ink = OM.fieldInks('tokyo-night');
       const th = OM.theme('tokyo-night');
       const end = start + duration;
       const PULL0 = 281.031, PULL1 = 282.842; // first kick to the downbeat
       const OPEN = 282.842, TYPE0 = 283.0, CLOSE = 288.369, LAND = 289.483;
-      const PRINT = [283.91, 284.979, 285.698, 286.418, 287.115]; // a row per hit; the last on the downbeat
+      const PRINT = [283.91, 284.537, 284.979, 285.698, 286.418, 287.115]; // a row per hit; the maker on the kick, early enough to stay in view to the close
       const STOPS = [287.486, 287.602, 287.742, 287.858, 287.974, 288.113, 288.253, 288.369];
       const CMD = 'credits';
       const ZIN = 1 / S1, CREEP = 1.035;
@@ -338,6 +367,20 @@
         ctx.lineTo(1756, 696);
         ctx.stroke();
 
+        // Dust in the sunbeam: motes drifting on slow seeded paths, lit only inside the beam.
+        for (let i = 0; i < 70; i++) {
+          const h1 = OM.hash(i, 1, 801), h2 = OM.hash(i, 2, 801), h3 = OM.hash(i, 3, 801), h4 = OM.hash(i, 4, 801);
+          const y = 180 + 860 * ((((h2 + T * 0.012 * (0.4 + h4)) % 1) + 1) % 1);
+          const v = (y - 180) / 860;
+          const x = 1720 - 520 * v + (h1 - 0.5) * 300 + 22 * Math.sin(T * (0.25 + 0.3 * h3) + h1 * 6.283);
+          const inBeam = 1 - Math.abs(x - (1720 - 520 * v)) / 170;
+          const a = d * OM.clamp(inBeam) * (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(T * 1.7 + h3 * 9)));
+          if (a <= 0.02) continue;
+          ctx.fillStyle = rgba(ink.crest, 0.8 * a);
+          const sz = 2 + 2 * h4;
+          ctx.fillRect(x, y, sz, sz);
+        }
+
         // The machine: lid around the screen, the base slab on the desk, the dawn on its right edge.
         ctx.fillStyle = th['bg-deep'];
         ctx.fillRect(SX - 22, SY - 22, SW + 44, SH + 44);
@@ -385,8 +428,37 @@
         ctx.strokeRect(42, 42, 1836, 996);
         ctx.font = TERM;
         ctx.textBaseline = 'alphabetic';
-        const ADV = ctx.measureText('M').width, X = 96, LH = 84;
-        let y = 160;
+        // Phone-size terminal type: each credit's label on one line, its value wrapped under it,
+        // and the output scrolls up as new rows print, as a real terminal does.
+        const ADV = ctx.measureText('M').width, X = 96, LH = 112, LHM = 150, TOP = 64, AREA = 912, MAXW = 1880 - X - 56;
+        const wrap = (text) => {
+          const out = [];
+          let cur = '';
+          for (const w of text.split(' ')) {
+            const next = cur ? cur + ' ' + w : w;
+            if (cur && ctx.measureText(next).width > MAXW - 2 * ADV) { out.push(cur); cur = w; } else cur = next;
+          }
+          if (cur) out.push(cur);
+          return out;
+        };
+        const lines = [{ kind: 'cmd', t: -Infinity, h: LH }];
+        ROWS.forEach(([k, v], i) => {
+          const t = PRINT[i];
+          if (k === 'Made by') return lines.push({ kind: 'made', text: k + ' ' + v, t, h: LHM });
+          lines.push({ kind: 'key', text: k.toLowerCase(), t, h: LH });
+          for (const w of wrap(v)) lines.push({ kind: i === ROWS.length - 1 ? 'brand' : 'val', text: w, t, h: LH });
+        });
+        const PROMPT_T = PRINT[PRINT.length - 1] + 0.2;
+        lines.push({ kind: 'prompt', t: PROMPT_T, h: LH });
+        // Scroll: after each print the output glides up (0.16 s) just enough to keep the newest line in view.
+        const events = [...PRINT, PROMPT_T];
+        const target = (te) => Math.max(0, lines.filter((l) => l.t <= te).reduce((s, l) => s + l.h, 0) - AREA);
+        let scroll = 0;
+        for (const te of events) {
+          if (T < te) break;
+          const to = target(te);
+          scroll += (to - scroll) * OM.ease.outCubic(OM.prog(T, te, te + 0.16));
+        }
         const prompt = (y) => {
           ctx.fillStyle = ink.lit;
           ctx.fillText('~', X, y);
@@ -396,29 +468,44 @@
         };
         const block = (x, y, color) => {
           ctx.fillStyle = color;
-          ctx.fillRect(x, y - 40, ADV, 52);
+          ctx.fillRect(x, y - 0.8 * LH * 0.68, ADV, LH * 0.68);
         };
-        // The command, typed at a hi-hat pace.
-        let x = prompt(y);
-        const n = Math.max(0, Math.min(CMD.length, Math.floor((T - TYPE0) / 0.075) + 1));
-        ctx.fillStyle = th.text;
-        ctx.fillText(CMD.slice(0, n), x, y);
-        if (T < PRINT[0]) block(x + n * ADV, y, th.text);
-        // The credits, printed a row per hit, flashing crest as they land.
-        y += LH * 1.4;
-        ROWS.forEach(([k, v], i) => {
-          if (T < PRINT[i]) return;
-          const fresh = T - PRINT[i] < 0.09;
-          ctx.fillStyle = fresh ? ink.crest : th['text-muted'];
-          ctx.fillText(k.toLowerCase(), X, y + i * LH);
-          ctx.fillStyle = fresh ? ink.crest : i === ROWS.length - 1 ? th.brand : th.text;
-          ctx.fillText(v, X + 15 * ADV, y + i * LH);
-        });
-        // A fresh prompt; its cursor stutters on the hard stops.
-        if (T >= PRINT[4] + 0.2) {
-          const py = y + ROWS.length * LH + LH * 0.4;
-          const px = prompt(py);
-          if (OM.hitCount(STOPS, T) % 2 === 0) block(px, py, OM.hitCount(STOPS, T) ? ink.crest : th.text);
+        ctx.beginPath();
+        ctx.rect(44, 44, 1832, 992);
+        ctx.clip();
+        // The output dims away over the 0.3 s before the tile closes, so the homepage behind it
+        // never shows through readable text.
+        ctx.globalAlpha = a * (1 - OM.smooth(OM.prog(T, CLOSE - 0.3, CLOSE)));
+        let y = TOP + 40 - scroll;
+        for (const l of lines) {
+          if (T < l.t) break;
+          const base = y + l.h * 0.72;
+          y += l.h;
+          if (base < 0 || base - l.h > 1080) continue;
+          const fresh = T - l.t < 0.09;
+          if (l.kind === 'cmd') {
+            // The command, typed at a hi-hat pace.
+            const x = prompt(base);
+            const n = Math.max(0, Math.min(CMD.length, Math.floor((T - TYPE0) / 0.075) + 1));
+            ctx.fillStyle = th.text;
+            ctx.fillText(CMD.slice(0, n), x, base);
+            if (T < PRINT[0]) block(x + n * ADV, base, th.text);
+          } else if (l.kind === 'prompt') {
+            // A fresh prompt; its cursor stutters on the hard stops.
+            const px = prompt(base);
+            if (OM.hitCount(STOPS, T) % 2 === 0) block(px, base, OM.hitCount(STOPS, T) ? ink.crest : th.text);
+          } else if (l.kind === 'made') {
+            // The maker's credit, the loudest line: heavy, larger, in crest ink with a brand bar.
+            ctx.font = MADE;
+            ctx.fillStyle = th.brand;
+            ctx.fillRect(X - 40, base - LHM * 0.62, 12, LHM * 0.72);
+            ctx.fillStyle = ink.crest;
+            ctx.fillText(l.text, X, base);
+            ctx.font = TERM;
+          } else {
+            ctx.fillStyle = fresh ? ink.crest : l.kind === 'key' ? th['text-muted'] : l.kind === 'brand' ? th.brand : th.text;
+            ctx.fillText(l.text, l.kind === 'key' ? X : X + 2 * ADV, base);
+          }
         }
         ctx.restore();
       };
@@ -428,7 +515,17 @@
           const ctx = c.ensure();
           const dpr = c.dpr;
           ctx.globalAlpha = 1;
-          if (T < PULL0 || T >= LAND || T >= end - 0.07) return OM.handoff('word', ctx, T, dpr);
+          // The whole-frame dolly: out to 1.04 as the room arrives, settling back to rest before the push.
+          const dolly = OM.smooth(OM.prog(T, 281.6, 282.9)) * (1 - OM.ease.inOutSine(OM.prog(T, 282.9, 287.6)));
+          const post = () => fx.apply(T, {
+            amount: OM.post.envelope(T, start, end, { ramp: 0.6 }) * (0.35 + 0.65 * dawnOf(T)),
+            cam: { zoom: 1 + 0.04 * dolly, x: -18 * dolly, y: 6 * dolly },
+            p0: [OM.prog(T, 281.4, 289.2), 0, 0, 0],
+          });
+          if (T < PULL0 || T >= LAND || T >= end - 0.07) {
+            OM.handoff('word', ctx, T, dpr);
+            return post();
+          }
           const k = zoom(T);
           // Room space through the camera.
           ctx.setTransform(dpr * k, 0, 0, dpr * k, dpr * P.x * (1 - k), dpr * P.y * (1 - k));
@@ -444,8 +541,12 @@
           if (T >= OPEN) drawTerminal(ctx, T);
           ctx.restore();
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          post();
         },
-        release: () => c.release(),
+        release: () => {
+          fx.release();
+          c.release();
+        },
       };
     },
   });

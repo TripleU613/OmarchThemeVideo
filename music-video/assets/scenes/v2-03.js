@@ -13,7 +13,24 @@ OM.scene({
     const cv = document.createElement('canvas');
     cv.className = 'om-fill';
     el.appendChild(cv);
+    // Rewind: tracking bands that shear sideways, a scrub blur along x, a green cast; all off outside the rewind.
+    const FX = `vec4 effect(vec2 uv) {
+      vec2 q = cam(uv);
+      vec4 base = src(q);
+      float rw = uP0.x * uAmount;
+      if (rw <= 0.0) return base;
+      float band = floor(q.y * 18.0 + uTime * 30.0);
+      float sh = step(0.72, hash(vec2(band, 3.0))) * (hash(vec2(band, 7.0)) - 0.5) * 0.03;
+      vec3 acc = vec3(0.0);
+      for (int i = 0; i < 6; i++) acc += src(q + vec2(sh + (float(i) - 2.5) * 0.0025, 0.0)).rgb;
+      acc /= 6.0;
+      float l = dot(acc, vec3(0.3, 0.59, 0.11));
+      vec3 g = mix(acc, vec3(l * 0.78, l * 1.02, l * 0.62), 0.45);
+      float line = smoothstep(0.96, 1.0, fract(q.y * 18.0 + uTime * 30.0)) * 0.12;
+      return vec4(mix(base.rgb, g + vec3(0.52, 0.66, 0.35) * line, rw), 1.0);
+    }`;
     const c = OM.canvas(cv, { alpha: false });
+    const fx = OM.post(el, c, { effect: FX });
     const ink = V.ink(), th = V.th();
     const sung = OM.sung('v2-03');
     const on = sung.map((w) => w.t0);
@@ -63,7 +80,7 @@ OM.scene({
     return {
       render(t, T) {
         const ctx = c.ensure();
-        if (T < start + V.HOLD_IN || T >= END - V.HOLD_OUT) return V.still(ctx, 7);
+        if (T < start + V.HOLD_IN || T >= END - V.HOLD_OUT) return fx.apply(T), V.still(ctx, 7);
         if (!F || !V.met().ok) F = fit();
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
@@ -119,8 +136,31 @@ OM.scene({
             ctx.fillRect(0, yy + 10 + i * 3, 1920, 18);
           }
         }
+        // Debris: chips knocked off each window as it breaks, flying with it and back again in the rewind.
+        for (let k = 0; k < NB; k++) {
+          const ta = tau(k, T);
+          if (ta <= 0) continue;
+          const r = SLOT[k];
+          for (let i = 0; i < 10; i++) {
+            const hx = OM.hash(k, i, 31), hv = OM.hash(k, i, 32), hw = OM.hash(k, i, 33);
+            const x = r.x + r.w * hx + (hv - 0.5) * 700 * ta, y = r.y + r.h + (-300 - 300 * hw) * ta + 0.5 * G * ta * ta;
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(hw * 6 + ta * (hv - 0.5) * 20);
+            ctx.fillStyle = i % 2 ? th['border-strong'] : ink.mid;
+            ctx.fillRect(-6, -3, 12 + 10 * hv, 6);
+            ctx.restore();
+          }
+        }
+        const ce = V.camEnv(T, start, END);
+        const fall = OM.ease.inOutSine(OM.prog(T, on[0], R0)) * (1 - back(T));
+        fx.apply(T, {
+          amount: V.env(T, start, END),
+          cam: { zoom: 1 + ce * (0.015 + 0.03 * fall), rot: ce * 0.03 * fall, y: ce * 10 * fall },
+          p0: [Math.sin(Math.PI * OM.prog(T, R0, R1 + 0.08)), 0, 0, 0],
+        });
       },
-      release: () => c.release(),
+      release: () => { fx.release(); c.release(); },
     };
   },
 });

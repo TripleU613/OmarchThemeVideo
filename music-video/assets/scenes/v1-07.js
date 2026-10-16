@@ -12,6 +12,19 @@ OM.ownWords.add('v1-07');
   const V = OM.v1;
   const WEIGHT = 800;
   const PROBE = V.ready('v1-07-type', WEIGHT);
+  const GLSL = V.TEXTMASK + `
+vec4 effect(vec2 uv) {
+  vec4 c = src(cam(uv));
+  float a = uAmount;
+  if (a <= 0.0) return c;
+  float l = dot(c.rgb, vec3(0.299, 0.587, 0.114));
+  float crush = smoothstep(0.08, 0.5, l);
+  float n = hash(floor(uv * uRes / 3.0) + floor(uTime * 15.0)) - 0.5; // toner noise
+  float band = 0.5 + 0.5 * sin(uv.y * 140.0 + uTime * 3.0); // banding
+  vec3 col = mix(c.rgb, c.rgb * (0.55 + 0.9 * crush), a); // crushed contrast
+  col *= 1.0 + a * (0.22 * n - 0.08 * band);
+  return vec4(col, 1.0);
+}`;
   OM.scene({
     id: 'v1-07',
     build(el, { start, duration }) {
@@ -19,6 +32,7 @@ OM.ownWords.add('v1-07');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      const fx = V.post(el, c, GLSL);
       const END = start + duration, H = V.HOLD, H0 = 0.045; // the first sweep starts 0.06s in
       const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
       const on = OM.sung('v1-07').map((w) => w.t0);
@@ -27,7 +41,7 @@ OM.ownWords.add('v1-07');
       const hc = OM.cellAt(HM, 960, 540), hrow = hc.row, hcol = hc.col;
       const LY = HM.y0 + (hrow + 0.5) * HM.ch, LX = HM.x0 + (hcol + 0.5) * HM.cw;
       const SH = { w: 1560, h: 640 }, FS = { w: 1800, h: 900 };
-      const CLOSE0 = 66.86, CLOSE1 = 67.06, SHRINK1 = END - H - 0.01;
+      const CLOSE0 = 66.6, CLOSE1 = 66.82, SHRINK1 = END - H - 0.01;
       const deg = (k) => 0.15 + 0.7 * (k / Math.max(1, LAST - 1));
 
       const get = V.lazy(PROBE, () => {
@@ -104,8 +118,21 @@ OM.ownWords.add('v1-07');
         ctx.restore();
       };
 
+      // Camera: tracks the lamp's sweep, riding out with the bars. The copy's degradation is in the shader too,
+      // and it resolves to nothing on the last word: the original is crisp.
+      const FXP = (ctx, dpr, T) => {
+        const e = V.env(T, start, END);
+        const k = OM.hitCount(on, T) - 1;
+        const d = k < 0 ? 0 : k < LAST ? 0.25 + 0.4 * deg(k) : Math.max(0, 0.6 * (1 - OM.prog(T, on[LAST], on[LAST] + 0.3)));
+        const sweep = k < 0 ? 0 : Math.sin(Math.PI * OM.prog(T, on[k], on[k] + 0.32));
+        return { amount: e * d, cam: { zoom: 1 + 0.03 * e, y: 18 * sweep * e } };
+      };
       return {
         render(t, T) {
+          this.draw(t, T);
+          fx.apply(T, FXP(c.ensure(), c.dpr, T));
+        },
+        draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + H0 || T < on[0]) return OM.handoff('line', ctx, T, dpr);
@@ -117,7 +144,7 @@ OM.ownWords.add('v1-07');
           if (T >= CLOSE1) {
             // The row shrinks to the spark.
             const f = OM.ease.inOutCubic(OM.prog(T, CLOSE1, SHRINK1));
-            const n = Math.round(OM.lerp(HM.cols, 0, f));
+            const n = Math.round(OM.lerp(Math.ceil(Math.max(LX, 1920 - LX) / HM.cw) + 1, 0, f)); // from the frame's edge, so the shrink is seen all the way
             ctx.fillStyle = ink.crest;
             for (let col = hcol - n; col <= hcol + n; col++) OM.cell(ctx, HM, col, hrow, dpr);
             const g = ctx.createRadialGradient(LX, LY, 0, LX, LY, 72);
@@ -135,7 +162,7 @@ OM.ownWords.add('v1-07');
               const back = (k - 1 - j) + OM.ease.outExpo(OM.prog(T, on[k], on[k] + 0.22));
               copy(ctx, S, j, -back * 38, -back * 26, -back * 0.016);
             }
-            const e = ext(T, on[k], SH.h / 2 + 40, 0.15);
+            const e = k ? ext(T, on[k], SH.h / 2 + 40, 0.15) : (SH.h / 2 + 40) * OM.ease.inOutCubic(OM.prog(T, on[0], on[0] + 0.3)); // the first sweep eases off the cut
             ctx.save();
             ctx.beginPath();
             ctx.rect(0, LY - e, 1920, 2 * e);
@@ -175,7 +202,10 @@ OM.ownWords.add('v1-07');
           const a = T >= CLOSE0 ? 1 : 1 - OM.prog(T, on[LAST] + 0.2, on[LAST] + 0.34);
           bars(ctx, dpr, e, a);
         },
-        release: () => c.release(),
+        release: () => {
+          fx.release();
+          c.release();
+        },
       };
     },
   });

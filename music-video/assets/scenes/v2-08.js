@@ -14,7 +14,22 @@ OM.scene({
     const cv = document.createElement('canvas');
     cv.className = 'om-fill';
     el.appendChild(cv);
+    // Sunrise lens flare: a halo and an anamorphic streak on the sun point at the horizon (uP0.y),
+    // strength uP0.x; heat shimmer wobbling the road just below the horizon only.
+    const FX = `vec4 effect(vec2 uv) {
+      vec2 q = cam(uv);
+      float hy = uP0.y, s = uP0.x * uAmount;
+      float below = smoothstep(0.0, 0.01, hy - q.y) * smoothstep(0.12, 0.0, hy - q.y);
+      q.x += (vnoise(vec2(q.y * 260.0, uTime * 7.0)) - 0.5) * 0.006 * below * uAmount;
+      vec3 c = src(q).rgb;
+      vec2 d = (uv - vec2(0.5, hy)) * vec2(uRes.x / uRes.y, 1.0);
+      float halo = exp(-length(d) * 7.0) * 0.35;
+      float streak = exp(-abs(d.y) * 160.0) * exp(-abs(d.x) * 1.6) * 0.5;
+      float ring = smoothstep(0.02, 0.0, abs(length(d - vec2(0.0, -0.18)) - 0.07)) * 0.08;
+      return vec4(c + vec3(0.73, 0.87, 0.59) * (halo + streak + ring) * s, 1.0);
+    }`;
     const c = OM.canvas(cv, { alpha: false });
+    const fx = OM.post(el, c, { effect: FX });
     const ink = V.ink(), th = V.th();
     const sung = OM.sung('v2-08');
     const N = sung.length;
@@ -42,7 +57,7 @@ OM.scene({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (T < start + V.HOLD_IN || T >= END - V.HOLD_OUT) return OM.handoff('line', ctx, T, dpr);
+        if (T < start + V.HOLD_IN || T >= END - V.HOLD_OUT) return fx.apply(T), OM.handoff('line', ctx, T, dpr);
         if (!F || !V.met().ok) plan();
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
@@ -179,8 +194,27 @@ OM.scene({
           ctx.restore();
         });
 
+        // Light streaks rushing past along both shoulders.
+        for (let i = 0; i < 10; i++) {
+          const z0 = ((i * 3.7 - dist * 1.6) % 37 + 37) % 37 + 1.2, z1 = z0 + 2.2;
+          for (const sx of [-1, 1]) {
+            const xw = sx * (ROAD + 1.6 + OM.hash(i, sx, 88) * 2);
+            ctx.strokeStyle = V.rgba(i % 2 ? ink.hover : ink.lit, OM.clamp(1 - z0 / 30) * road * 0.8);
+            ctx.lineWidth = Math.max(1, 30 / z0);
+            ctx.beginPath();
+            ctx.moveTo(X(xw, z0), Y(1.2, z0));
+            ctx.lineTo(X(xw, z1), Y(1.2, z1));
+            ctx.stroke();
+          }
+        }
+        const ce = V.camEnv(T, start, END);
+        fx.apply(T, {
+          amount: V.env(T, start, END),
+          cam: { zoom: 1 + ce * 0.03, rot: ce * 0.014 * Math.sin((T - start) * 0.9), y: ce * (2 * Math.sin(T * 53) + 1.4 * Math.sin(T * 77) + 3 * kick) },
+          p0: [0.4 + 0.6 * dawn + 0.8 * flare, 1 - YH / 1080, 0, 0],
+        });
       },
-      release: () => c.release(),
+      release: () => { fx.release(); c.release(); },
     };
   },
 });

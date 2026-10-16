@@ -86,6 +86,25 @@ OM.ownWords.add('c1-04');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      // Shallow depth of field: sharp on the screen and its words, the room and the shoulders falling soft.
+      const fx = OM.post(el, c, {
+        effect: `vec4 effect(vec2 uv) {
+  vec2 q = cam(uv);
+  vec4 b = src(q);
+  if (uAmount <= 0.0) return b;
+  vec2 d = (uv - uP0.zw) * vec2(uRes.x / uRes.y, 1.0);
+  float k = smoothstep(1.0, 1.8, length(d / uP0.xy)) * uAmount;
+  if (k < 0.002) return b;
+  vec2 px = (uRes.y / 1080.0) / uRes;
+  float R = 10.0 * k;
+  vec3 acc = b.rgb;
+  for (int i = 0; i < 16; i++) {
+    float a = 2.39996 * float(i), rr = sqrt((float(i) + 0.5) / 16.0) * R;
+    acc += src(q + vec2(cos(a), sin(a)) * rr * px).rgb;
+  }
+  return vec4(acc / 17.0, 1.0);
+}`,
+      });
       const off = document.createElement('canvas');
       let ox = null;
       const L = OM.HOME;
@@ -246,8 +265,10 @@ OM.ownWords.add('c1-04');
           if (T < w.t0) continue;
           const age = T - w.t0;
           const glow = Math.exp(-age / 0.3) + (T >= ON[KEY] ? 0.8 * Math.exp(-(T - ON[KEY]) / 0.5) : 0);
-          pool(x, w.cx, w.cy, w.w * 0.62 + w.cap, w.cap * 1.5, ink.lit, 0.2 * glow * (1 - fade));
-          const k = 1 + (w.key ? 0.32 : 0.2) * (1 - OM.ease.outCubic(OM.clamp(age / 0.16)));
+          const swell = w.t0 === ON[0] ? OM.smooth(OM.clamp(age / 0.14)) : 1;
+          pool(x, w.cx, w.cy, w.w * 0.62 + w.cap, w.cap * 1.5, ink.lit, 0.2 * glow * swell * (1 - fade));
+          // The first word lands two frames after the cut: a softer punch, so the cut stays smooth.
+          const k = 1 + (w.key ? 0.32 : w.t0 === ON[0] ? 0.07 : 0.2) * (1 - OM.ease.outCubic(OM.clamp(age / 0.16)));
           const cool = OM.clamp(age / 0.45);
           let row = null, end = 0, fill = null, xa = 0, xb = 0, ya = 0, yb = 0;
           const flush = () => {
@@ -448,7 +469,43 @@ OM.ownWords.add('c1-04');
         }
       };
 
-      return {
+      // ---- camera: c1-03's push carried through the cut and let go into the pull-back; then a gentle
+      // over-the-shoulder dolly, drifting sideways past the friend, home by the last frames ----
+      const PUSH = OM.c1.push34, TAU = 0.45;
+      const look = (T) => {
+        const s = Math.max(0, T - start);
+        const carry = (PUSH.ZOOM - 1 + PUSH.SPEED * TAU * (1 - Math.exp(-s / TAU))) * (1 - OM.smooth(OM.prog(T, PULL0, DROP)));
+        const par = OM.smooth(OM.prog(T, PULL0 + 0.2, DROP + 0.3)) * (1 - OM.smooth(OM.prog(T, KICK2, END - SEAM)));
+        const x = -30 * par * Math.sin(0.8 * (T - PULL0) + 0.4), rot = ((0.7 * Math.PI) / 180) * par * Math.sin(0.6 * (T - PULL0) - 0.9);
+        const zoom = (1 + carry) * OM.c1.cover(rot, x, 0);
+        // The sharp zone: the screen, as it is projected now.
+        const k = camAt(T), kc = F / k.D;
+        const amount = OM.post.envelope(T, start, END - SEAM, { ramp: 0.4, hold: 0.05 }) * OM.smooth(OM.prog(T, PULL0, DROP));
+        return { amount, cam: { zoom, rot, x, y: 0 }, p0: [Math.max(0.3, (SW * kc * 0.55) / 1080), Math.max(0.24, (SH * kc * 0.6) / 1080), (960 - kc * k.ex) / 1920, 0.5] };
+      };
+      // ---- extras: the screen's light flickering on the room, motes drifting through its beam ----
+      const beam = (ctx, T, G, scx, scy, kc) => {
+        const on2 = OM.smooth(OM.prog(T, PULL0, DROP));
+        if (on2 <= 0 || G <= 0.01) return;
+        const flick = 0.6 + 0.4 * OM.hash(Math.floor(T * 30), 3, 0xc104);
+        pool(ctx, scx, scy, SW * kc * 1.25, SH * kc * 1.1, ink.lit, 0.05 * on2 * Math.min(G, 1.4) * flick);
+        const R = SW * kc * 0.9;
+        for (let i = 0; i < 46; i++) {
+          const h1 = OM.hash(i, 1, 0xc104), h2 = OM.hash(i, 2, 0xc104), h3 = OM.hash(i, 3, 0xc104);
+          const x = (((h1 * 2400 + T * (14 + 18 * h3)) % 2400) + 2400) % 2400 - 240;
+          const y = 60 + h2 * 960 + 22 * Math.sin(T * (0.4 + 0.5 * h3) + 6.28 * h1) - T * 6;
+          const d = Math.hypot((x - scx) / R, (y - scy) / (R * 0.7));
+          const a = on2 * Math.min(1, G) * Math.exp(-d * d * 1.6) * (0.5 + 0.5 * Math.sin(T * 3 + 9 * h2));
+          if (a < 0.03) continue;
+          ctx.globalAlpha = Math.min(0.9, a);
+          ctx.fillStyle = h3 > 0.7 ? ink.crest : ink.hover;
+          const sz = h3 > 0.85 ? 3 : 2;
+          ctx.fillRect(x, ((y % 1080) + 1080) % 1080, sz, sz);
+        }
+        ctx.globalAlpha = 1;
+      };
+
+      return OM.c1.post({
         render(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
@@ -500,6 +557,7 @@ OM.ownWords.add('c1-04');
             if (q >= 0 && q < hc && r >= 0 && r < friendHead.rows) friend.work[r * hc + q] = 1;
           }
           person(ctx, dpr, friend, G * (0.3 + 0.7 * (1 - turn)) * (1 + 0.35 * lean), true, 0.45);
+          beam(ctx, T, G, scx, scy, kc);
         },
         release: () => {
           c.release();
@@ -507,7 +565,7 @@ OM.ownWords.add('c1-04');
           off.height = 0;
           ox = null;
         },
-      };
+      }, fx, look);
     },
   });
 })();

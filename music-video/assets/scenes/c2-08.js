@@ -12,6 +12,21 @@ OM.ownWords.add('c2-08');
   OM.c2.ready('c2-08', W);
   const { pool, sm, decay } = OM.c2;
 
+  const FX = `vec4 effect(vec2 uv) {
+    vec2 p = cam(uv);
+    if (uAmount <= 0.0) return src(p);
+    // Circuit glow: green traces bloom, with rings of current racing out from the core.
+    vec4 c = src(p);
+    vec3 g = vec3(0.0);
+    vec2 px = 6.0 / uRes;
+    for (int i = -2; i <= 2; i++) for (int k = -2; k <= 2; k++) { vec3 s = src(p + vec2(float(i), float(k)) * px).rgb; g += s * step(s.r + 0.12, s.g); }
+    g /= 25.0;
+    float r = length((p - vec2(0.5)) * vec2(uRes.x / uRes.y, 1.0));
+    float wave = pow(0.5 + 0.5 * sin(r * 40.0 - uTime * 18.0), 4.0);
+    c.rgb += g * (0.6 + 2.0 * wave) * uAmount;
+    return c;
+  }`;
+
   OM.scene({
     id: 'c2-08',
     build(el, { start, duration }) {
@@ -19,6 +34,7 @@ OM.ownWords.add('c2-08');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      const fx = OM.post(el, c, { effect: FX });
       const END = start + duration;
       const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
       const words = OM.sung('c2-08');
@@ -34,7 +50,7 @@ OM.ownWords.add('c2-08');
       const S0 = HM.cw / CORE;
       /** Camera scale: from the spark out to the board, a slow drift, then the dive on the roll. */
       const scale = (T) => {
-        const open = OM.lerp(S0, 1, OM.ease.outExpo(OM.prog(T, start + 0.03, on[0])));
+        const open = OM.lerp(S0, 1, OM.ease.inOutCubic(OM.prog(T, start + 0.03, on[0] + 0.35)));
         return open * (1 + 0.1 * OM.prog(T, on[0], DB2)) * Math.exp(2.4 * Math.max(0, T - DB2 - 0.1));
       };
 
@@ -109,7 +125,7 @@ OM.ownWords.add('c2-08');
       });
 
       return {
-        render(t, T) {
+        draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + 0.05) return OM.handoff('spark', ctx, T, dpr);
@@ -119,7 +135,7 @@ OM.ownWords.add('c2-08');
           ctx.fillRect(0, 0, 1920, 1080);
           const s = scale(T);
           const X = (x) => ZX + (x - ZX) * s, Y = (y) => ZY + (y - ZY) * s;
-          const dark = sm(T, OFF - 0.06, OFF + 0.04); // lights out
+          const dark = sm(T, OFF - 0.1, OFF + 0.25); // lights out, eased into the night
           const wordsOut = OM.prog(T, DB2 + 0.5, DB2 + 1.2);
           const grow = OM.prog(T, start + 0.03, on[0] + 0.25); // traces run out as the board opens
           const pulse = Math.max(decay(T, DB1, 0.16), ...KICKS.map((k) => 0.5 * decay(T, k, 0.08)));
@@ -204,7 +220,32 @@ OM.ownWords.add('c2-08');
             }
           }
         },
-        release: () => c.release(),
+        render(t, T) {
+          this.draw(t, T);
+          const ctx = c.ensure();
+          if (OM.c2.live(T, start, END)) {
+          // Electrons flowing out along the traces.
+          const s = scale(T), X = (x) => ZX + (x - ZX) * s, Y = (y) => ZY + (y - ZY) * s;
+          const grow = OM.prog(T, start + 0.03, on[0] + 0.25), dark = sm(T, OFF - 0.1, OFF + 0.25), sz = 4 * Math.min(s, 3);
+          ctx.fillStyle = OM.c2.rgba(ink.lit, 1 - dark);
+          traces.forEach((tr, n) => {
+            if (n % 2) return;
+            const d = (T * 520 + tr.ph * tr.len) % tr.len;
+            if (d > tr.len * grow) return;
+            for (const [a, b, acc, l] of tr.segs) {
+              if (d < acc || d > acc + l) continue;
+              const f = (d - acc) / l;
+              ctx.fillRect(X(a[0] + (b[0] - a[0]) * f) - sz / 2, Y(a[1] + (b[1] - a[1]) * f) - sz / 2, sz, sz);
+            }
+          });
+          }
+          // Fast dive through the layers, banking as it goes; easing level into the dark.
+          OM.c2.apply(fx, T, start, END, { amount: 0.85, rot: 0.03 * Math.sin((T - start) * 1.1) * (0.4 + 0.6 * sm(T, DB2, DB2 + 0.5)), zoom: 1 + 0.03 * sm(T, DB2, OFF), ramp: 0.55 });
+        },
+        release: () => {
+          fx.release();
+          c.release();
+        },
       };
     },
   });

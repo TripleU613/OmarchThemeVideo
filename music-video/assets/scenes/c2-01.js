@@ -51,6 +51,23 @@ OM.ownWords.add('c2-01');
       ctx.fillRect(-rx, -rx, 2 * rx, 2 * rx);
       ctx.restore();
     },
+    /** The section camera: a slow drift shared by every chorus 2 scene, so it carries straight through the inner cuts; at rest at the section's two ends. `d` adds a scene's own move. Zoom rises as needed to cover the corners. */
+    camAt(T, d = {}) {
+      const A = OM.smooth(OM.prog(T, 157.971 + 0.07, 158.8)) * (1 - OM.smooth(OM.prog(T, 192.35, 193.285 - 0.08)));
+      const x = A * 22 * Math.sin(0.6 * T) + (d.x || 0), y = A * 12 * Math.sin(0.45 * T + 1) + (d.y || 0);
+      const rot = A * 0.004 * Math.sin(0.37 * T) + (d.rot || 0);
+      const zoom = (1 + A * 0.02) * (d.zoom || 1);
+      const zmin = 1 + (2 * Math.abs(x)) / 1920 + (2 * Math.abs(y)) / 1080 + 1.8 * Math.abs(rot);
+      return { zoom: Math.max(zoom, zmin), rot, x, y };
+    },
+    /** Run a scene's post pass: its own move and effect amount eased to 0 at its window's ends, over the section camera. */
+    apply(fx, T, start, end, { amount = 0, zoom = 1, rot = 0, x = 0, y = 0, p0, p1, ramp = 0.4 } = {}) {
+      const e = OM.post.envelope(T, start, end, { ramp, hold: 0.07 });
+      const cam = OM.c2.camAt(T, { zoom: 1 + (zoom - 1) * e, rot: rot * e, x: x * e, y: y * e });
+      return fx.apply(T, { amount: amount * e, cam, p0, p1 });
+    },
+    /** True away from the cut frames, where extras may draw. */
+    live: (T, start, end) => T > start + 0.07 && T < end - 0.07,
     sm: (T, a, b) => OM.smooth(OM.prog(T, a, b)),
     decay: (T, t0, half) => (T < t0 ? 0 : Math.pow(0.5, (T - t0) / half)),
     /**
@@ -138,6 +155,20 @@ OM.ownWords.add('c2-01');
   OM.c2.ready('c2-01', W);
   const { pool, sm, decay } = OM.c2;
 
+  const FX = `vec4 effect(vec2 uv) {
+    vec2 p = cam(uv);
+    if (uAmount <= 0.0) return src(p);
+    // Glass refraction: the picture bends along the shard edges, with caustic sparkle riding them.
+    vec2 px = 2.0 / uRes;
+    vec3 L = vec3(0.3, 0.59, 0.11);
+    vec2 g = vec2(dot(src(p + vec2(px.x, 0.0)).rgb - src(p - vec2(px.x, 0.0)).rgb, L), dot(src(p + vec2(0.0, px.y)).rgb - src(p - vec2(0.0, px.y)).rgb, L));
+    float edge = clamp(length(g) * 4.0, 0.0, 1.0);
+    vec4 c = src(p + g * uAmount * 0.0025);
+    float sp = step(0.993, hash(floor(p * uRes / 6.0) + floor(uTime * 10.0)));
+    c.rgb += vec3(0.855, 0.925, 0.776) * sp * edge * uAmount;
+    return c;
+  }`;
+
   OM.scene({
     id: 'c2-01',
     build(el, { start, duration }) {
@@ -145,6 +176,7 @@ OM.ownWords.add('c2-01');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      const fx = OM.post(el, c, { effect: FX });
       const END = start + duration;
       const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
       const words = OM.sung('c2-01');
@@ -216,7 +248,7 @@ OM.ownWords.add('c2-01');
       });
 
       return {
-        render(t, T) {
+        draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + 0.05) return OM.handoff('glow', ctx, T, dpr);
@@ -291,7 +323,32 @@ OM.ownWords.add('c2-01');
             ctx.strokeRect(321, 141, 1278, 798);
           }
         },
-        release: () => c.release(),
+        render(t, T) {
+          this.draw(t, T);
+          const ctx = c.ensure();
+          if (OM.c2.live(T, start, END)) {
+          // Glass glints: four-point stars flaring on the mesh's joints once the pane is whole.
+          if (T > on[0] + 0.1 && T < DB2) {
+            for (let n = 0; n < 22; n++) {
+              const slot = Math.floor(T * 5 + n * 0.37), vi = Math.floor(OM.hash(n, slot, 21) * V.length), [x, y] = V[vi];
+              const f = (T * 5 + n * 0.37) % 1, a = Math.sin(Math.PI * f) * (1 - sm(T, SNARES[2], DB2));
+              if (OM.hash(slot, n, 22) < 0.5 || a < 0.05) continue;
+              const r = 4 + 9 * a;
+              ctx.fillStyle = OM.c2.rgba(ink.crest, a);
+              ctx.fillRect(x - r, y - 1, 2 * r, 2);
+              ctx.fillRect(x - 1, y - r, 2, 2 * r);
+            }
+          }
+          }
+          // Slow-motion pull-out as the shards fly home, locking with a small punch on the key word.
+          const amount = 0.12 + 0.5 * (1 - sm(T, on[K] + 0.1, on[K] + 0.6));
+          const zoom = 1 + 0.07 * (1 - OM.smooth(OM.prog(T, start, on[K]))) + 0.012 * decay(T, on[K], 0.12);
+          OM.c2.apply(fx, T, start, END, { amount, zoom });
+        },
+        release: () => {
+          fx.release();
+          c.release();
+        },
       };
     },
   });

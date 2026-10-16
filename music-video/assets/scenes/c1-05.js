@@ -29,6 +29,24 @@
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      // Graphite grain: the pencil's grey marks broken up by the paper's tooth, with a faint lead sheen; the
+      // green render is left alone, and the grain fades out as the render becomes real.
+      const fx = OM.post(el, c, {
+        effect: `vec4 effect(vec2 uv) {
+  vec2 q = cam(uv);
+  vec4 b = src(q);
+  if (uAmount <= 0.0) return b;
+  vec2 sp = q * uRes / (uRes.y / 1080.0);
+  float l = dot(b.rgb, vec3(0.3, 0.59, 0.11));
+  float lead = step(b.g, b.b + 0.03) * smoothstep(0.1, 0.3, l);
+  float tooth = smoothstep(0.3, 0.8, vnoise(sp * vec2(0.85, 0.3)) * 0.65 + hash(floor(q * uRes)) * 0.35);
+  float sheen = pow(vnoise(sp * 0.012 + vec2(uTime * 0.2, 0.0)), 3.0);
+  vec3 c = b.rgb * (1.0 - 0.6 * tooth * lead * uAmount) + vec3(0.753, 0.792, 0.961) * 0.12 * sheen * lead * uAmount;
+  float surf = (1.0 - smoothstep(0.04, 0.16, l)) * (hash(floor(q * uRes)) - 0.5);
+  c += vec3(0.255, 0.282, 0.408) * 0.18 * surf * uAmount;
+  return vec4(c, 1.0);
+}`,
+      });
       const L = OM.HOME;
       const ink = OM.fieldInks('tokyo-night');
       const th = OM.theme('tokyo-night');
@@ -412,7 +430,62 @@
       };
 
       let lay = null;
-      return {
+      // ---- camera: a tracking pan along the sheet, leaning toward each window as its word inks ----
+      const look = (T) => {
+        const e = OM.post.envelope(T, start, END, { ramp: 0.45, hold: HOLD });
+        let x = 0;
+        if (lay) {
+          const lean = (k) => -0.085 * (lay.tiles[k].x + lay.tiles[k].w / 2 - 960);
+          x = lean(0) * OM.smooth(OM.prog(T, S0, on[0] + 0.1));
+          for (let k = 1; k < 3; k++) x += (lean(k) - lean(k - 1)) * OM.smooth(OM.prog(T, on[k] - 0.12, on[k] + 0.32));
+          x -= lean(2) * OM.smooth(OM.prog(T, KICK2, KICK2 + 0.5));
+        }
+        x *= e;
+        const zoom = (1 + 0.012 * e) * OM.c1.cover(0, x, 0);
+        const amount = e * (1 - OM.smooth(OM.prog(T, on[0], on[2] + D[2] + 0.25)));
+        return { amount, cam: { zoom, rot: 0, x, y: 0 } };
+      };
+      // ---- extras: pencil shavings drifting down while it is drawn, eraser crumbs where the construction is rubbed out ----
+      const crumbs = (ctx, T) => {
+        if (!lay) return;
+        const shav = 1 - OM.smooth(OM.prog(T, on[2], on[2] + 0.4));
+        if (shav > 0) {
+          for (let i = 0; i < 14; i++) {
+            const h1 = OM.hash(i, 1, 0xc105), h2 = OM.hash(i, 2, 0xc105), t0 = S0 + h2 * (on[2] - S0);
+            const a = T - t0;
+            if (a < 0 || a > 1.4) continue;
+            const x = IN.x + 80 + h1 * (IN.w - 160) + 30 * Math.sin(a * 5 + 7 * h1), y = IN.y + 40 + a * (260 + 140 * h2);
+            ctx.save();
+            ctx.globalAlpha = 0.75 * shav * Math.min(1, a * 6) * (1 - a / 1.4);
+            ctx.translate(x, y);
+            ctx.rotate(a * (3 + 4 * h1) + 6 * h2);
+            ctx.fillStyle = i % 3 ? th['text-muted'] : ink.dim;
+            ctx.beginPath();
+            ctx.moveTo(-6, 0);
+            ctx.quadraticCurveTo(0, -5, 6, 0);
+            ctx.lineTo(0, 2);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+        // Rubbed out: each window's sketch as it renders, the bar on its kick, all the guides on the key word.
+        const rub = [...[0, 1, 2].map((k) => [on[k] + 0.5 * D[k], lay.tiles[k], 10]), [KICK1 + 0.08, { x: IN.x, y: IN.y, w: IN.w, h: Y(BAR) - IN.y }, 10], [on[2], IN, 34]];
+        rub.forEach(([t0, r, n], j) => {
+          for (let i = 0; i < n; i++) {
+            const h1 = OM.hash(i, 1, 0xc15 + j), h2 = OM.hash(i, 2, 0xc15 + j), h3 = OM.hash(i, 3, 0xc15 + j);
+            const a = T - t0 - 0.25 * h3;
+            if (a < 0 || a > 0.6) continue;
+            const x = r.x + h1 * r.w + (h2 - 0.5) * 90 * a, y = r.y + h2 * r.h + 600 * a * a - 40 * a;
+            ctx.globalAlpha = 0.8 * (1 - a / 0.6);
+            ctx.fillStyle = i % 2 ? th['border-strong'] : th['text-muted'];
+            const d = 2 + 3 * h3;
+            ctx.fillRect(x, y, d, d * 0.8);
+          }
+        });
+        ctx.globalAlpha = 1;
+      };
+      return OM.c1.post({
         render(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
@@ -564,9 +637,10 @@
               ctx.fillRect(x2, y, 1, y2 - y + 1);
             }
           }
+          crumbs(ctx, T);
         },
         release: () => c.release(),
-      };
+      }, fx, look);
     },
   });
 })();

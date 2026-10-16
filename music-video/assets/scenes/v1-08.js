@@ -14,6 +14,19 @@ OM.ownWords.add('v1-08');
   const V = OM.v1;
   const WEIGHT = 800;
   const PROBE = V.ready('v1-08-type', WEIGHT);
+  const GLSL = V.TEXTMASK + `
+float lum(vec2 uv) { return dot(src(cam(uv)).rgb, vec3(0.333)); }
+vec4 effect(vec2 uv) {
+  vec4 c = src(cam(uv));
+  if (uAmount <= 0.0) return c;
+  vec2 px = 1.4 / vec2(1920.0, 1080.0);
+  float tl = lum(uv + px * vec2(-1, 1)), t = lum(uv + px * vec2(0, 1)), tr = lum(uv + px * vec2(1, 1));
+  float l = lum(uv + px * vec2(-1, 0)), r = lum(uv + px * vec2(1, 0));
+  float bl = lum(uv + px * vec2(-1, -1)), b = lum(uv + px * vec2(0, -1)), br = lum(uv + px * vec2(1, -1));
+  float gx = tr + 2.0 * r + br - tl - 2.0 * l - bl, gy = tl + 2.0 * t + tr - bl - 2.0 * b - br;
+  float edge = clamp(length(vec2(gx, gy)), 0.0, 1.0); // Sobel outline light along the ridges
+  return vec4(c.rgb + vec3(0.73, 0.87, 0.59) * edge * (0.35 + 0.5 * uP0.x) * uAmount, 1.0);
+}`;
   OM.scene({
     id: 'v1-08',
     build(el, { start, duration }) {
@@ -21,6 +34,7 @@ OM.ownWords.add('v1-08');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      const fx = V.post(el, c, GLSL);
       const END = start + duration, H = V.HOLD;
       const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
       const sung = OM.sung('v1-08');
@@ -113,8 +127,31 @@ OM.ownWords.add('v1-08');
         pool(ctx, 960, 880, 440, 110, ink.lit, 0.42 * a);
       };
 
+      // Camera: a slow push into the core with the scanner's micro-rotation, back to rest for the spot.
+      // Verification particles ride the completion wave.
+      const FXP = (ctx, dpr, T) => {
+        const e = V.env(T, start, END, 0.5);
+        const push = OM.smooth(OM.prog(T, start, DONE)) * (1 - OM.smooth(OM.prog(T, LIE0 - 0.3, LIE1)));
+        const wv = T >= DONE ? OM.prog(T, DONE, DONE + 0.6) : -1;
+        if (wv >= 0 && wv < 1) {
+          const rr = OM.ease.outCubic(wv) * 1.15 * RMAX;
+          ctx.fillStyle = ink.crest;
+          for (let i = 0; i < 64; i++) {
+            const a = (i / 64) * Math.PI * 2 + OM.hash(i, 1, 81) * 0.1, j = rr + (OM.hash(i, 2, 81) - 0.5) * 30;
+            ctx.globalAlpha = (1 - wv) * e;
+            ctx.fillRect(PX + Math.cos(a) * j - 3, PY + Math.sin(a) * j - 3, 6, 6);
+          }
+          ctx.globalAlpha = 1;
+        }
+        const glow = T >= DONE ? Math.exp(-(T - DONE) / 0.5) : 0;
+        return { amount: e * (1 - OM.prog(T, LIE0, LIE1)), cam: { zoom: 1 + 0.07 * push * e, rot: 0.0035 * Math.sin(T * 9) * push * e }, p0: [glow, 0, 0, 0] };
+      };
       return {
         render(t, T) {
+          this.draw(t, T);
+          fx.apply(T, FXP(c.ensure(), c.dpr, T));
+        },
+        draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + H) return OM.handoff('spark', ctx, T, dpr);
@@ -124,8 +161,12 @@ OM.ownWords.add('v1-08');
           ctx.fillRect(0, 0, 1920, 1080);
           const lie = OM.smooth(OM.prog(T, LIE0, LIE1));
           if (lie > 0) spot(ctx, lie);
-          const wake = OM.prog(T, start + H, on[0]);
+          const wake = OM.smooth(OM.prog(T, start + H, on[0] + 0.1));
           pool(ctx, PX, PY, 72, 72, ink.lit, 0.4 * (1 - wake)); // the spark's halo, fading as the core grows
+          ctx.globalAlpha = 1 - wake;
+          ctx.fillStyle = ink.crest;
+          OM.cell(ctx, HM, hc.col, hc.row, dpr); // the spark itself, until the core has grown round it
+          ctx.globalAlpha = 1;
           ctx.save();
           ctx.globalAlpha = 1 - lie;
           ctx.translate(960, OM.lerp(PY, 880, lie));
@@ -179,7 +220,10 @@ OM.ownWords.add('v1-08');
           });
           ctx.restore();
         },
-        release: () => c.release(),
+        release: () => {
+          fx.release();
+          c.release();
+        },
       };
     },
   });

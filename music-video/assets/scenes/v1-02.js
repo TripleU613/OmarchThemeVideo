@@ -10,6 +10,13 @@ OM.ownWords.add('v1-02');
   const V = OM.v1;
   const WEIGHT = 800;
   const PROBE = V.ready('v1-02-type', WEIGHT);
+  const GLSL = V.TEXTMASK + `
+vec4 effect(vec2 uv) {
+  float top = smoothstep(0.55, 1.0, uv.y) * uAmount * offText(uv); // the strings sway most near the top
+  vec2 u = cam(uv);
+  u.x += (sin(uv.y * 9.0 + uTime * 1.7) * 0.006 + sin(uv.y * 23.0 - uTime * 2.3) * 0.002) * top;
+  return src(u);
+}`;
   OM.scene({
     id: 'v1-02',
     build(el, { start, duration }) {
@@ -17,6 +24,7 @@ OM.ownWords.add('v1-02');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      const fx = V.post(el, c, GLSL);
       const END = start + duration, H = V.HOLD, H0 = 0.045; // the first word lands 0.06s in
       const W = OM.theme('white'), WI = OM.fieldInks('white');
       const on = OM.sung('v1-02').map((w) => w.t0);
@@ -37,9 +45,9 @@ OM.ownWords.add('v1-02');
       // The camera: one eased step up per word, the big tilt to the hand, then out past it.
       const camY = (T) => {
         let y = 0;
-        on.forEach((t0, k) => (y += (k ? 55 : 170) * OM.ease.outExpo(OM.prog(T, t0 - 0.06, t0 + 0.45))));
+        on.forEach((t0, k) => (y += k ? 55 * OM.ease.outExpo(OM.prog(T, t0 - 0.06, t0 + 0.45)) : 170 * OM.ease.inOutCubic(OM.prog(T, start, t0 + 0.55)))); // eased off the cut
         y += 1000 * OM.ease.inOutCubic(OM.prog(T, TILT0, YANK));
-        y += 1500 * OM.ease.inCubic(OM.prog(T, YANK + 0.12, GONE));
+        y += 1500 * OM.ease.inOutCubic(OM.prog(T, YANK + 0.1, 46.15)); // settled on white well before the cut
         return y;
       };
       // A chip's drop: falls from out of frame to arrive on its onset, then jerks on the string.
@@ -59,8 +67,32 @@ OM.ownWords.add('v1-02');
       };
       const barX = (x) => 960 + (x - 960) * 0.42;
 
+      // Camera: a small nod down as each chip lands on its strings, at 1.03; dust falling through the light.
+      const FXP = (ctx, dpr, T) => {
+        const e = V.env(T, start, END);
+        const L = lay(), cy = camY(T);
+        let x0 = 1920, x1 = 0, y0 = 1080, y1 = 0;
+        for (const ch of L.chips) { x0 = Math.min(x0, ch.x - ch.px); x1 = Math.max(x1, ch.x + ch.w + ch.px); y0 = Math.min(y0, ch.y + cy - ch.h / 2 - 40); y1 = Math.max(y1, ch.y + cy + ch.h / 2 + 40); }
+        let nod = 0;
+        for (const t0 of on) if (T >= t0) nod += 12 * Math.exp(-(T - t0) / 0.12) * Math.sin(Math.min(Math.PI, ((T - t0) / 0.1) * Math.PI));
+        if (e > 0) {
+          ctx.fillStyle = WI.dim;
+          for (let i = 0; i < 70; i++) {
+            const h = OM.hash(i, 1, 21), s = 2 + 2 * OM.hash(i, 2, 21);
+            const y = ((OM.hash(i, 3, 21) * 1080 + T * (30 + 50 * h)) % 1100) - 10, x = OM.hash(i, 4, 21) * 1920 + 14 * Math.sin(T * 0.8 + i);
+            ctx.globalAlpha = 0.7 * e;
+            ctx.fillRect(x, y, s, s);
+          }
+          ctx.globalAlpha = 1;
+        }
+        return { amount: e, cam: { zoom: 1 + 0.03 * e, y: nod * e }, p1: V.rect(x0 - 30, y0, x1 + 30, y1) };
+      };
       return {
         render(t, T) {
+          this.draw(t, T);
+          fx.apply(T, FXP(c.ensure(), c.dpr, T));
+        },
+        draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + H0) return V.phoneFrame(ctx);
@@ -147,7 +179,10 @@ OM.ownWords.add('v1-02');
             ctx.restore();
           }
         },
-        release: () => c.release(),
+        release: () => {
+          fx.release();
+          c.release();
+        },
       };
     },
   });

@@ -41,6 +41,20 @@ OM.ownWords.add('b-01');
   B.SPARK = { col: hc.col, row: hc.row, x: OM.HOME.x0 + (hc.col + 0.5) * OM.HOME.cw, y: OM.HOME.y0 + (hc.row + 0.5) * OM.HOME.ch };
   /** Landing time of a word: its onset, though not inside the in-handoff's first frames. */
   B.land = (t0, start) => Math.max(t0, start + 0.05);
+  /** Camera and effect envelope: exactly 0 on the cut frames at both ends, easing in and out with no speed at the cuts. */
+  B.env = (T, start, end, ramp = 0.5) => OM.post.envelope(T, start, end, { ramp, hold: 0.12 });
+  /** Drifting specks, analytic in T: n of them in a box, wrapping, twinkling. */
+  B.motes = (ctx, T, { seed = 1, n = 40, color, alpha = 0.5, x = 0, y = 0, w = 1920, h = 1080, vx = 6, vy = -10, size = 3 }) => {
+    ctx.fillStyle = color;
+    for (let i = 0; i < n; i++) {
+      const a = OM.hash(i, 1, seed), b = OM.hash(i, 2, seed), sp = 0.5 + OM.hash(i, 3, seed);
+      const px = x + ((((a * w + vx * sp * T) % w) + w) % w), py = y + ((((b * h + vy * sp * T) % h) + h) % h);
+      ctx.globalAlpha = alpha * (0.4 + 0.6 * Math.abs(Math.sin(T * (1 + sp) + i)));
+      const z = size * (0.6 + 0.8 * OM.hash(i, 4, seed));
+      ctx.fillRect(px - z / 2, py - z / 2, z, z);
+    }
+    ctx.globalAlpha = 1;
+  };
 
   /**
    * Set a line's words in centred rows of monospace type, measured at runtime.
@@ -129,6 +143,19 @@ OM.ownWords.add('b-01');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+    const fx = OM.post(el, c, { effect: `vec4 effect(vec2 uv) {
+  vec2 q = cam(uv);
+  vec4 base = src(q);
+  float d = abs(uv.y - uP0.x);
+  float R = 11.0 * smoothstep(0.07, 0.34, d);
+  vec4 acc = vec4(0.0);
+  for (int i = 0; i < 12; i++) {
+    float a = float(i) * 0.5236;
+    float k = 0.45 + 0.55 * float(i % 3) / 2.0;
+    acc += src(q + vec2(cos(a) / 1920.0, sin(a) / 1080.0) * R * k);
+  }
+  return mix(base, acc / 12.0, uAmount);
+}` });
       const END = start + duration;
       const th = OM.theme('tokyo-night');
       const ink = OM.fieldInks('tokyo-night');
@@ -185,7 +212,7 @@ OM.ownWords.add('b-01');
       };
 
       return {
-        render(t, T) {
+        draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < on[0] || T >= END - 0.1) return OM.handoff(T < on[0] ? 'night' : 'spark', ctx, T, dpr);
@@ -194,14 +221,14 @@ OM.ownWords.add('b-01');
           const { set, drums } = lay();
 
           // The whole counter: slams in on the first word, folds into the spark at the end.
-          const slam = 1 - OM.ease.outCubic(OM.prog(T, on[0], on[0] + 0.16));
+          const slam = 1 - OM.ease.inOutCubic(OM.prog(T, on[0], start + 0.45));
           const fold = OM.ease.inCubic(OM.prog(T, FOLD, END - 0.12));
-          const k = (1 + 0.06 * slam) * (1 - fold) + 0.004;
+          const k = (1 + 0.04 * slam) * (1 - fold) + 0.004;
           ctx.save();
           ctx.translate(B.SPARK.x, B.SPARK.y);
           ctx.scale(k, k);
           ctx.translate(-B.SPARK.x, -B.SPARK.y);
-          ctx.globalAlpha = 1 - OM.prog(T, FOLD + 0.05, END - 0.14);
+          ctx.globalAlpha = OM.smooth(OM.prog(T, on[0] - 0.02, start + 0.38)) * (1 - OM.prog(T, FOLD + 0.05, END - 0.14));
 
           // The key word's downbeat shakes the housing.
           const jolt = (tt, a) => (T < tt ? 0 : a * Math.exp(-(T - tt) / 0.07) * Math.sin((T - tt) * 70));
@@ -269,7 +296,37 @@ OM.ownWords.add('b-01');
             ctx.globalAlpha = 1;
           }
         },
-        release: () => c.release(),
+        render(t, T) {
+          this.draw(t, T);
+          const e = B.env(T, start, END);
+          const ctx = c.ensure();
+          ctx.globalAlpha = 1;
+          if (e > 0) {
+
+            const { set, drums } = lay();
+            // Dust in the counter's light.
+            B.motes(ctx, T, { seed: 101, n: 46, color: OM.fieldInks('tokyo-night').mid, alpha: 0.45 * e, vx: 14, vy: -6, size: 3 });
+            // Click flashes: a crest tick above each drum as it locks.
+            const ik = OM.fieldInks('tokyo-night');
+            const dh = set.cap * 1.75;
+            for (const d of drums) {
+              const a = T - on[d.k];
+              if (a < 0 || a > 0.12) continue;
+              ctx.globalAlpha = e * (1 - a / 0.12);
+              ctx.fillStyle = ik.crest;
+              const top = d.y - set.cap / 2 - dh / 2;
+              ctx.fillRect(d.x + set.adv / 2 - 2, top - 14 - a * 80, 4, 10);
+              ctx.fillRect(d.x + 4, top - 4, set.adv - 8, 2);
+            }
+          }
+          ctx.globalAlpha = 1;
+          fx.apply(T, {
+            amount: e * (1 - 0.6 * OM.pulse(on, T, 0.15)),
+            cam: { zoom: 1 + 0.14 * e, x: e * 110 * (1 - 2 * OM.smooth(OM.prog(T, start, END))) },
+            p0: [1 - 700 / 1080, 0, 0, 0],
+          });
+        },
+        release: () => { fx.release(); c.release(); },
       };
     },
   });

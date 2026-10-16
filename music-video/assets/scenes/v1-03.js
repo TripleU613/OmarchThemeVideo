@@ -12,6 +12,13 @@ OM.ownWords.add('v1-03');
   const WEIGHT = 800, RW = 700;
   const PROBE = V.ready('v1-03-type', WEIGHT);
   V.ready('v1-03-receipt', RW);
+  const GLSL = V.TEXTMASK + `
+vec4 effect(vec2 uv) {
+  vec4 c = src(cam(uv));
+  float f = uAmount * (0.06 * step(0.85, hash(vec2(floor(uTime * 30.0), 3.0))) + 0.012 * sin(uTime * 377.0));
+  float band = uAmount * 0.025 * smoothstep(0.3, 1.0, sin(uv.y * 3.0 - uTime * 1.3)); // the tube's slow roll
+  return vec4(c.rgb * (1.0 - f - band), 1.0);
+}`;
   OM.scene({
     id: 'v1-03',
     build(el, { start, duration }) {
@@ -19,6 +26,7 @@ OM.ownWords.add('v1-03');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      const fx = V.post(el, c, GLSL);
       const END = start + duration, H = V.HOLD, H0 = 0.012; // the first coin lands 14ms in
       const W = OM.theme('white'), WI = OM.fieldInks('white');
       const sung = OM.sung('v1-03');
@@ -47,8 +55,28 @@ OM.ownWords.add('v1-03');
       });
 
       const roll = (T, t0, d = 0.16) => OM.ease.outExpo(OM.prog(T, t0, t0 + d));
+      // Camera: a slow truck along the counter, punching in on each coin. The tubes flicker on at the cut.
+      const FXP = (ctx, dpr, T) => {
+        const e = V.env(T, start, END);
+        const on1 = OM.lerp(40, -40, OM.smooth(OM.prog(T, start, END)));
+        let punch = 0;
+        for (const t0 of on) if (T >= t0) punch += 0.03 * Math.exp(-(T - t0) / 0.09);
+        // Lights on: the white page flickers into the store over the first 0.3s.
+        const lit = OM.prog(T, start + H0, start + 0.32);
+        if (T >= start + H0 && lit < 1) {
+          ctx.fillStyle = W.bg;
+          ctx.globalAlpha = (1 - lit) * (OM.hash(Math.floor(T * 30), 5, 31) > 0.45 ? 1 : 0.5);
+          ctx.fillRect(0, 0, 1920, 1080);
+          ctx.globalAlpha = 1;
+        }
+        return { amount: e, cam: { zoom: 1 + (0.045 + punch) * e, x: on1 * e } };
+      };
       return {
         render(t, T) {
+          this.draw(t, T);
+          fx.apply(T, FXP(c.ensure(), c.dpr, T));
+        },
+        draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + H0) return OM.handoff('white', ctx, T, dpr);
@@ -187,7 +215,10 @@ OM.ownWords.add('v1-03');
           ctx.fill();
           ctx.globalAlpha = 1;
         },
-        release: () => c.release(),
+        release: () => {
+          fx.release();
+          c.release();
+        },
       };
     },
   });

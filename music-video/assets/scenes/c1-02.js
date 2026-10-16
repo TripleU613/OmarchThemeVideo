@@ -81,6 +81,32 @@ OM.ownWords.add('c1-02'); // this scene draws its own words, so the caption bar 
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      // The X-ray: a technical view in the theme's blues (faces translucent, edges drawn as light, a faint
+      // drafting grid), the green light of the keys and seams kept as it is; at power-on a scan bar runs up
+      // the frame and flips it to the real render.
+      const fx = OM.post(el, c, {
+        effect: `vec4 effect(vec2 uv) {
+  vec2 q = cam(uv);
+  vec4 b = src(q);
+  if (uAmount <= 0.0) return b;
+  vec2 px = 1.6 / uRes;
+  vec3 w = vec3(0.333);
+  float gx = dot(src(q + vec2(px.x, 0.0)).rgb - src(q - vec2(px.x, 0.0)).rgb, w);
+  float gy = dot(src(q + vec2(0.0, px.y)).rgb - src(q - vec2(0.0, px.y)).rgb, w);
+  float edge = clamp(length(vec2(gx, gy)) * 7.0, 0.0, 1.0);
+  float l = dot(b.rgb, vec3(0.3, 0.59, 0.11));
+  vec2 g = fract(q * uRes / (uRes.y / 1080.0 * 48.0));
+  float grid = max(step(g.x, 0.03), step(g.y, 0.03));
+  vec3 xr = vec3(0.075, 0.078, 0.110) + vec3(0.255, 0.282, 0.408) * (0.9 * smoothstep(0.03, 0.2, l) + 0.18 * grid)
+          + vec3(0.753, 0.792, 0.961) * edge * 0.85;
+  float keep = smoothstep(0.38, 0.55, b.g) * step(b.b + 0.06, b.g);
+  xr = mix(xr, b.rgb, keep);
+  float above = smoothstep(uP0.x - 0.004, uP0.x + 0.004, uv.y);
+  vec3 c = mix(b.rgb, xr, above * uAmount);
+  float bar = exp(-pow((uv.y - uP0.x) / 0.006, 2.0)) * uP0.y;
+  return vec4(mix(c, vec3(0.855, 0.925, 0.776), clamp(bar, 0.0, 0.9)), 1.0);
+}`,
+      });
       const ink = OM.fieldInks('tokyo-night');
       const END = start + duration;
       const IN_END = start + 0.07, OUT_AT = END - 0.075; // a couple of 30 fps frames on each handoff
@@ -376,7 +402,40 @@ OM.ownWords.add('c1-02'); // this scene draws its own words, so the caption bar 
         }
       };
 
-      return {
+      // ---- camera and effect: a slow turntable sway while it is apart, a crash zoom on the slam ----
+      const FLIP = 0.12; // the scan bar's run up the frame, from the slam
+      const look = (T) => {
+        const e = OM.post.envelope(T, start, END, { ramp: 0.45, hold: 0.07 });
+        const sway = e * (1 - smooth(prog(T, SLAM - 0.5, SLAM - 0.05)));
+        const rot = -1.6 * DEG * sway * Math.sin(0.8 * (T - start) + 0.6);
+        const x = 36 * sway * Math.sin(0.55 * (T - start) - 0.4);
+        const a = T - SLAM;
+        const crash = a < 0 ? 0 : 0.1 * ease.outCubic(clamp(a / 0.05)) * Math.exp(-Math.max(0, a - 0.05) / 0.3);
+        const zoom = (1 + crash * e) * OM.c1.cover(rot, x, 0);
+        const scan = -0.1 + 1.2 * prog(T, SLAM, SLAM + FLIP);
+        const amount = e * (T < SLAM + FLIP ? 1 : 0);
+        return { amount, cam: { zoom, rot, x, y: 0 }, p0: [scan, T >= SLAM ? 1 : 0, 0, 0] };
+      };
+      // ---- extras: assembly sparks off each row's seam as it locks, a ring of them on the slam ----
+      const sparks = (ctx, T) => {
+        for (let k = 0; k < N; k++) {
+          const a = T - on[k];
+          if (a < 0 || a > 0.6 || !rows[k].w) continue;
+          const K = camAt(on[k]);
+          const big = k === KEY, z = big ? kz0 + N * RP : rows[k].z0 + RP;
+          for (const side of [0, 1]) {
+            const p = [side ? bx0 + (big ? BW : rows[k].w) : bx0, Y_TOP, z];
+            OM.c1.burst(T, on[k], big ? 26 : 12, 0xc102 + k * 2 + side, { x: K.x(p), y: K.y(p), speed: big ? 700 : 420, spread: 2.2, dir: side ? -0.6 : -Math.PI + 0.6, g: 1400, life: big ? 0.6 : 0.4 }, (x, y, u) => {
+              ctx.globalAlpha = 1 - u * u;
+              ctx.fillStyle = u < 0.35 ? ink.crest : u < 0.7 ? ink.hover : ink.lit;
+              ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+            });
+          }
+        }
+        ctx.globalAlpha = 1;
+      };
+
+      return OM.c1.post({
         render(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
@@ -471,9 +530,11 @@ OM.ownWords.add('c1-02'); // this scene draws its own words, so the caption bar 
             drawRow(ctx, K, dpr, falling, offDeck[1] + falling.H * (1 - Math.pow(q, 2.2)), T, 1);
           }
           ctx.textAlign = 'left';
+          ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          sparks(ctx, T);
         },
         release: () => c.release(),
-      };
+      }, fx, look);
     },
   });
 })();

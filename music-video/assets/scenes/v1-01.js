@@ -120,6 +120,14 @@ OM.ownWords.add('v1-01');
     },
   });
 
+  // The effects pass: each scene's shader through OM.post, at rest on the cut frames.
+  V.post = (el, c, effect) => OM.post(el, c, { effect });
+  V.env = (T, a, b, ramp = 0.35) => OM.post.envelope(T, a, b, { ramp, hold: 0.07 });
+  /** GLSL: 1 outside the words' box (uP1, uv), 0 inside, so effects ease off the words. */
+  V.TEXTMASK = `float offText(vec2 uv) { vec2 d = max(uP1.xy - uv, uv - uP1.zw); return smoothstep(0.0, 0.03, max(d.x, d.y)); }\n`;
+  /** A CSS-px box as a uv rect (origin bottom-left) for uP1. */
+  V.rect = (x0, y0, x1, y1) => [x0 / 1920, 1 - y1 / 1080, x1 / 1920, 1 - y0 / 1080];
+
   // ---------- the phone: v1-01's last frame and v1-02's first ----------
   const W = OM.theme('white'), WI = OM.fieldInks('white');
   const PH = { w: 800, h: 450, bez: 26, r: 46 }; // the screen (landscape), its bezel and corner
@@ -181,6 +189,16 @@ OM.ownWords.add('v1-01');
   // ---------- v1-01 ----------
   const WEIGHT = 800;
   const PROBE = V.ready('v1-01-type', WEIGHT);
+  const GLSL = V.TEXTMASK + `
+vec4 effect(vec2 uv) {
+  vec2 u = cam(uv);
+  float b = smoothstep(0.17, 0.47, abs(uv.y - 0.5)) * uAmount; // tilt-shift: sharp band across the middle
+  if (b <= 0.0) return src(u);
+  vec2 px = b * 9.0 / vec2(1920.0, 1080.0);
+  vec4 s = vec4(0.0);
+  for (int i = -2; i <= 2; i++) for (int j = -2; j <= 2; j++) s += src(u + vec2(float(i), float(j)) * px);
+  return s / 25.0;
+}`;
   OM.scene({
     id: 'v1-01',
     build(el, { start, duration }) {
@@ -188,6 +206,7 @@ OM.ownWords.add('v1-01');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      const fx = V.post(el, c, GLSL);
       const END = start + duration, H = V.HOLD;
       const on = OM.sung('v1-01').map((w) => w.t0);
       const N = on.length;
@@ -328,8 +347,21 @@ OM.ownWords.add('v1-01');
         BD.forEach((row, r) => { for (let q = 0; q < 7; q++) if (row[q] === '#') ctx.fillRect(x + (q - 3.5) * s, y + (r - 4) * s, s, s); });
       };
 
+      // Camera: dive in to 1.25 off the white page, then crane up to 1.0 across the line; a shake as each lock snaps.
+      const FXP = (ctx, dpr, T) => {
+        const e = V.env(T, start, END);
+        const M = get();
+        const dive = OM.smooth(OM.prog(T, start + 0.07, start + 0.5)), pull = OM.ease.inOutCubic(OM.prog(T, 37.3, 41.1));
+        let sh = 0;
+        for (const t0 of M.ons) if (T >= t0) sh += 6 * Math.exp(-(T - t0) / 0.06);
+        return { amount: e, cam: { zoom: 1 + 0.25 * dive * (1 - pull), x: sh * Math.sin(T * 93), y: sh * Math.cos(T * 71) } };
+      };
       return {
         render(t, T) {
+          this.draw(t, T);
+          fx.apply(T, FXP(c.ensure(), c.dpr, T));
+        },
+        draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + H) return OM.handoff('white', ctx, T, dpr);
@@ -419,7 +451,10 @@ OM.ownWords.add('v1-01');
             ctx.restore();
           }
         },
-        release: () => c.release(),
+        release: () => {
+          fx.release();
+          c.release();
+        },
       };
     },
   });

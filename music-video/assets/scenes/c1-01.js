@@ -9,6 +9,62 @@
 // pulse on the snares, then the glaze burns away outward from them into the
 // back light it stood in, the seams follow, and what is left is the glow.
 OM.ownWords.add('c1-01');
+
+// Chorus 1's shared camera-and-effects helpers (scene files load in timeline order, so c1-02..c1-08 use them).
+OM.c1 = {
+  /** The smallest zoom at which a roll (radians) and a shift (CSS px) never show past the frame's edge. */
+  cover(rot = 0, x = 0, y = 0) {
+    const c = Math.cos(rot), s = Math.abs(Math.sin(rot)), ax = 960 + Math.abs(x), ay = 540 + Math.abs(y);
+    return Math.max(1, (ax * c + ay * s) / 960, (ax * s + ay * c) / 540);
+  },
+  /** Run a scene through its post pass: every render, handoff frames included, ends in fx.apply(T, look(T)). */
+  post(sc, fx, look) {
+    const draw = sc.render, rel = sc.release;
+    sc.render = (t, T) => {
+      draw(t, T);
+      fx.apply(T, look(T));
+    };
+    sc.release = () => {
+      fx.release();
+      rel();
+    };
+    return sc;
+  },
+  /** 1 away from the onsets, dipping to `floor` from just before each onset until `hold` after it. */
+  quiet(T, ons, hold = 0.3, floor = 0) {
+    let q = 1;
+    for (const t0 of ons) {
+      const a = T - t0;
+      if (a > -0.08 && a < hold + 0.25) q = Math.min(q, a < hold ? floor : OM.lerp(floor, 1, OM.smooth((a - hold) / 0.25)));
+    }
+    return q;
+  },
+  /** A four-point sparkle: a cross of light, crisp in the middle. */
+  star(ctx, x, y, r, color, a) {
+    if (a <= 0.01 || r < 0.5) return;
+    ctx.globalAlpha = Math.min(1, a);
+    ctx.fillStyle = color;
+    ctx.fillRect(x - r, y - 1, 2 * r, 2);
+    ctx.fillRect(x - 1, y - r, 2, 2 * r);
+    ctx.fillRect(x - 2, y - 2, 4, 4);
+    ctx.globalAlpha = 1;
+  },
+  /** Ballistic particles from a hit, as pure functions of the age: n of them, seeded, each calling dot(x, y, life 0..1, i). */
+  burst(T, t0, n, seed, { x, y, speed = 400, spread = Math.PI * 2, dir = -Math.PI / 2, g = 900, life = 0.5 }, dot) {
+    const a = T - t0;
+    if (a < 0 || a > life) return;
+    for (let i = 0; i < n; i++) {
+      const h1 = OM.hash(i, 1, seed), h2 = OM.hash(i, 2, seed), h3 = OM.hash(i, 3, seed);
+      const ang = dir + (h1 - 0.5) * spread, v = speed * (0.35 + 0.65 * h2), li = life * (0.55 + 0.45 * h3);
+      if (a > li) continue;
+      dot(x + Math.cos(ang) * v * a, y + Math.sin(ang) * v * a + 0.5 * g * a * a, a / li, i);
+    }
+  },
+  /** The c1-03 -> c1-04 cut: a slow push carried through it, at zoom ZOOM moving at SPEED per second. */
+  push34: { ZOOM: 1.035, SPEED: 0.075 },
+  /** The c1-07 -> c1-08 cut: the camera held high above the stage (content shifted down), at rest. */
+  crane78: { Y: 34 },
+};
 (() => {
   const W_ROW = 300, W_KEY = 200; // crack stroke weights: thin enough to read as fractures on the sub-lattice
   const fontAt = (w, px) => `${w} ${px}px 'JetBrains Mono'`;
@@ -43,6 +99,20 @@ OM.ownWords.add('c1-01');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      // Specular glints running along the green seams: a crest band sweeping the lit strokes, a twinkle in their cores.
+      const fx = OM.post(el, c, {
+        effect: `vec4 effect(vec2 uv) {
+  vec4 b = src(cam(uv));
+  if (uAmount <= 0.0) return b;
+  float seam = smoothstep(0.55, 0.72, b.g) * step(b.b + 0.08, b.g);
+  vec2 p = uv * vec2(uRes.x / uRes.y, 1.0);
+  float d = p.x + 0.55 * p.y - uP0.x;
+  float band = exp(-d * d / 0.0035) + 0.45 * exp(-d * d / 0.03);
+  float tw = pow(vnoise(p * 140.0 + vec2(uTime * 2.3, -uTime * 1.7)), 7.0);
+  float k = clamp(seam * (uP0.y * band + 0.9 * tw) * uAmount, 0.0, 0.85);
+  return vec4(mix(b.rgb, vec3(0.855, 0.925, 0.776), k), 1.0);
+}`,
+      });
       const END = start + duration;
       const ink = OM.fieldInks('tokyo-night');
       const tk = OM.theme('tokyo-night');
@@ -370,7 +440,51 @@ OM.ownWords.add('c1-01');
       const haloA = (T) => (0.15 + 0.25 * decay(T, on[0], 0.18) + 0.2 * decay(T, LAND, 0.15)) * (1 - sm(T, 84.55, 84.9));
       let cr = null;
 
-      return {
+      // ---- camera and effect: a slow orbit round the bowl, glints chasing along the seams ----
+      const GLINTS = [LAND, ...SNARES, SURGE];
+      const look = (T) => {
+        const e = OM.post.envelope(T, start, END, { ramp: 0.6, hold: 0.07 });
+        const p = OM.prog(T, start, END);
+        const rot = ((2 * Math.PI) / 180) * Math.sin(Math.PI * p) * e;
+        const x = -16 * Math.sin(2 * Math.PI * p) * e, y = 0;
+        // 1.00 to 1.05 of push, never less than the roll needs to keep the corners covered.
+        const zoom = Math.max(1 + 0.05 * e * OM.smooth(OM.prog(T, start, 84.4)), OM.c1.cover(rot, x, y));
+        // The sweep runs off each hit: the key word's landing, every snare pulse, the surge.
+        const h = OM.lastHit(GLINTS, T), run = h === null ? -1 : OM.prog(T, h, h + (h === LAND ? 0.7 : 0.4));
+        const amount = e * OM.smooth(OM.prog(T, LAND + 0.05, LAND + 0.35)) * (1 - sm(T, 84.6, 84.9));
+        return { amount, cam: { zoom, rot, x, y }, p0: [-0.4 + 2.8 * run, run > 0 && run < 1 ? 1 : 0, 0, 0] };
+      };
+      // ---- extras: sparkles where the seams meet, once the light has reached them ----
+      let junc = null;
+      const junctions = () => {
+        const { M, cIdx, cTc } = cr, at = new Int32Array(N).fill(-1), out = [];
+        for (let q = 0; q < M; q++) at[cIdx[q]] = q;
+        for (let q = 0; q < M; q++) {
+          const idx = cIdx[q];
+          let n = 0;
+          for (const o of NB4) if (idx + o >= 0 && idx + o < N && at[idx + o] >= 0) n++;
+          if (n < 3) continue;
+          const x = X(idx % GW), y = Y((idx / GW) | 0);
+          if (out.some((j) => Math.abs(j.x - x) + Math.abs(j.y - y) < 40)) continue;
+          out.push({ x, y, tc: cTc[q], ph: OM.hash(idx, 7, 0xc101), sp: 0.9 + 0.8 * OM.hash(idx, 9, 0xc101) });
+          if (out.length >= 44) break;
+        }
+        return { ok: cr.ok, out };
+      };
+      const sparkles = (ctx, T) => {
+        if (!junc || junc.ok !== cr.ok) junc = junctions();
+        const fade = 1 - sm(T, 84.5, 84.8);
+        for (const j of junc.out) {
+          const a = T - j.tc - 0.12;
+          if (a < 0) continue;
+          const arrive = Math.pow(0.5, a / 0.12); // a flare as the light reaches the joint, then a slow twinkle
+          const tw = Math.pow(Math.max(0, Math.sin(2 * Math.PI * (j.sp * T + j.ph))), 10);
+          const k = Math.max(arrive, 0.85 * tw) * fade;
+          OM.c1.star(ctx, j.x, j.y, 3 + 9 * k, k > 0.6 ? ink.crest : ink.hover, k);
+        }
+      };
+
+      return OM.c1.post({
         render(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
@@ -461,9 +575,10 @@ OM.ownWords.add('c1-01');
             ctx.fillStyle = ink.crest;
             OM.cell(ctx, HM, sp.col, sp.row, dpr);
           }
+          sparkles(ctx, T);
         },
         release: () => c.release(),
-      };
+      }, fx, look);
     },
   });
 })();

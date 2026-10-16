@@ -135,6 +135,39 @@ rounds. Don't run assemble and don't edit any other file; the orchestrator does 
 - Report (150 words or less, no lyric text): one line per scene with its device name
   (unique) and key hits, plus anything that needs fixing outside your files.
 
+## Camera and effects pass
+
+Each scene gets the camera move, signature shader and extras from its row in
+`storyboard/FX.md`. Read that file's rules first.
+
+- **Engine:** `assets/lib/post.js`. In `build`, create `const fx = OM.post(el, c, { effect: GLSL })`
+  after your `OM.canvas`. At the end of `render`, call
+  `fx.apply(T, { amount, cam: { zoom, rot, x, y }, p0: [...4], p1: [...4] })`.
+  In `release`, call `fx.release()` before `c.release()`.
+- **The shader:** your GLSL defines `vec4 effect(vec2 uv)` using `src(uv)`, `cam(uv)`,
+  `uTime`, `uAmount`, `uRes`, `uP0`, `uP1`, `hash()` and `vnoise()`. uv's origin is
+  bottom-left. Keep it on palette, and when it's off it must return
+  `src(cam(uv))` exactly.
+- **At the cuts:**
+  - `amount` must be 0 for the cut frames: use
+    `OM.post.envelope(T, start, end, { ramp, hold })`.
+  - At your section's first and last cut, the camera must be at rest too (zoom 1,
+    rot 0, x 0, y 0). With both at rest, `fx.apply` shows the raw 2D frame and
+    the handoff stays exact.
+  - Inside your section, the camera may carry through a cut, as long as both
+    scenes compute the same camera at the cut time with continuous speed.
+- **Overscan:** a zoom of 1 or more never shows past the frame's edge. If you
+  rotate or shift, zoom in enough to cover the corners. As a rough guide, a
+  2-degree roll needs about 1.04, and a 40px shift needs about 1.045.
+- **Extras:** drawn in your 2D canvas, before `fx.apply`, as pure functions of T:
+  particles computed from time and a seed, never simulated frame to frame.
+- **Words:** they stay readable at every onset and while the line reads
+  together, so ease the effect off them.
+- **Checks (2 snapshot rounds per scene at most):** snapshot each cut 4 ms either
+  side (the two frames must match), and each cut at -0.25, -0.1, +0.1 and +0.25 s
+  (the motion must flow, with no jump at the cut). Add your scene's peak effect
+  moment too.
+
 ## Report back (120 words or less, no lyric text)
 
 - Device name (8 words or less, unique in the film).

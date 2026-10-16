@@ -15,6 +15,25 @@ OM.scene({
     cv.className = 'om-fill';
     el.appendChild(cv);
     const c = OM.canvas(cv, { alpha: false });
+    const fx = OM.post(el, c, { effect: `vec4 effect(vec2 uv) {
+  vec2 p = uv - 0.5;
+  p.x *= 1.7778;
+  float r = length(p);
+  vec2 pd = p * (1.0 + 0.06 * r * r);
+  vec2 q = cam(vec2(pd.x / 1.7778, pd.y) + 0.5);
+  vec4 s = src(q);
+  float R = 2.5 * uP0.x;
+  vec4 acc = s;
+  for (int i = 0; i < 6; i++) {
+    float a = float(i) * 1.0472;
+    acc += src(q + vec2(cos(a) / 1920.0, sin(a) / 1080.0) * R);
+  }
+  s = acc / 7.0;
+  float vig = smoothstep(0.99, 0.74, r);
+  vec3 col = s.rgb * vig;
+  col += vec3(0.4, 0.52, 0.29) * 0.12 * smoothstep(0.03, 0.0, abs(r - 0.9));
+  return mix(src(cam(uv)), vec4(col, 1.0), uAmount);
+}` });
     const END = start + duration;
     const L = OM.HOME;
     const ink = OM.fieldInks('tokyo-night');
@@ -47,13 +66,15 @@ OM.scene({
     }
     ticks.splice(0, ticks.length, ...clock);
 
-    const M = 14;
-    const c0 = L.cMin - M, r0 = L.rMin - M, W = L.cols + 2 * M, Hh = L.rows + 2 * M;
+    // The board runs on the half lattice (2x2 cells per grid square), so the letters are clean strokes.
+    const G = B.sub(2);
+    const M = 24;
+    const c0 = 2 * L.cMin - M, r0 = 2 * L.rMin - M, W = 2 * L.cols + 2 * M, Hh = 2 * L.rows + 2 * M;
     const idx = (col, row) => (row - r0) * W + (col - c0);
 
     const lay = B.lazy(() => {
       const set = B.set(sung, { weight: 800, cap: 100, minCap: 72, maxW: 1640, cy: 530, lead: 1.42 });
-      const words = set.words.map((w) => B.cells(w, set, L).map(([col, row]) => idx(col, row)));
+      const words = set.words.map((w) => B.cells(w, set, G).map(([col, row]) => idx(col, row)));
       // Every generation precomputed: live cells with their age, the word cells pinned.
       let board = new Uint8Array(W * Hh);
       const pin = new Uint8Array(W * Hh), age = new Uint16Array(W * Hh), born = new Float32Array(W * Hh);
@@ -77,8 +98,12 @@ OM.scene({
         on.forEach((o, k) => {
           if (Math.abs(o - tk) < 1e-6 && tk < RELEASE) for (const i of words[k]) { board[i] = 1; pin[i] = 1; age[i] = 0; born[i] = o; }
         });
+        // A one-cell moat around the held letters stays dark, so life works at their edges, never inside the strokes.
+        const moat = new Uint8Array(W * Hh);
+        for (let i = W + 1; i < W * Hh - W - 1; i++)
+          if (pin[i]) for (const o of [-W - 1, -W, -W + 1, -1, 1, W - 1, W, W + 1]) moat[i + o] = 1;
         const live = [], ages = [], pins = [];
-        for (let i = 0; i < W * Hh; i++) if (board[i]) { live.push(i); ages.push(age[i]); pins.push(pin[i]); }
+        for (let i = 0; i < W * Hh; i++) if (board[i] && (pin[i] || !moat[i])) { live.push(i); ages.push(age[i]); pins.push(pin[i]); }
         gens.push({ live: Int32Array.from(live), ages: Uint16Array.from(ages), pins: Uint8Array.from(pins) });
       }
       return { gens, born };
@@ -94,7 +119,7 @@ OM.scene({
     };
 
     return {
-      render(t, T) {
+      draw(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
         if (T < on[0] || T >= END - 0.1) return OM.handoff(T < on[0] ? 'grid' : 'screen', ctx, T, dpr);
@@ -120,21 +145,21 @@ OM.scene({
         for (let n = 0; n < cur.live.length; n++) {
           const i = cur.live[n];
           const col = (i % W) + c0, row = Math.floor(i / W) + r0;
-          const x = L.x0 + (col + 0.5) * L.cw, y = L.y0 + (row + 0.5) * L.ch;
+          const x = G.x0 + (col + 0.5) * G.cw, y = G.y0 + (row + 0.5) * G.ch;
           if (x < -20 || x > 1940 || y < -20 || y > 1100) continue;
           const inside = x > SCR.x && x < SCR.x + SCR.w && y > SCR.y && y < SCR.y + SCR.h;
           if (out > 0 && !inside && (x < ex0 || x > ex1 || y < ey0 || y > ey1 || out >= 1)) continue;
           let col0;
           if (cur.pins[n]) {
             const a = T - born[i];
-            col0 = OM.mix(ink.hover, ink.crest, Math.max(Math.exp(-a / 0.18), kick * 0.6));
-          } else col0 = OM.mix(AGE[Math.min(cur.ages[n], AGE.length - 1)], ink.crest, kick * 0.35);
+            col0 = OM.mix(ink.hover, ink.crest, Math.max(Math.exp(-a / 0.12), kick * 0.3));
+          } else col0 = OM.mix(AGE[Math.min(cur.ages[n] + (T < RELEASE ? 2 : 0), AGE.length - 1)], ink.crest, kick * 0.25);
           ctx.globalAlpha = inside ? 1 - dark : 1;
           ctx.fillStyle = col0;
           if (cur.ages[n] === 0 && !cur.pins[n] && pop < 1) {
             const k = 0.35 + 0.65 * pop;
-            ctx.fillRect(L.x0 + (col + 0.5 - k / 2) * L.cw, L.y0 + (row + 0.5 - k / 2) * L.ch, k * L.cw, k * L.ch);
-          } else OM.cell(ctx, L, col, row, dpr);
+            ctx.fillRect(G.x0 + (col + 0.5 - k / 2) * G.cw, G.y0 + (row + 0.5 - k / 2) * G.ch, k * G.cw, k * G.ch);
+          } else OM.cell(ctx, G, col, row, dpr);
         }
         ctx.globalAlpha = 1;
         // The screen's border draws in around what is left.
@@ -146,7 +171,26 @@ OM.scene({
           ctx.globalAlpha = 1;
         }
       },
-      release: () => c.release(),
+      render(t, T) {
+          this.draw(t, T);
+          const e = B.env(T, start, END);
+          const ctx = c.ensure();
+          ctx.globalAlpha = 1;
+          if (e > 0) {
+
+            // Micro-particles drifting through the slide.
+            B.motes(ctx, T, { seed: 404, n: 60, color: OM.fieldInks('tokyo-night').dim, alpha: 0.7 * e, vx: 9, vy: 5, size: 4 });
+            B.motes(ctx, T, { seed: 405, n: 18, color: OM.fieldInks('tokyo-night').mid, alpha: 0.4 * e, vx: -5, vy: 8, size: 2 });
+          }
+          ctx.globalAlpha = 1;
+          fx.apply(T, {
+            // The lens eases off while the line is held, so the strokes read crisp.
+            amount: e * (1 - 0.9 * OM.smooth(OM.prog(T, on[0] - 0.1, on[0] + 0.1)) * (1 - OM.smooth(OM.prog(T, RELEASE, RELEASE + 0.3)))),
+            cam: { zoom: 1 + e * 0.075, x: e * 22 * Math.sin(T * 0.6), y: e * 14 * Math.cos(T * 0.8), rot: e * 0.008 * Math.sin(T * 0.5) },
+            p0: [0.5 + 0.5 * Math.sin(T * 2.7), 0, 0, 0],
+          });
+        },
+        release: () => { fx.release(); c.release(); },
     };
   },
 });

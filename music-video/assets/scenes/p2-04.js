@@ -13,6 +13,25 @@ OM.scene({
     cv.className = 'om-fill';
     el.appendChild(cv);
     const c = OM.canvas(cv, { alpha: false });
+    // Light scattering through the cloud layers: rays from the sun above the tops, through the gaps in the cloud.
+    const fx = OM.post(el, c, {
+      effect: `vec4 effect(vec2 uv) {
+  vec2 q = cam(uv);
+  vec3 c = src(q).rgb;
+  if (uAmount <= 0.0) return vec4(c, 1.0);
+  vec2 dir = uP0.xy - q;
+  vec3 acc = vec3(0.0);
+  float w = 1.0, j = hash(uv * uRes) * 0.5;
+  for (int i = 0; i < 24; i++) {
+    vec3 v = src(q + dir * (float(i) + j) / 24.0 * 0.42).rgb;
+    acc += v * smoothstep(0.18, 0.5, dot(v, vec3(0.3, 0.59, 0.11))) * w;
+    w *= 0.92;
+  }
+  acc /= 11.0;
+  float b = exp(-length((q - uP0.xy) * vec2(1.78, 1.0)) * 2.2);
+  return vec4(c + uAmount * (acc * vec3(0.72, 1.0, 0.55) * 0.9 + vec3(0.36, 0.5, 0.24) * b * 0.35 * uP0.z), 1.0);
+}`,
+    });
     const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
     const L = OM.HOME, P = OM.p2;
     const end = start + duration;
@@ -61,7 +80,7 @@ OM.scene({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (P.cut(ctx, T, dpr, start, end, 'spark', 'glow')) return;
+        if (P.cut(ctx, T, dpr, start, end, 'spark', 'glow')) return void fx.apply(T, {});
         if (!lay || (!lay.ok && P.ready())) lay = layout();
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
@@ -196,12 +215,45 @@ OM.scene({
           ctx.globalAlpha = 1;
         }
 
-        // Through the tops into the light: the chorus's glow.
+        // Condensation: vapour streaks rushing past the lens as we climb through the cloud.
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        if (cloudIn > 0) {
+          ctx.strokeStyle = ink.hover;
+          ctx.lineWidth = 2;
+          for (let i = 0; i < 34; i++) {
+            const rate = 1.4 + 1.6 * OM.hash(i, 1, 6) + 2 * OM.prog(T, WHIP, end);
+            const p = (OM.hash(i, 2, 6) + (T - start) * rate) % 1;
+            const x0 = OM.hash(i, 3, 6) * 2200 - 140, y0 = -120 + p * 1320;
+            const len = 40 + 90 * OM.hash(i, 4, 6);
+            ctx.globalAlpha = 0.28 * cloudIn * Math.sin(Math.PI * p);
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x0 - len * 0.32, y0 + len);
+            ctx.stroke();
+          }
+          ctx.globalAlpha = 1;
+        }
+
+        // Through the tops into the light: the chorus's glow.
         const g = OM.ease.inOutSine(OM.prog(T, DB, end - 0.08));
         if (g > 0) P.pool(ctx, 960, 540, 620, ink.lit, 0.5 * g);
+
+        // Camera: a steep climb with turbulence, bumped on the kicks, calm again at the glow.
+        const env = OM.post.envelope(T, start, end, { ramp: 0.35 });
+        const k = OM.pulse(KICKS, T, 0.07);
+        const tb = env * (1 + 1.6 * k);
+        fx.apply(T, {
+          amount: env * (0.4 + 0.6 * OM.prog(T, DB - 0.2, WHIP + 0.4)),
+          cam: {
+            zoom: 1 + 0.08 * env,
+            rot: tb * 0.006 * Math.sin(T * 29) - 0.01 * env,
+            x: tb * (6 * Math.sin(T * 23) + 4 * Math.sin(T * 37 + 1)),
+            y: tb * (5 * Math.sin(T * 31 + 2) + 3 * Math.sin(T * 17)) - 14 * env,
+          },
+          p0: [0.5, 1.15, OM.prog(T, DB, end), 0],
+        });
       },
-      release: () => c.release(),
+      release: () => { fx.release(); c.release(); },
     };
   },
 });

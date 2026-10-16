@@ -54,7 +54,22 @@ OM.scene({
     });
 
     const R = (s) => ({ rx: RX * s, ry: RY * s });
-    return {
+    // Camera: an orbital roll round the planet with a slow push. Effect: the atmosphere scatters light
+    // along the planet's limb, green at the edge going to the theme's blue above it.
+    const FX = `vec4 effect(vec2 uv) {
+  vec2 p = cam(uv);
+  vec3 c = src(p).rgb;
+  vec2 px = vec2(p.x * 1920.0, (1.0 - p.y) * 1080.0);
+  float d = length(px - vec2(960.0, 2010.0)) - 1250.0;
+  float rim = d > 0.0 ? exp(-d / 70.0) : exp(d / 16.0);
+  vec3 sky = mix(vec3(0.62, 0.81, 0.42), vec3(0.48, 0.64, 0.97), smoothstep(0.0, 120.0, d));
+  return vec4(c + uAmount * uP0.x * rim * sky * 0.45, 1.0);
+}`;
+    const fxAt = (T) => ({
+      amount: 1, p0: [C.sm(T, start + 0.05, start + 0.5) * (1 - C.sm(T, COLLAPSE, COLLAPSE + 0.3)), 0, 0, 0],
+      cam: { zoom: 1.05 + 0.04 * OM.prog(T, start, END), rot: 0.03 * Math.sin((T - start) * 0.7) },
+    });
+    return OM.c3.withFx(el, c, start, END, FX, fxAt)({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
@@ -70,6 +85,22 @@ OM.scene({
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
         C.stars(ctx, T, C.sm(T, start, start + 0.4) * shrink);
+        // Satellite glints on high orbits, and drifting debris.
+        const skyA = C.sm(T, start + 0.1, start + 0.6) * shrink;
+        if (skyA > 0.01) {
+          for (let i = 0; i < 5; i++) {
+            const x = ((OM.hash(i, 1, 21) * 2200 + (T - start) * (40 + 60 * OM.hash(i, 2, 21))) % 2200) - 140, y = 50 + 330 * OM.hash(i, 3, 21);
+            const blink = ((T + OM.hash(i, 4, 21)) * 1.4) % 1 < 0.12;
+            ctx.fillStyle = C.rgba(blink ? ink.crest : ink.mid, skyA);
+            ctx.fillRect(Math.round(x), Math.round(y), blink ? 4 : 2, blink ? 4 : 2);
+            if (blink) C.pool(ctx, x + 2, y + 2, 26, ink.hover, 0.35 * skyA);
+          }
+          ctx.fillStyle = C.rgba(th['border-strong'] || ink.dim, 0.8 * skyA);
+          for (let i = 0; i < 36; i++) {
+            const x = OM.hash(i, 5, 22) * 2000 - (T - start) * 18 * (0.5 + OM.hash(i, 6, 22));
+            ctx.fillRect(Math.round((((x % 2000) + 2000) % 2000) - 40), Math.round(OM.hash(i, 7, 22) * 1080), 3, 2);
+          }
+        }
         // The line's ends beyond the ring burn off as it tilts open.
         const tail = 1 - C.sm(T, start + 0.02, start + 0.2);
         if (tail > 0) {
@@ -180,6 +211,6 @@ OM.scene({
         }
       },
       release: () => c.release(),
-    };
+    });
   },
 });

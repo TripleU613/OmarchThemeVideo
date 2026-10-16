@@ -90,6 +90,22 @@
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      // Anamorphic streaks: the brightest light smeared out sideways, cool blue-white, off the title at the lock.
+      const fx = OM.post(el, c, { effect: `
+vec4 effect(vec2 uv) {
+  vec2 p = cam(uv);
+  vec4 c = src(p);
+  if (uAmount <= 0.0) return c;
+  vec3 acc = vec3(0.0);
+  for (int i = 1; i <= 28; i++) {
+    float o = float(i) * uP0.x / uRes.x, w = 1.0 - float(i) / 29.0;
+    vec2 j = vec2(0.0, (hash(vec2(float(i), 3.0)) - 0.5) * 1.5 / uRes.y);
+    acc += (max(src(p + vec2(o, 0.0) + j).rgb - 0.62, 0.0) + max(src(p - vec2(o, 0.0) + j).rgb - 0.62, 0.0)) * w;
+  }
+  acc /= 9.0;
+  float l = dot(acc, vec3(0.33));
+  return vec4(c.rgb + l * uAmount * vec3(0.48, 0.64, 0.97) * 1.1, 1.0);
+}` });
       const L = OM.HOME;
       const ink = OM.fieldInks('tokyo-night');
       const th = OM.theme('tokyo-night');
@@ -213,7 +229,10 @@
         render(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
-          if (T >= WHITE) return OM.handoff('white', ctx, T, dpr);
+          if (T >= WHITE) {
+            OM.handoff('white', ctx, T, dpr);
+            return fx.apply(T);
+          }
           if (!type || (!type.ok && document.fonts.check(FONT))) type = rasterize();
           ctx.fillStyle = ink.bg;
           ctx.fillRect(0, 0, 1920, 1080);
@@ -221,7 +240,10 @@
           // Camera: a slow drift (the near plane moves more than the far: parallax) and a push that lands on the lock.
           const age = T - OPEN;
           const dx = 10 * Math.sin(age * 0.6), dy = 6 * Math.sin(age * 0.43);
-          const sFar = 1 + 0.06 * OM.smooth(OM.prog(T, OPEN, END));
+          // Dolly zoom: the whole frame swells into the lock while the far plane is held back, so the mark stays put and the title comes at us.
+          const swell = OM.smooth(OM.prog(T, KICK, LOCK)) * (1 - OM.smooth(OM.prog(T, LOCK + 0.4, 35.0)));
+          const zf = 1 + 0.06 * swell;
+          const sFar = (1 + 0.06 * OM.smooth(OM.prog(T, OPEN, END))) / zf;
           const punch = T >= LOCK ? 0.018 * Math.exp(-(T - LOCK) / 0.18) : 0;
           const sNear = OM.lerp(0.95, 1, OM.smooth(OM.prog(T, OPEN, LOCK))) + punch + 0.012 * OM.prog(T, LOCK + 0.5, END);
 
@@ -252,6 +274,23 @@
             text(ctx, dpr, 'Kevin Koontz / REARRANGED', "400 24px 'JetBrains Mono'", th['text-muted'], at(960, sNear, dx, 960), at(660, sNear, dy, 540), '0.08em', 14 * (1 - p), OM.clamp(p * 2));
           }
 
+          // Foreground dust: big soft square bokeh drifting past, well in front of everything.
+          const dustA = OM.post.envelope(T, OPEN, BLOOM, { ramp: 0.8, hold: 0.1 });
+          if (dustA > 0) {
+            for (let i = 0; i < 12; i++) {
+              const sz = 40 + 70 * OM.hash(i, 1, 41), sp = 30 + 50 * OM.hash(i, 2, 41);
+              const x = ((OM.hash(i, 3, 41) * 2400 + sp * (T - OPEN)) % 2400) - 240, y = 80 + 920 * OM.hash(i, 4, 41) + 20 * Math.sin(T * 0.4 + i);
+              const a = dustA * (0.05 + 0.06 * OM.hash(i, 5, 41));
+              for (let k = 0; k < 4; k++) {
+                const g = sz * (1 - k * 0.18);
+                ctx.globalAlpha = a * (0.4 + 0.2 * k);
+                ctx.fillStyle = k > 2 ? ink.hover : ink.lit;
+                ctx.fillRect(x - g / 2, y - g / 2, g, g);
+              }
+            }
+            ctx.globalAlpha = 1;
+          }
+
           // The ending: on the 35.11 downbeat the mark's glow behind the title swells, warms to
           // white and floods the frame; the screen's light becomes the white world verse 1 opens on.
           if (T >= BLOOM) {
@@ -270,8 +309,17 @@
             ctx.fillRect(0, 0, 1920, 1080);
             ctx.globalAlpha = 1;
           }
+          const streak = T >= LOCK ? OM.smooth(OM.prog(T, LOCK, LOCK + 0.05)) * Math.exp(-(T - LOCK) / 0.45) : 0;
+          fx.apply(T, {
+            amount: streak * OM.post.envelope(T, OPEN, END, { ramp: 0.4, hold: 0.1 }) * (1 - OM.smooth(OM.prog(T, BLOOM - 0.4, BLOOM))),
+            cam: { zoom: zf },
+            p0: [16 * dpr, 0, 0, 0],
+          });
         },
-        release: () => c.release(),
+        release: () => {
+          fx.release();
+          c.release();
+        },
       };
     },
   });

@@ -50,12 +50,31 @@ OM.scene({
       return { D, cell };
     });
 
-    return {
+    // Camera: a wide pan following the formation. Effect: the dim swarm goes to soft bokeh while the
+    // formed drones stay crisp, and moving drones leave short glow trails.
+    const FX = C.GLSL_LUM + `vec4 effect(vec2 uv) {
+  vec2 p = cam(uv);
+  vec3 c = src(p).rgb, b = vec3(0.0), tr = vec3(0.0);
+  vec2 r = vec2(7.0 / 1920.0, 7.0 / 1080.0) * uAmount;
+  for (int i = 0; i < 12; i++) { float a = float(i) * 0.5236; b += src(p + vec2(cos(a), sin(a)) * r).rgb; }
+  b /= 12.0;
+  for (int i = 1; i < 6; i++) tr += src(p + vec2(0.0, float(i) * 4.0 / 1080.0) * uAmount * uP0.x).rgb;
+  tr /= 5.0;
+  vec3 soft = mix(c, max(b * 1.7, c * 0.5), uAmount);
+  return vec4(mix(soft, c, smoothstep(0.3, 0.55, lum(c))) + max(tr - 0.25, 0.0) * 0.6 * uAmount, 1.0);
+}`;
+    const fxAt = (T) => ({
+      amount: 1, p0: [Math.max(1 - OM.ease.outExpo(OM.prog(T, start + 0.03, start + 0.45)), OM.clamp(OM.prog(T, POUR, END - 0.25) * 3), C.decay(T, on[NAME], 0.2)), 0, 0, 0],
+      cam: { zoom: 1.07, x: 55 * Math.sin((T - start) * 0.7) },
+    });
+    let XS = new Float32Array(0), YS = XS;
+    return OM.c3.withFx(el, c, start, END, FX, fxAt)({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
         if (C.seam(ctx, T, dpr, start, END, 'spark', 'spot')) return;
         const { D, cell } = swarm();
+        if (XS.length !== D.length) { XS = new Float32Array(D.length); YS = new Float32Array(D.length); }
         const burst = OM.ease.outExpo(OM.prog(T, start + 0.03, start + 0.45));
         const pour = OM.ease.inOutCubic(OM.prog(T, POUR, END - 0.25));
         const brk = OM.ease.outCubic(OM.prog(T, BREAK, BREAK + 0.4));
@@ -117,6 +136,8 @@ OM.scene({
             sz = OM.lerp(sz, 3, p);
             v = OM.lerp(v, 0.3, p);
           }
+          XS[i] = x;
+          YS[i] = y;
           const a = 1 - fade;
           if (a <= 0) continue;
           ctx.globalAlpha = a;
@@ -128,8 +149,17 @@ OM.scene({
           ctx.fillRect(Math.round(x - sz / 2), Math.round(y - sz / 2), Math.round(sz), Math.round(sz));
         }
         ctx.globalAlpha = 1;
+        // Twinkle sparkles across the swarm: little four-point stars on drones.
+        const spA = burst * (1 - fade);
+        for (let j = 0; j < 16 && spA > 0.01; j++) {
+          const ph = T * 5 + j * 0.37, slot = Math.floor(ph), life = ph - slot;
+          const i = Math.floor(OM.hash(slot, j, 33) * D.length), x = XS[i], y = YS[i], s = 12 * (1 - life);
+          ctx.fillStyle = C.rgba(ink.crest, spA * (1 - life));
+          ctx.fillRect(Math.round(x - s), Math.round(y - 1), Math.round(2 * s), 2);
+          ctx.fillRect(Math.round(x - 1), Math.round(y - s), 2, Math.round(2 * s));
+        }
       },
       release: () => c.release(),
-    };
+    });
   },
 });

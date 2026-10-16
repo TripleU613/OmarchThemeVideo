@@ -11,12 +11,37 @@ OM.scene({
     cv.className = 'om-fill';
     el.appendChild(cv);
     const c = OM.canvas(cv, { alpha: false });
+    // Ambient occlusion: wall feet darken where they meet the floor, and the floor darkens at the walls.
+    const fx = OM.post(el, c, {
+      effect: `vec4 effect(vec2 uv) {
+  vec2 q = cam(uv);
+  vec3 c = src(q).rgb;
+  if (uAmount <= 0.0) return vec4(c, 1.0);
+  vec2 px = 1.0 / uRes * (uRes.y / 1080.0);
+  float l = dot(c, vec3(0.3, 0.59, 0.11));
+  float below = 0.0, near = 0.0;
+  for (int i = 1; i <= 6; i++) {
+    float f = float(i) * 6.0;
+    below += step(dot(src(q - vec2(0.0, f) * px).rgb, vec3(0.3, 0.59, 0.11)), 0.12);
+    near += dot(src(q + vec2(0.0, f) * px).rgb, vec3(0.3, 0.59, 0.11)) + dot(src(q + vec2(f, 0.0) * px).rgb, vec3(0.3, 0.59, 0.11)) * 0.5;
+  }
+  below /= 6.0; near /= 9.0;
+  float wall = step(0.12, l) * (1.0 - smoothstep(0.62, 0.75, l));
+  float ao = wall * below * 0.45 + (1.0 - wall) * clamp(near * 1.4, 0.0, 1.0) * 0.6;
+  vec2 v = uv - 0.5;
+  float vig = smoothstep(0.35, 0.95, length(v * vec2(1.4, 1.8))) * 0.35;
+  return vec4(c * (1.0 - uAmount * uP0.x * ao) * (1.0 - uAmount * vig), 1.0);
+}`,
+    });
     const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
     const L = OM.HOME, P = OM.p2;
     const END = start + duration;
     const h = OM.cellAt(L, 960, 540);
     const YL = L.y0 + h.row * L.ch, YC = YL + L.ch / 2;
-    const DB = 152.741, KICK = 152.834, SNARE = 153.228, SINK = 153.42, FLAT = 153.86;
+    const DB = 152.741, KICK = 152.834, SNARE = 153.228, SINK = 153.5, FLAT = 153.86;
+    // The reading moment: after the kick the floor turns to face front with a short extrusion.
+    const FRONT = 152.9, FACED = 153.02;
+    const faceAt = (T) => OM.ease.inOutCubic(OM.prog(T, FRONT, FACED));
     const S = 2; // offscreen outline resolution (crisp at 4K)
 
     let lay = null;
@@ -72,13 +97,14 @@ OM.scene({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (P.cut(ctx, T, dpr, start, END, 'line', 'grid')) return;
+        if (P.cut(ctx, T, dpr, start, END, 'line', 'grid')) return void fx.apply(T, {});
         if (!lay || (!lay.ok && P.ready())) lay = layout();
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
 
-        const u = tiltAt(T);
-        const Hw = Math.max(0, wallAt(T));
+        const fr = faceAt(T);
+        const u = tiltAt(T) * (1 - 0.82 * fr);
+        const Hw = Math.max(0, wallAt(T)) * (1 - 0.72 * fr);
         const cyk = 1 - 0.4 * u, ks = -(0.3 + 0.05 * Math.sin((T - DB) * 1.4)) * u;
         const lift = 0.5 * Hw * u + 30 * u;
         // Plan -> screen: x' = x + ks (y - YC), y' = YC + cyk (y - YC) - height + lift.
@@ -135,9 +161,34 @@ OM.scene({
           }
         }
         ctx.globalAlpha = 1;
+
+        // Construction dust: puffs kicked up off the wall feet as they rise, settling as they sink.
+        const scr = (x, y) => [x + ks * (y - YC), YC + cyk * (y - YC) + lift];
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        const bases = [[0, 1920, YL + L.ch], ...lay.items.map((it) => [it.x, it.x + it.tw, it.y])];
+        for (let i = 0; i < 90; i++) {
+          const born = DB + OM.hash(i, 3, 2) * 0.25 + (i % 2 ? 0 : SINK - DB), age = T - born;
+          if (age < 0 || age > 0.8) continue;
+          const b = bases[i % bases.length];
+          const [x, y] = scr(OM.lerp(b[0], b[1], OM.hash(i, 4, 2)), b[2]);
+          const dx = (OM.hash(i, 5, 2) - 0.5) * 160 * age, dy = -(40 + 90 * OM.hash(i, 6, 2)) * age + 60 * age * age;
+          const s = 3 + 6 * OM.hash(i, 7, 2);
+          ctx.globalAlpha = (1 - age / 0.8) * 0.8 * fade;
+          ctx.fillStyle = i % 4 ? ink.mid : ink.hover;
+          ctx.fillRect(x + dx - s / 2, y + dy - s / 2, s, s);
+        }
+        ctx.globalAlpha = 1;
+
+        // Camera: rises with the walls, from plan view into a perspective push.
+        const env = OM.post.envelope(T, start, END, { ramp: 0.35 });
+        const e2 = env * (0.25 + 0.75 * u);
+        fx.apply(T, {
+          amount: env * OM.clamp(0.3 + Hw / 78) * (1 - 0.7 * fr),
+          cam: { zoom: 1 + 0.07 * e2, rot: -0.012 * e2, y: 26 * e2 },
+          p0: [OM.clamp(Hw / 78), 0, 0, 0],
+        });
       },
-      release: () => c.release(),
+      release: () => { fx.release(); c.release(); },
     };
   },
 });

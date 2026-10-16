@@ -85,6 +85,21 @@ OM.scene({
       return [PEN.x, PEN.y];
     };
 
+    // Long exposure: a fading echo of the frame dragged back along the pen's path (lighten only, so type stays crisp).
+    const fx = OM.post(el, c, {
+      effect: `vec4 effect(vec2 uv) {
+  vec2 s = cam(uv);
+  vec4 c = src(s);
+  vec3 e = vec3(0.0);
+  for (int i = 1; i <= 12; i++) {
+    float w = pow(0.82, float(i));
+    e = max(e, src(s - uP0.xy * float(i)).rgb * w);
+  }
+  float near = smoothstep(0.3, 0.0, length((s - uP0.zw) * vec2(uRes.x / uRes.y, 1.0)));
+  c.rgb = max(c.rgb, e * vec3(0.8, 1.0, 0.75) * 0.6 * uAmount * near);
+  return c;
+}`,
+    });
     return {
       render(t, T) {
         const ctx = c.ensure();
@@ -92,9 +107,9 @@ OM.scene({
         if (T < start + 0.05) {
           ctx.fillStyle = ink.bg;
           ctx.fillRect(0, 0, 1920, 1080);
-          return OM.p1.pen(ctx, dpr);
+          return fx.apply(T), OM.p1.pen(ctx, dpr);
         }
-        if (T > END - 0.07) return OM.handoff('grid', ctx, T, dpr);
+        if (T > END - 0.07) return fx.apply(T), OM.handoff('grid', ctx, T, dpr);
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
         const S = layout(ctx);
@@ -194,8 +209,29 @@ OM.scene({
           ctx.fillStyle = rgba(ink.crest, penA);
           ctx.fillRect(snap(pen[0] - PEN.s / 2), snap(pen[1] - PEN.s / 2), snap(PEN.s), snap(PEN.s));
         }
+        // Sparks thrown off the nib: emitted on a fixed 12 ms grid, each a closed-form ballistic arc.
+        const DT = 0.012, LIFE = 0.34;
+        for (let j = 0; j < LIFE / DT; j++) {
+          const tau = (Math.floor(T / DT) - j) * DT, a = T - tau;
+          if (tau < start + 0.05 || tau > wEnd[K] || a < 0) continue;
+          const o = penAt(S, F, tau), n = Math.round(tau / DT);
+          for (let m = 0; m < 2; m++) {
+            const vx = (OM.hash(n, m, 21) - 0.5) * 700, vy = -OM.hash(n, m, 22) * 420;
+            const x = o[0] + vx * a, y = o[1] + vy * a + 0.5 * 1500 * a * a;
+            ctx.fillStyle = rgba(m ? ink.crest : ink.hover, 0.9 * (1 - a / LIFE));
+            ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+          }
+        }
+        // Camera: a slow roll of about 3 degrees leaning after the pen, at rest at both cuts.
+        const b = Math.sin(Math.PI * OM.prog(T, start + 0.07, END - 0.07)) ** 2;
+        const lean = OM.clamp((pen[0] - 960) / 960, -1, 1);
+        const cam = { rot: 0.052 * b, zoom: 1 + 0.1 * b, x: -36 * lean * b, y: 0 };
+        const prev = penAt(S, F, Math.max(start + 0.05, T - 0.03));
+        const dx = pen[0] - prev[0], dy = pen[1] - prev[1], dl = Math.hypot(dx, dy) || 1, k = Math.min(1, dl / 40) * 0.0035;
+        const amount = OM.post.envelope(T, start, END, { ramp: 0.15 }) * (1 - sm(T, wEnd[K], wEnd[K] + 0.06));
+        fx.apply(T, { amount, cam, p0: [(-dx / dl) * k, (dy / dl) * k * (16 / 9), pen[0] / 1920, 1 - pen[1] / 1080] });
       },
-      release: () => c.release(),
+      release: () => (fx.release(), c.release()),
     };
   },
 });

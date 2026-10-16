@@ -23,7 +23,7 @@ OM.scene({
     const K = words.length - 1;
     const L = OM.HOME, H = OM.cellAt(L, 960, 540);
     const YC = L.y0 + (H.row + 0.5) * L.ch, SX = L.x0 + (H.col + 0.5) * L.cw;
-    const OPEN = [start + 0.05, start + 0.2];
+    const OPEN = [start + 0.01, on[0]]; // unfolds from the cut, fully open on word 0's onset
     const F1 = [on[0] + 0.05, on[0] + 0.24], F2 = [on[1] + 0.01, on[K] - 0.03];
     const THROW = 80.18, ARRIVE = END - 0.085;
     const W2 = 800, H2 = 360; // half sheet
@@ -64,16 +64,26 @@ OM.scene({
       return { p, sc, rot, u, lift };
     };
 
+    // Launch motion blur: the frame smeared along the flight line, only once the plane is thrown.
+    const fx = OM.post(el, c, {
+      effect: `vec4 effect(vec2 uv) {
+  vec2 s = cam(uv);
+  vec4 c = src(s);
+  vec4 acc = vec4(0.0);
+  for (int i = 0; i < 14; i++) acc += src(s - uP0.xy * (float(i) - 3.0));
+  return mix(c, acc / 14.0, uAmount);
+}`,
+    });
     return {
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (T < start + 0.05) return OM.handoff('line', ctx, T, dpr);
-        if (T > END - 0.07) return OM.handoff('spark', ctx, T, dpr);
+        if (T < start + 0.05) return fx.apply(T), OM.handoff('line', ctx, T, dpr);
+        if (T > END - 0.07) return fx.apply(T), OM.handoff('spark', ctx, T, dpr);
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
         const Lay = layout(ctx);
-        const o = OM.ease.outExpo(OM.prog(T, OPEN[0], OPEN[1]));
+        const o = OM.smooth(OM.prog(T, OPEN[0], OPEN[1])); // smoothstep: at most ~30% of the sheet per 1/24 s
         const f1 = OM.ease.inOutCubic(OM.prog(T, F1[0], F1[1])), f2 = OM.ease.inOutCubic(OM.prog(T, F2[0], F2[1]));
         const P = pose(T);
         const kick = decay(T, on[0], 0.08) + decay(T, 79.644, 0.06);
@@ -91,6 +101,34 @@ OM.scene({
             OM.cell(ctx, L, cc.col, cc.row, dpr);
           }
         }
+        // The ribbon: a smooth light trail through the plane's past positions, and wind streaks rushing past.
+        if (P.u > 0 && fadeT > 0) {
+          ctx.lineCap = 'round';
+          for (const [lw, hex, a] of [[22, ink.lit, 0.12], [6, ink.hover, 0.5]]) {
+            ctx.strokeStyle = rgba(hex, a * fadeT);
+            ctx.lineWidth = lw * (0.3 + P.sc);
+            ctx.beginPath();
+            for (let i = 0; i <= 40; i++) {
+              const q = pose(Math.max(THROW, T - i * 0.012)).p;
+              i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]);
+            }
+            ctx.stroke();
+          }
+        }
+        const wind = sm(T, on[K], THROW + 0.05) * (1 - sm(T, 80.6, 80.95));
+        if (wind > 0) {
+          for (let i = 0; i < 26; i++) {
+            const sp = 2200 + 1600 * OM.hash(i, 1, 41);
+            const x = 2200 - ((OM.hash(i, 2, 41) * 2600 + T * sp) % 2600);
+            const y = OM.hash(i, 3, 41) * 1080 + (2200 - x) * 0.35;
+            ctx.strokeStyle = rgba(i % 3 ? th['text-muted'] : ink.hover, 0.28 * wind);
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + 160 + 120 * OM.hash(i, 4, 41), y + 56);
+            ctx.stroke();
+          }
+        }
         // Back light: the open page glows, flaring on the launch and the throw.
         pool(ctx, P.p[0], P.p[1], 900 * P.sc + 80, 520 * P.sc + 80, ink.lit, 0.08 * o + 0.3 * launch + 0.3 * thr);
 
@@ -106,7 +144,7 @@ OM.scene({
           const hw = OM.lerp(980, W2, o), hh = OM.lerp(L.ch / 2, H2, o);
           ctx.scale(hw / W2, hh / H2);
           const lightK = sm(P.u, 0.2, 0.8); // far away it is just light
-          const col = (hex) => OM.mix(OM.mix(ink.crest, hex, o), ink.crest, lightK);
+          const col = (hex) => OM.mix(ink.bg, OM.mix(OM.mix(ink.crest, hex, o), ink.crest, lightK), 0.4 + 0.6 * o); // brightness ramps 40% -> full as it opens
           // Body: the sheet below the folds.
           const py = OM.lerp(-H2, -H2 * (1 - 1240 / 1600), f2), px = W2 - H2;
           const body = f1 <= 0 ? [[-W2, -H2], [W2, -H2], [W2, H2], [-W2, H2]] : [[-W2, -H2], [px, py], [W2, 0], [px, -py], [-W2, H2]];
@@ -204,8 +242,17 @@ OM.scene({
           else ctx.fillRect(P.p[0] - L.cw / 2, P.p[1] - L.ch / 2, L.cw, L.ch);
           ctx.globalAlpha = 1;
         }
+        // Camera: push in as it lifts, whip and tilt up after the throw, then pull back to rest before the spark.
+        const w = OM.prog(T, THROW, 81.0);
+        const bw = Math.sin(Math.PI * Math.sqrt(w)) ** 2 * (w < 1 ? 1 : 0);
+        const pre = sm(T, on[K], THROW) * (1 - sm(T, THROW, 81.0));
+        const cam = T < on[K] || w >= 1 ? null : { zoom: 1 + 0.08 * pre + 0.075 * bw, rot: 0.035 * bw, x: -50 * bw, y: 70 * bw };
+        const prev = pose(T - 0.02).p;
+        const vx = (P.p[0] - prev[0]) / 1920, vy = -(P.p[1] - prev[1]) / 1080;
+        const amount = OM.post.envelope(T, start, END, { ramp: 0.2 }) * sm(T, THROW, THROW + 0.06) * (1 - sm(T, 80.7, 80.98));
+        fx.apply(T, { amount, cam, p0: [vx * 0.12, vy * 0.12, 0, 0] });
       },
-      release: () => c.release(),
+      release: () => (fx.release(), c.release()),
     };
   },
 });

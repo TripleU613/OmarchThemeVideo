@@ -12,6 +12,19 @@ OM.ownWords.add('c2-07');
   OM.c2.ready('c2-07', W);
   const { pool, sm, decay } = OM.c2;
 
+  const FX = `vec4 effect(vec2 uv) {
+    vec2 p = cam(uv);
+    if (uAmount <= 0.0) return src(p);
+    // Canyon depth haze below the deck, and the train's headlight flare.
+    vec4 c = src(p);
+    float deep = smoothstep(0.5, 0.0, p.y);
+    c.rgb = mix(c.rgb, vec3(0.141, 0.157, 0.231), deep * 0.35 * uAmount * (1.0 - smoothstep(0.3, 0.9, c.g)));
+    vec2 d = (p - uP0.xy) * vec2(uRes.x / uRes.y, 1.0);
+    float fl = uP0.z * (exp(-abs(d.y) * 90.0) * exp(-abs(d.x) * 2.5) + 0.5 * exp(-length(d) * 14.0));
+    c.rgb += vec3(0.855, 0.925, 0.776) * fl * uAmount * 0.6;
+    return c;
+  }`;
+
   OM.scene({
     id: 'c2-07',
     build(el, { start, duration }) {
@@ -19,6 +32,7 @@ OM.ownWords.add('c2-07');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      const fx = OM.post(el, c, { effect: FX });
       const END = start + duration;
       const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
       const words = OM.sung('c2-07');
@@ -60,7 +74,7 @@ OM.ownWords.add('c2-07');
       });
 
       return {
-        render(t, T) {
+        draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + 0.05) return OM.handoff('line', ctx, T, dpr);
@@ -157,7 +171,40 @@ OM.ownWords.add('c2-07');
             OM.cell(ctx, HM, sp.col, sp.row, dpr);
           }
         },
-        release: () => c.release(),
+        render(t, T) {
+          this.draw(t, T);
+          const ctx = c.ensure();
+          if (OM.c2.live(T, start, END)) {
+          const { gx0, gx1 } = get();
+          const fade = 1 - sm(T, DIM, PULL);
+          // Grit trickling off the broken deck edges into the canyon.
+          for (let n = 0; n < 36; n++) {
+            const h = OM.hash(n, 1, 71), x = (n % 2 ? gx0 : gx1) + (n % 2 ? 1 : -1) * 40 * OM.hash(n, 2, 71);
+            const y = lineY + HM.ch + ((T * (220 + 200 * h) + h * 700) % 600);
+            ctx.fillStyle = OM.c2.rgba(ink.mid, 0.7 * fade * OM.clamp((T - start - 0.1) * 4));
+            ctx.fillRect(x, y, 3, 3);
+          }
+          // Sparks off the rails behind the train.
+          const xh = OM.lerp(-200, 2120, OM.prog(T, TR0, TR1));
+          if (T >= TR0 && T < TR1 + 0.3) {
+            for (let n = 0; n < 16; n++) {
+              const slot = Math.floor(T * 30) - (n % 6), a = T - slot / 30, h = OM.hash(slot, n, 72);
+              const x = OM.lerp(-200, 2120, OM.prog(slot / 30, TR0, TR1)) - 280 - 200 * h * a * 3, y = lineY + HM.ch * 3 + 200 * a * h + 1200 * a * a;
+              ctx.fillStyle = OM.c2.rgba(ink.crest, 1 - a * 5);
+              ctx.fillRect(x, y, 3, 3);
+            }
+          }
+          }
+          // Wide on the canyon, then a push along the span riding with the train.
+          const xh = OM.lerp(-200, 2120, OM.prog(T, TR0, TR1));
+          const push = sm(T, TR0 - 0.2, TR0 + 0.5) * (1 - sm(T, TR1, PULL));
+          const flare = sm(T, TR0, TR0 + 0.1) * (1 - sm(T, TR1, TR1 + 0.2));
+          OM.c2.apply(fx, T, start, END, { amount: 1, zoom: 1 + 0.07 * push, x: -(xh - 960) * 0.05 * push, p0: [xh / 1920, 1 - (lineY + HM.ch * 1.5) / 1080, flare, 0] });
+        },
+        release: () => {
+          fx.release();
+          c.release();
+        },
       };
     },
   });

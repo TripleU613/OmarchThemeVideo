@@ -16,6 +16,19 @@ OM.scene({
     cv.className = 'om-fill';
     el.appendChild(cv);
     const c = OM.canvas(cv, { alpha: false });
+    const fx = OM.post(el, c, { effect: `vec4 effect(vec2 uv) {
+  vec2 q = cam(uv);
+  vec4 base = src(q);
+  vec2 w = vec2(sin(q.y * 60.0 + uTime * 4.0), cos(q.x * 50.0 + uTime * 3.0)) * 0.0011;
+  vec4 s = src(q + w);
+  float g = clamp((s.g - max(s.r, s.b) * 0.6) * 2.5, 0.0, 1.0);
+  vec2 cp = q * vec2(16.0, 9.0) * 3.0;
+  float c1 = vnoise(cp + vec2(uTime * 0.6, -uTime * 0.4));
+  float c2 = vnoise(cp * 1.7 - vec2(uTime * 0.5, uTime * 0.7));
+  float caus = pow(clamp(1.0 - abs(c1 - c2) * 2.5, 0.0, 1.0), 10.0);
+  vec3 col = s.rgb + vec3(0.73, 0.87, 0.59) * caus * 0.22 * g * g;
+  return mix(base, vec4(col, 1.0), uAmount);
+}` });
     const END = start + duration;
     const ink = OM.fieldInks('tokyo-night');
     const th = OM.theme('tokyo-night');
@@ -93,7 +106,7 @@ OM.scene({
     };
 
     return {
-      render(t, T) {
+      draw(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
         if (T < start + 0.05 || T >= END - 0.1) return OM.handoff(T < start + 0.05 ? 'screen' : 'glow', ctx, T, dpr);
@@ -106,16 +119,16 @@ OM.scene({
         const keep = 1 - swell;
         ctx.globalAlpha = keep;
 
-        const pull = OM.ease.inOutCubic(OM.prog(T, start + 0.05, on[0] + 0.06));
+        const pull = OM.ease.inOutCubic(OM.prog(T, start + 0.05, start + 0.55));
         const s = OM.lerp(1, S1, pull);
-        const fill = OM.ease.outCubic(OM.prog(T, start + 0.05, on[0] + 0.1));
+        const fill = OM.smooth(OM.prog(T, start + 0.05, start + 0.65));
         const scr = machine(ctx, s, fill * keep, pull * keep);
         ctx.globalAlpha = keep;
         const kick = OM.pulse(KICKS, T, 0.1);
 
         // The pour: a falling sheet of light over the deck's lip to the floor.
         const pourA = OM.prog(T, POUR, on[0]);
-        if (pull > 0.6) {
+        if (pull > 0.35) {
           const q0 = Math.floor((960 - 70 - H.x0) / H.cw), q1 = Math.floor((960 + 70 - H.x0) / H.cw);
           const r0 = Math.floor((scr.y + scr.h + 40 * s / S1 - H.y0) / H.ch), r1 = Math.floor((IMPACT.y - H.y0) / H.ch);
           const reach = r0 + (r1 - r0) * OM.ease.inCubic(pourA);
@@ -168,7 +181,43 @@ OM.scene({
         }
         ctx.globalAlpha = 1;
       },
-      release: () => c.release(),
+      render(t, T) {
+          this.draw(t, T);
+          const e = B.env(T, start, END);
+          const ctx = c.ensure();
+          ctx.globalAlpha = 1;
+          if (e > 0) {
+
+            const { set, words } = lay();
+            const ik = OM.fieldInks('tokyo-night');
+            // Droplets falling through the pour.
+            ctx.fillStyle = ik.hover;
+            for (let i = 0; i < 26; i++) {
+              const a = ((T * 1.8 + OM.hash(i, 1, 55)) % 1 + 1) % 1;
+              if (T < POUR + 0.2) break;
+              ctx.globalAlpha = e * (1 - a) * 0.9;
+              ctx.fillRect(960 + (OM.hash(i, 2, 55) - 0.5) * 240, 360 + a * a * 110, 3, 6);
+            }
+            // Light splashes: crest specks thrown up from each word as it floods.
+            ctx.fillStyle = ik.crest;
+            for (const w of words) {
+              const a = T - on[w.w.k];
+              if (a < 0 || a > 0.45) continue;
+              for (let i = 0; i < 14; i++) {
+                const ang = Math.PI * (1.1 + 0.8 * OM.hash(i, w.w.k, 3)), v = 160 + 220 * OM.hash(i, w.w.k, 4);
+                const x = w.w.x + 8 + Math.cos(ang) * v * a, y = w.w.y - set.cap + Math.sin(ang) * v * a + 500 * a * a;
+                ctx.globalAlpha = e * (1 - a / 0.45);
+                ctx.fillRect(x, y, 4, 4);
+              }
+            }
+          }
+          ctx.globalAlpha = 1;
+          fx.apply(T, {
+            amount: e * (1 - 0.6 * OM.pulse(on, T, 0.2)),
+            cam: { zoom: 1 + e * 0.1, y: e * (48 - 96 * OM.smooth(OM.prog(T, start + 0.3, 211.6))) },
+          });
+        },
+        release: () => { fx.release(); c.release(); },
     };
   },
 });

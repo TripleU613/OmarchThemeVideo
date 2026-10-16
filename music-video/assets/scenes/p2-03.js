@@ -12,6 +12,25 @@ OM.scene({
     cv.className = 'om-fill';
     el.appendChild(cv);
     const c = OM.canvas(cv, { alpha: false });
+    // Layered atmospheric fog by depth: drifting haze in the theme's blues, thicker toward the frame's edges and as we climb.
+    const fx = OM.post(el, c, {
+      effect: `vec4 effect(vec2 uv) {
+  vec2 q = cam(uv);
+  vec3 c = src(q).rgb;
+  if (uAmount <= 0.0) return vec4(c, 1.0);
+  float f = 0.0, w = 0.5;
+  for (int k = 0; k < 3; k++) {
+    float fk = float(k);
+    f += w * vnoise(uv * vec2(3.2, 1.8) * (1.0 + fk * 1.7) + vec2(uTime * 0.06 * (fk + 1.0), fk * 7.3 - uTime * 0.03));
+    w *= 0.55;
+  }
+  f /= 0.8;
+  float depth = smoothstep(0.28, 0.8, length((uv - 0.5) * vec2(1.0, 1.7)));
+  float dens = clamp((depth * 0.7 + uP0.x * 0.6) * f, 0.0, 1.0);
+  vec3 fog = mix(vec3(0.141, 0.157, 0.231), vec3(0.255, 0.282, 0.408), f);
+  return vec4(mix(c, fog, uAmount * dens * 0.55), 1.0);
+}`,
+    });
     const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
     const L = OM.HOME, P = OM.p2;
     const END = start + duration;
@@ -88,7 +107,7 @@ OM.scene({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (P.cut(ctx, T, dpr, start, END, 'grid', 'spark')) return;
+        if (P.cut(ctx, T, dpr, start, END, 'grid', 'spark')) return void fx.apply(T, {});
         if (!lay || (!lay.ok && P.ready())) lay = layout();
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
@@ -164,6 +183,25 @@ OM.scene({
           }
         }
 
+        // Traffic streaks: headlights run both ways along the lit avenue, and down each feeder once powered.
+        for (let i = 0; i < 26; i++) {
+          const dir = i % 2 ? 1 : -1, v = 420 + 380 * OM.hash(i, 1, 4);
+          const x = ((OM.hash(i, 2, 4) * 2400 + dir * v * (T - start)) % 2400 + 2400) % 2400 - 240;
+          if (x > reach - 30 || x < 0) continue;
+          ctx.fillStyle = dir > 0 ? ink.crest : ink.hover;
+          ctx.fillRect(x, ya + (dir > 0 ? -7 : 4), 34, 3);
+        }
+        for (const d of D) {
+          const age = T - d.t0;
+          if (age < 0) continue;
+          const yd = cellY(d.side < 0 ? d.edge + 1 : d.edge), xm = cellX(d.mid) + L.cw / 2 - 2;
+          for (let j = 0; j < 3; j++) {
+            const p = ((age * 1.6 + j / 3) % 1);
+            ctx.fillStyle = ink.crest;
+            ctx.fillRect(xm - 1, OM.lerp(ya, yd, p) - 9, 6, 18);
+          }
+        }
+
         // The city as one spark: the halo comes up as the city collapses into it.
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         const sp = OM.prog(climb, 0.55, 1);
@@ -174,8 +212,17 @@ OM.scene({
           OM.cell(ctx, L, h.col, h.row, dpr);
           ctx.globalAlpha = 1;
         }
+
+        // Camera: an aerial climb, pulling back and turning as the city powers on.
+        const env = OM.post.envelope(T, start, END, { ramp: 0.35 });
+        const pw = OM.ease.inOutSine(OM.prog(T, DB - 0.1, CLIMB + 0.2));
+        fx.apply(T, {
+          amount: env * (0.45 + 0.55 * climb),
+          cam: { zoom: 1 + env * (0.07 - 0.025 * pw), rot: env * 0.024 * (pw - 0.3) },
+          p0: [climb, 0, 0, 0],
+        });
       },
-      release: () => c.release(),
+      release: () => { fx.release(); c.release(); },
     };
   },
 });

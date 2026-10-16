@@ -31,7 +31,7 @@ OM.scene({
     // Ticks: every eighth from the downbeat, every sixteenth on the roll.
     const TICKS = [];
     for (let x = DOWN; x < ROLL - 0.01; x += OM.SPB / 2) TICKS.push(x);
-    for (let x = ROLL; x < END; x += OM.SPB / 4) TICKS.push(x);
+    for (let x = ROLL; x < OFF[0]; x += OM.SPB / 4) TICKS.push(x);
 
     /** The train: gear k is sized to its word; gears alternate above and below the centre row. */
     const layout = (ctx) => {
@@ -116,12 +116,26 @@ OM.scene({
       }
     };
 
+    // Specular sweep: a bright diagonal band raking across the gear faces after each lock (mid tones only, so type stays put).
+    const fx = OM.post(el, c, {
+      effect: `vec4 effect(vec2 uv) {
+  vec2 s = cam(uv);
+  vec4 c = src(s);
+  float d = dot(s * vec2(uRes.x / uRes.y, 1.0), normalize(vec2(1.0, 0.55)));
+  float band = exp(-pow((d - uP0.x) / 0.07, 2.0)) + 0.4 * exp(-pow((d - uP0.x + 0.16) / 0.03, 2.0));
+  float lum = dot(c.rgb, vec3(0.3, 0.59, 0.11));
+  float m = smoothstep(0.05, 0.1, lum) * (1.0 - smoothstep(0.38, 0.5, lum));
+  c.rgb += vec3(0.855, 0.925, 0.776) * band * m * 0.55 * uAmount;
+  return c;
+}`,
+    });
+    const LOCKS = [...on, DOWN];
     return {
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (T < start + 0.05) return OM.handoff('grid', ctx, T, dpr);
-        if (T > END - 0.07) return OM.handoff('line', ctx, T, dpr);
+        if (T < start + 0.05) return fx.apply(T), OM.handoff('grid', ctx, T, dpr);
+        if (T > END - 0.07) return fx.apply(T), OM.handoff('line', ctx, T, dpr);
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
         // The grid it cut in on, fading as the parts arrive.
@@ -138,7 +152,7 @@ OM.scene({
         const s = drive(T);
         const drop = decay(T, on[K], 0.16), down = decay(T, DOWN, 0.12);
         const tick = TICKS.reduce((m, x) => Math.max(m, decay(T, x, 0.05)), 0);
-        const crush = OM.ease.inCubic(OM.prog(T, OFF[0] + 0.06, OFF[1]));
+        const crush = OM.ease.inOutCubic(OM.prog(T, OFF[0] + 0.01, OFF[1]));
         const dark = sm(T, OFF[0], OFF[0] + 0.08);
         // The drop shakes the frame.
         const shake = 14 * drop * Math.sin((T - on[K]) * 90);
@@ -147,7 +161,7 @@ OM.scene({
         ctx.scale(1 + 0.12 * crush, Math.max(0.002, 1 - crush));
         ctx.translate(-960, -YC);
         // Back light behind the train, pumping on the ticks.
-        pool(ctx, 960, YC, 900, 420, ink.lit, 0.05 + 0.1 * sm(T, on[K], DOWN) + 0.12 * drop + 0.06 * tick);
+        pool(ctx, 960, YC, 900, 420, ink.lit, (0.05 + 0.1 * sm(T, on[K], DOWN) + 0.12 * drop + 0.06 * tick) * (1 - crush));
         G.forEach((g, k) => {
           // Flying in: the part accelerates into its mesh and hits on the onset.
           const inbound = k === 0 ? Math.max(0.06, on[0] - start - 0.06) : 0.3;
@@ -191,17 +205,43 @@ OM.scene({
             pool(ctx, px, py, 120 + (k === K ? 180 : 0), 120 + (k === K ? 180 : 0), ink.crest, 0.7 * hit);
           }
         });
+        // Sparks where the teeth bite: a burst at each lock and each tick, closed-form arcs.
+        for (let k = 1; k <= K; k++) {
+          if (T < on[k]) continue;
+          const a = G[k - 1], g = G[k];
+          const px = a.x + ((g.x - a.x) * a.r) / (a.r + g.r), py = a.y + ((g.y - a.y) * a.r) / (a.r + g.r);
+          for (const h of [on[k], ...TICKS]) {
+            const age = T - h;
+            if (age < 0 || age > 0.3) continue;
+            const n = Math.round(h * 100) + k * 7;
+            for (let m = 0; m < (h === on[k] ? 14 : 6); m++) {
+              const an = OM.hash(n, m, 31) * Math.PI * 2, sp = 250 + 650 * OM.hash(n, m, 32);
+              const x = px + Math.cos(an) * sp * age, y = py + Math.sin(an) * sp * age + 900 * age * age;
+              ctx.fillStyle = rgba(m % 3 ? ink.hover : ink.crest, 1 - age / 0.3);
+              ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
+            }
+          }
+        }
         ctx.restore();
         // The crushed train becomes the crest line.
-        const lineA = OM.prog(T, OFF[1] - 0.04, OFF[1]);
+        const lineA = sm(T, OFF[1] - 0.11, OFF[1]);
         if (lineA > 0) {
           ctx.globalAlpha = lineA;
           ctx.fillStyle = ink.crest;
           for (let col = L.cMin; col < L.cMin + L.cols; col++) OM.cell(ctx, L, col, H.row, dpr);
           ctx.globalAlpha = 1;
         }
+        // Camera: a ratchet roll, one click per lock, unwinding before the crush.
+        let rot = 0;
+        LOCKS.forEach((h, i) => (rot += (i === LOCKS.length - 1 ? 0.012 : 0.008) * OM.ease.outBack(OM.prog(T, h, h + 0.1), 3)));
+        rot *= 1 - OM.ease.inOutCubic(OM.prog(T, 78.62, 78.98));
+        if (Math.abs(rot) < 1e-7) rot = 0;
+        const last = LOCKS.filter((h) => h <= T).pop();
+        const q = last === undefined ? 1 : OM.prog(T, last, last + 0.45);
+        const amount = OM.post.envelope(T, start, END, { ramp: 0.2 }) * Math.sin(Math.PI * q) * (1 - crush);
+        fx.apply(T, { amount, cam: { rot, zoom: 1 + 1.25 * Math.abs(rot) }, p0: [OM.lerp(-0.2, 2.1, q), 0, 0, 0] });
       },
-      release: () => c.release(),
+      release: () => (fx.release(), c.release()),
     };
   },
 });

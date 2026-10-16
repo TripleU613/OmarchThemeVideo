@@ -150,7 +150,24 @@ OM.ownWords.add('v2-01');
     return h.length ? h : fallback;
   };
 
-  OM.v2 = { FONT, ink, th, rgba, pool, met, fontOf, layout, fitWord, drawWord, grid, lerpRect, win, still, ring, hitsIn, HOLD_IN: 0.04, HOLD_OUT: 0.07 };
+  /** Effect and camera envelopes: exactly at rest at a cut, easing in and out with zero speed. */
+  const env = (T, s, e) => OM.post.envelope(T, s, e, { ramp: 0.4, hold: 0.07 });
+  const camEnv = (T, s, e) => OM.post.envelope(T, s, e, { ramp: 0.45, hold: 0.04 });
+  /** A burst of square sparks from (x, y), `age` seconds old: analytic ballistic paths from a seed. */
+  const burst = (ctx, x, y, age, seed, { n = 12, sp = 420, life = 0.4, g = 900, color, size = 4, up = 0 } = {}) => {
+    if (age < 0 || age > life) return;
+    const r = OM.rng(seed);
+    ctx.fillStyle = color || ink().crest;
+    for (let i = 0; i < n; i++) {
+      const a = r() * Math.PI * 2, v = sp * (0.4 + 0.6 * r()), l = life * (0.5 + 0.5 * r());
+      if (age > l) continue;
+      ctx.globalAlpha = 1 - age / l;
+      const px = x + Math.cos(a) * v * age, py = y + (Math.sin(a) * v - up) * age + 0.5 * g * age * age;
+      ctx.fillRect(px - size / 2, py - size / 2, size, size);
+    }
+    ctx.globalAlpha = 1;
+  };
+  OM.v2 = { env, camEnv, burst, FONT, ink, th, rgba, pool, met, fontOf, layout, fitWord, drawWord, grid, lerpRect, win, still, ring, hitsIn, HOLD_IN: 0.04, HOLD_OUT: 0.07 };
 })();
 
 OM.scene({
@@ -170,7 +187,7 @@ OM.scene({
     const SCREEN = { x: 320, y: 140, w: 1280, h: 800 };
     const DB = V.hitsIn(OM.T && OM.T.downbeats, start, END, [116.518, 118.654]);
     const PULL = 0.11; // the magnetic pull into the tile, accelerating to the click
-    const CL0 = END - 0.24, CL1 = END - 0.09; // the words clear
+    const CL0 = END - 0.42, CL1 = END - 0.08; // the words clear, gradually, by the cut
     const rng = OM.rng(2101);
     // Dropped cards: where each lies, the edge it slides in from, its drift.
     const CARD = SLOT.map((r, k) => {
@@ -180,13 +197,23 @@ OM.scene({
         fx: Math.cos(a) * 1500, fy: Math.sin(a) * 1000, ph: rng() * 6.28, at: start + 0.04 + k * 0.035,
       };
     });
+    // Magnetic ripple: space bends in a ring running out of the window that just snapped.
+    const FX = `vec4 effect(vec2 uv) {
+      vec2 q = cam(uv);
+      vec2 c = uP0.xy; float age = uP0.z;
+      vec2 d = (q - c) * vec2(uRes.x / uRes.y, 1.0);
+      float r = length(d), ring = age * 1.3;
+      float w = sin((r - ring) * 70.0) * exp(-abs(r - ring) * 18.0) * exp(-age * 4.0);
+      return src(q + normalize(d + 1e-5) * w * 0.006 * uAmount * vec2(uRes.y / uRes.x, 1.0));
+    }`;
+    const fx = OM.post(el, c, { effect: FX });
     let fits = null;
     const fit = () => SLOT.map((r, k) => V.fitWord((sung[k] && sung[k].text) || '', r.x + r.w / 2, r.y + r.h / 2 + 10, r.w - 56, 112));
 
     /** A card's loose pose at T: sliding in, then drifting where it fell. */
     const loose = (k, T) => {
       const C = CARD[k], r = SLOT[k];
-      const e = OM.ease.outCubic(OM.prog(T, C.at, C.at + 0.4));
+      const e = OM.ease.inOutCubic(OM.prog(T, C.at, C.at + 0.6));
       const d = T - start;
       return {
         x: C.cx + C.fx * (1 - e) + 14 * Math.sin(d * 1.3 + C.ph) - (r.x + r.w / 2),
@@ -199,13 +226,13 @@ OM.scene({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
-        if (T < start + V.HOLD_IN) return OM.handoff('screen', ctx, T, dpr);
-        if (T >= END - V.HOLD_OUT) return V.still(ctx, N);
+        if (T < start + V.HOLD_IN) return fx.apply(T), OM.handoff('screen', ctx, T, dpr);
+        if (T >= END - V.HOLD_OUT) return fx.apply(T), V.still(ctx, N);
         if (!fits || !V.met().ok) fits = fit();
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
         const db = OM.pulse(DB, T, 0.1);
-        const clear = OM.ease.inCubic(OM.prog(T, CL0, CL1));
+        const clear = OM.ease.inOutSine(OM.prog(T, CL0, CL1));
         const latest = OM.hitCount(on, T) - 1;
 
         // Loose cards first (behind), then the tiles that have clicked in.
@@ -215,7 +242,7 @@ OM.scene({
           const landed = T >= on[k];
           if (k === 0) {
             // The screen itself: it is window 0, and snaps into its tile from the first word.
-            const e = OM.ease.outQuint(OM.prog(T, start + V.HOLD_IN, on[0] + 0.14));
+            const e = OM.ease.inOutCubic(OM.prog(T, start + V.HOLD_IN, on[0] + 0.5)); // eased out of the screen handoff
             const rr = V.lerpRect(SCREEN, r, e);
             const brd = landed ? OM.mix(ink.crest, k === latest ? th.brand : th['border-strong'], OM.clamp((T - on[0]) / 0.3)) : ink.mid;
             V.win(ctx, rr, { border: OM.mix(brd, th['border-strong'], clear), prompt: e > 0.5 });
@@ -243,8 +270,22 @@ OM.scene({
           if (age >= 0 && age < 0.3) V.ring(ctx, r, 4 + 26 * OM.ease.outCubic(age / 0.3), 3, ink.crest, 1 - age / 0.3);
           if (age >= 0 && db > 0.05) V.ring(ctx, r, 6, 2, ink.lit, db * 0.8 * (1 - clear));
         });
+        // Contact sparks off the corners of each tile as it clicks in.
+        SLOT.forEach((r, k) => {
+          const age = T - on[k];
+          if (age < 0 || age > 0.45 || k === 0) return;
+          [[r.x, r.y], [r.x + r.w, r.y], [r.x, r.y + r.h], [r.x + r.w, r.y + r.h]].forEach(([x, y], j) => V.burst(ctx, x, y, age, 2101 + k * 7 + j, { n: 7, sp: 380, life: 0.4 }));
+        });
+        const ce = V.camEnv(T, start, END), fe = V.env(T, start, END);
+        const k = Math.max(0, OM.hitCount(on, T) - 1), r = SLOT[k];
+        const punch = OM.pulse(on.slice(1), T, 0.07);
+        fx.apply(T, {
+          amount: fe * (T >= on[0] ? 1 : 0),
+          cam: { zoom: 1 + ce * (0.018 + 0.03 * punch), x: ce * 9 * Math.sin((T - start) * 0.8), y: ce * 6 * Math.cos((T - start) * 0.6) },
+          p0: [(r.x + r.w / 2) / 1920, 1 - (r.y + r.h / 2) / 1080, Math.max(0, T - on[k]), 0],
+        });
       },
-      release: () => c.release(),
+      release: () => { fx.release(); c.release(); },
     };
 
     function drawIn(ctx, k, T, r, clear) {

@@ -12,7 +12,15 @@ OM.scene({
     const cv = document.createElement('canvas');
     cv.className = 'om-fill';
     el.appendChild(cv);
+    // A third, screen-blended exposure ghosting off the frame, converging to nothing at the lock.
+    const FX = `vec4 effect(vec2 uv) {
+      vec2 q = cam(uv);
+      vec3 a = src(q).rgb, b = src(q + uP0.xy).rgb;
+      vec3 scr = 1.0 - (1.0 - a) * (1.0 - b * vec3(0.8, 1.0, 0.75));
+      return vec4(mix(a, scr, uP0.z * uAmount), 1.0);
+    }`;
     const c = OM.canvas(cv, { alpha: false });
+    const fx = OM.post(el, c, { effect: FX });
     const off = document.createElement('canvas'); // one exposure, drawn once and printed twice
     const oc = OM.canvas(off, { alpha: false });
     const ink = V.ink(), th = V.th();
@@ -25,13 +33,13 @@ OM.scene({
     const K1 = 132.331, K2 = 132.47; // kicks: collapse to a line, then to a dot
     const SLOT = V.grid(7);
     let F = null;
-    const fit = () => V.layout(sung, { cap: 118, maxW: 1800, cx: 960, cy: 540, lead: 1.45 });
+    const fit = () => V.layout(sung, { cap: 118, maxW: 1580, cx: 960, cy: 540, lead: 1.45 });
 
     /** The exposure: the desk, dimming back as the words arrive, and the words. */
     const expose = (x, T) => {
       x.fillStyle = ink.bg;
       x.fillRect(0, 0, 1920, 1080);
-      const dim = OM.ease.inOutCubic(OM.prog(T, start + V.HOLD_IN, on[0] + 0.3));
+      const dim = OM.ease.inOutCubic(OM.prog(T, start + V.HOLD_IN, start + 0.7));
       const lock = T >= LOCK ? Math.exp(-(T - LOCK) / 0.2) : 0;
       const db = OM.pulse([DB], T, 0.12);
       for (const r of SLOT) {
@@ -49,18 +57,18 @@ OM.scene({
     };
     /** How far out of register the two copies are: out, drifting, then pulled in to lock. */
     const drift = (T) => {
-      const out = OM.ease.outCubic(OM.prog(T, start + V.HOLD_IN, start + 0.7));
+      const out = OM.ease.inOutCubic(OM.prog(T, start + V.HOLD_IN, start + 1.0)); // eased out of the cut
       const pull = OM.ease.inCubic(OM.prog(T, LOCK - 1.1, LOCK));
       const a = out * (1 - pull);
       const d = T - start;
-      return { x: a * (46 + 18 * Math.sin(d * 1.7)), y: a * (30 + 12 * Math.cos(d * 1.3)), r: a * 0.014 * Math.sin(d * 1.1 + 0.6), s: a * 0.025 };
+      return { a, x: a * (46 + 18 * Math.sin(d * 1.7)), y: a * (30 + 12 * Math.cos(d * 1.3)), r: a * 0.014 * Math.sin(d * 1.1 + 0.6), s: a * 0.025 };
     };
 
     return {
       render(t, T) {
         const ctx = c.ensure();
-        if (T < start + V.HOLD_IN) return V.still(ctx, 7);
-        if (T >= END - V.HOLD_OUT || T >= K2 + 0.32) return OM.handoff('night', ctx, T, c.dpr);
+        if (T < start + V.HOLD_IN) return fx.apply(T), V.still(ctx, 7);
+        if (T >= END - V.HOLD_OUT || T >= K2 + 0.5) return fx.apply(T), OM.handoff('night', ctx, T, c.dpr);
         if (!F || !V.met().ok) F = fit();
         const x = oc.ensure();
         expose(x, T);
@@ -102,8 +110,21 @@ OM.scene({
           ctx.globalAlpha = 1;
         }
         ctx.setTransform(c.dpr, 0, 0, c.dpr, 0, 0);
+        // Phosphor: the dot's afterglow lingering on the tube after power-off.
+        const ph = T >= K2 + 0.12 ? 1 - OM.prog(T, K2 + 0.12, K2 + 0.48) : 0;
+        if (ph > 0) {
+          V.pool(ctx, 960, 540, 90, 90, ink.lit, 0.35 * ph * ph);
+          ctx.fillStyle = V.rgba(ink.crest, ph);
+          for (let i = -2; i <= 2; i++) for (let j = -2; j <= 2; j++) if (Math.abs(i) + Math.abs(j) <= 2) ctx.fillRect(958 + i * 6, 538 + j * 6, 4, 4);
+        }
+        const ce = V.camEnv(T, start, END), D = T < K1 ? drift(T) : { a: 0, x: 0, y: 0 };
+        fx.apply(T, {
+          amount: V.env(T, start, END),
+          cam: { zoom: 1 + ce * 0.045, x: ce * 0.4 * D.x, y: ce * 0.3 * D.y },
+          p0: [(D.x * 1.6) / 1920, (-D.y * 1.6) / 1080, 0.35 * D.a, 0],
+        });
       },
-      release: () => { c.release(); oc.release(); },
+      release: () => { fx.release(); c.release(); oc.release(); },
     };
   },
 });

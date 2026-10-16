@@ -18,9 +18,45 @@
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      // Light speed: radial streaks toward the vanishing point, max-blended so the
+      // lines stay crisp, and a polar twist that only bends the far centre.
+      const fx = OM.post(el, c, {
+        effect: `vec4 effect(vec2 uv) {
+          vec2 R = vec2(1920.0, 1080.0), px = uv * R, d = px - uP0.xy;
+          float r = length(d), a = uAmount * uP0.z * exp(-r / 260.0);
+          d = mat2(cos(a), -sin(a), sin(a), cos(a)) * d;
+          vec2 q = (uP0.xy + d) / R;
+          vec4 base = src(cam(q));
+          vec2 sp = cam(uv) * R; // ease the streaks off the front line's box (uP1, px, y up)
+          float clear = clamp(max(max(uP1.x - sp.x, sp.x - uP1.z), max(uP1.y - sp.y, sp.y - uP1.w)) / 30.0, 0.0, 1.0);
+          vec3 s = vec3(0.0);
+          for (int i = 1; i <= 10; i++) s += src(cam((uP0.xy + d * (1.0 - uP0.w * float(i) / 10.0)) / R)).rgb;
+          s /= 10.0;
+          return vec4(max(base.rgb, s * 0.75 * uAmount * clear), 1.0); // ghosts stay dimmer than the crisp lines
+        }`,
+      });
+      // Star streaks: points in the tunnel volume, each drawn from where it was a moment ago.
+      const STARS = Array.from({ length: 140 }, (_, n) => ({ x: (OM.hash(n, 1, 11) - 0.5) * 2.6, y: (OM.hash(n, 2, 11) - 0.5) * 1.5, z: OM.hash(n, 3, 11) * 10 }));
+      const stars = (ctx, T, F, k, sq) => {
+        const z = Zc(T), z0 = Zc(T - 0.035);
+        ctx.lineCap = 'square';
+        for (const s of STARS) {
+          if (Math.abs(s.x) < 0.25 && Math.abs(s.y) < 0.15) continue;
+          const d = ((s.z - z * 1.4) % 10 + 10) % 10 + 0.2;
+          const dp = d + (z - z0) * 1.4;
+          if (dp > 10.2) continue;
+          const x1 = C.x + ((s.x * F) / d) * k, y1 = C.y + ((s.y * F) / d) * k;
+          const x0 = C.x + ((s.x * F) / dp) * k, y0 = C.y + ((s.y * F) / dp) * k;
+          const f = OM.clamp((10 - d) / 5) * Math.pow(1 - sq, 2); // gone before the spark
+          if (f <= 0.01) continue;
+          ctx.strokeStyle = OM.mix(ink.bg, d < 2.5 || sq > 0.3 ? ink.crest : ink.mid, f);
+          ctx.lineWidth = Math.max(1, 3.2 / d);
+          ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+        }
+      };
       const L = OM.HOME;
       const ink = OM.fieldInks('tokyo-night');
-      const { C, MW, MH, motifs, Zc, focal, rings, frame, DOWN } = OM.xb;
+      const { C, MW, MH, motifs, Zc, focal, rings, frame, DOWN, camAt } = OM.xb;
       const END = start + duration;
       const SNARES = [233.895, 235.357, 236.402, 237.610, 238.097, 239.746, 240.094, 240.234, 240.628, 240.768, 242.091];
       // The squeeze: nothing until the last downbeat, then a step on each snare of the roll.
@@ -34,17 +70,16 @@
       };
       // Every line sung before the build, in order, each at its own depth along the tunnel.
       const ids = OM.T.lines.filter((l) => l.end <= start).map((l) => l.id);
-      const Z0 = 8.2, GAP = 1.25; // the first line enters the far plane (8) just after the seam
+      const Z0 = 9, GAP = 1; // one ring per line; the first enters the far plane (8) after the seam
       const items = ids.map((id, i) => {
-        const a = i * 2.39996 + 0.6;
-        return { id, z: Z0 + i * GAP, x: 0.34 * Math.cos(a), y: 0.2 * Math.sin(a) };
+        return { id, z: Z0 + i * GAP, x: 0, y: i % 2 ? 0.42 : -0.42 };
       });
       // The motifs ride between the lines, wide of the axis.
       const props = [0, 1, 2, 3, 4].map((i) => {
         const a = i * 2.6 + 2.2;
         return { i, z: Z0 + (4 + i * 8.5) * GAP + GAP / 2, x: 0.72 * Math.cos(a), y: 0.42 * Math.sin(a) };
       });
-      let texts = null;
+      let texts = null, front = null; // front: the nearest readable line's box, kept clear of the streaks
       const measure = () => {
         const m = document.createElement('canvas').getContext('2d');
         m.font = FONT;
@@ -57,8 +92,7 @@
         };
       };
 
-      return {
-        render(t, T) {
+      const draw = (t, T) => {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + 0.1) return frame(ctx, T, dpr);
@@ -72,6 +106,9 @@
           rings(ctx, dpr, T, { squeeze: sq, flash: OM.clamp(drop + 0.35 * snare) });
 
           const z = Zc(T), F = focal(T);
+          stars(ctx, T, F, k, sq);
+          // The camera's crop, so a line held "in frame" stays in the shown frame.
+          const cm = camAt(T), mx = 40 + (cm.zoom - 1) * 960 + Math.abs(cm.rot) * 560, my = 40 + (cm.zoom - 1) * 540 + Math.abs(cm.rot) * 980;
           const P = (x, y, d) => [C.x + ((x * F) / d) * k, C.y + ((y * F) / d) * k];
           // The motifs, as lattice blocks scaled by depth.
           for (const p of props) {
@@ -91,29 +128,44 @@
               }
             ctx.globalAlpha = 1;
           }
-          // The lines, far to near so the nearest lands on top.
+          // The lines: each rides its own ring, alternately just inside its top and
+          // bottom edge. Laid out near to far, a line is dropped if it would touch
+          // one nearer to the camera, so no two ever overlap; then drawn far to near
+          // on a dark plate, so nothing else reads over a line.
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          for (let n = items.length - 1; n >= 0; n--) {
+          const shown = [];
+          for (let n = 0; n < items.length; n++) {
             const it = items[n], tx = texts.list[n];
             const d = it.z - z;
             if (d < 0.22 || d > 8 || !tx.s) continue;
             // Grows with nearness up to the frame's width (or 170px), then dissolves rather than clip.
             const raw = ((190 * F) / 900 / d) * k;
-            const cap = Math.min(170, 1800 / Math.max(1, tx.w));
+            const cap = Math.min(170, (1880 - 2 * mx) / Math.max(1, tx.w));
             const size = Math.min(raw, cap);
             if (size < 3) continue;
             const gone = OM.clamp((raw / cap - 1) * 1.6);
             if (gone >= 1) continue;
             let [px, py] = P(it.x, it.y, d);
             const half = (tx.w * size) / 2;
-            px = OM.clamp(px, half + 40, 1880 - half); // the whole line stays in frame while it reads
-            py = OM.clamp(py, size * 0.6 + 40, 1040 - size * 0.6);
-            const f = OM.clamp((8 - d) / 3) * (1 - gone);
-            const near = OM.clamp((2.2 - d) / 1.4);
-            ctx.font = `700 ${size.toFixed(1)}px 'JetBrains Mono'`;
-            ctx.fillStyle = OM.mix(ink.bg, sq > 0.2 || drop > 0.5 ? ink.crest : near > 0.5 ? ink.crest : ink.hover, f);
-            ctx.fillText(tx.s, px, py);
+            px = OM.clamp(px, half + mx, 1920 - mx - half); // the whole line stays in frame while it reads
+            py = OM.clamp(py, size * 0.6 + my, 1080 - my - size * 0.6);
+            const pad = 0.25 * size;
+            const box = [px - half - pad, py - 0.6 * size - pad, px + half + pad, py + 0.6 * size + pad];
+            if (shown.some((o) => box[0] < o.box[2] && box[2] > o.box[0] && box[1] < o.box[3] && box[3] > o.box[1])) continue;
+            shown.push({ n, d, size, px, py, box, f: OM.clamp((8 - d) / 3) * (1 - gone), near: OM.clamp((2.2 - d) / 1.4) });
+          }
+          front = null;
+          for (let j = shown.length - 1; j >= 0; j--) {
+            const l = shown[j];
+            ctx.fillStyle = ink.bg;
+            ctx.globalAlpha = 0.92 * l.f;
+            ctx.fillRect(l.box[0], l.box[1], l.box[2] - l.box[0], l.box[3] - l.box[1]);
+            ctx.globalAlpha = 1;
+            ctx.font = `700 ${l.size.toFixed(1)}px 'JetBrains Mono'`;
+            ctx.fillStyle = OM.mix(ink.bg, sq > 0.2 || drop > 0.5 ? ink.crest : l.near > 0.5 ? ink.crest : ink.hover, l.f);
+            ctx.fillText(texts.list[l.n].s, l.px, l.py);
+            if (l.f > 0.5 && sq < 0.2) front = l.box;
           }
           // The point everything collapses into, growing into the spark's halo.
           if (sq > 0) {
@@ -128,8 +180,16 @@
             const h = OM.cellAt(L, C.x, C.y);
             OM.cell(ctx, L, h.col, h.row, dpr);
           }
+      };
+      return {
+        render(t, T) {
+          draw(t, T);
+          const tau = Math.max(0, T - DOWN[0]);
+          const speed = OM.clamp(Math.exp(0.3245 * tau) / 16); // the camera's speed, 1/16 .. 1
+          const amount = OM.post.envelope(T, start, END, { ramp: 0.4, hold: 0.07 }) * (0.35 + 0.65 * speed);
+          fx.apply(T, { amount, cam: camAt(T), p0: [C.x, 1080 - C.y, 0.5, 0.03 + 0.13 * speed], p1: front ? [front[0], 1080 - front[3], front[2], 1080 - front[1]] : [-1e5, -1e5, -1e5, -1e5] });
         },
-        release: () => c.release(),
+        release: () => { fx.release(); c.release(); },
       };
     },
   });

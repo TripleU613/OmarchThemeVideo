@@ -48,18 +48,40 @@ OM.ownWords.add('c1-08');
 
   OM.scene({
     id: 'c1-08',
-    build(el, { start }) {
+    build(el, { start, duration }) {
       const cv = document.createElement('canvas');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      // Volumetric haze in the spotlight's cone: slow drifting smoke catching the light, shafts fanning from
+      // the lamp, densest toward the pool; it goes when the spot cuts out on the downbeat.
+      const fx = OM.post(el, c, {
+        effect: `vec4 effect(vec2 uv) {
+  vec2 q = cam(uv);
+  vec4 b = src(q);
+  if (uAmount <= 0.0) return b;
+  vec2 sp = vec2(q.x * 1920.0, (1.0 - q.y) * 1080.0);
+  vec2 st = (sp - vec2(960.0, 540.0)) / uP0.x + vec2(960.0, 540.0);
+  float f = clamp(st.y / 880.0, 0.0, 1.0);
+  float x0 = mix(900.0, 520.0, f), x1 = mix(1020.0, 1400.0, f);
+  float w = x1 - x0;
+  float inside = smoothstep(0.0, 0.18 * w, st.x - x0) * smoothstep(0.0, 0.18 * w, x1 - st.x) * step(0.0, st.y) * (1.0 - smoothstep(860.0, 900.0, st.y));
+  if (inside <= 0.0) return b;
+  float smoke = vnoise(st * vec2(0.006, 0.004) + vec2(uTime * 0.05, -uTime * 0.11)) * 0.65 + vnoise(st * 0.017 + vec2(-uTime * 0.09, uTime * 0.04)) * 0.35;
+  float ang = (st.x - 960.0) / (st.y + 140.0);
+  float shafts = 0.55 + 0.45 * vnoise(vec2(ang * 22.0, uTime * 0.25));
+  float haze = inside * smoke * shafts * (0.45 + 0.55 * f);
+  float l = dot(b.rgb, vec3(0.3, 0.59, 0.11));
+  return vec4(mix(b.rgb, vec3(0.620, 0.808, 0.416), clamp(haze * 0.16 * uAmount * (1.0 - smoothstep(0.3, 0.6, l)), 0.0, 0.2)), 1.0);
+}`,
+      });
       const ink = OM.fieldInks('tokyo-night');
       const th = OM.theme('tokyo-night');
       const [w0, w1, w2] = OM.words('c1-08');
       const DB1 = OM.downbeatsIn(112, 112.5)[0] || 112.245;
       const DB2 = OM.downbeatsIn(114.2, 114.6)[0] || 114.381;
       const KICK = 110.99, ROLL0 = 112.71, ROLL1 = 114.33, SN_PRE = 113.43, SN_A = 113.78, SN_B = 113.94;
-      const OUT = 114.796; // v2-01's masked entrance starts here: the screen handoff holds from now to the window end
+      const OUT = start + duration - 0.07; // the push eases to a stop on the screen handoff, held for the last two frames
       const LIFT0 = start + 0.075; // the first frames are the spot handoff exactly
       const RELIEF = OM.mix(th['surface-2'], th['border-strong'], 0.6);
       const EMBOSS = OM.mix(th.surface, th['border-strong'], 0.7);
@@ -288,10 +310,42 @@ OM.ownWords.add('c1-08');
       const camera = (T) => {
         const creep = 1 + CREEP * OM.ease.inOutSine(OM.prog(T, w1, DB2));
         if (T <= DB2) return creep;
-        return (1 + CREEP) * Math.pow(PUSH / (1 + CREEP), Math.pow(OM.prog(T, DB2, OUT), 2.5));
+        return (1 + CREEP) * Math.pow(PUSH / (1 + CREEP), OM.ease.inOutCubic(OM.prog(T, DB2, OUT)));
       };
 
-      return {
+      // ---- camera: craning down from c1-07's high hold onto the stage as the lift rises; the push is camera() above ----
+      const CR = OM.c1.crane78;
+      const look = (T) => {
+        const down = 1 - OM.smooth(OM.prog(T, start, w0 + 0.4));
+        const y = CR.Y * down;
+        const amount = OM.post.envelope(T, start, DB2 + 0.5, { ramp: 0.35, hold: 0.075 }) * (T < DB2 ? 1 : 0);
+        return { amount, cam: { zoom: OM.c1.cover(0, 0, y), rot: 0, x: 0, y }, p0: [camera(T), 0, 0, 0] };
+      };
+      // ---- extras: stage smoke drifting low across the floor, a puff of dust where the cloth's hem drags off ----
+      const smoke = (ctx, T, X, Y, s, vis) => {
+        const lit = T < DB2 ? 1 : 0.4;
+        for (let i = 0; i < 7; i++) {
+          const h1 = OM.hash(i, 1, 0xc108), h2 = OM.hash(i, 2, 0xc108);
+          const x = 300 + ((h1 * 1500 + T * (18 + 22 * h2)) % 1500), y = GROUND - 30 - 70 * h2 + 10 * Math.sin(T * 0.7 + 6 * h1);
+          const r = (140 + 120 * h2) * s;
+          const g = ctx.createRadialGradient(X(x), Y(y), 0, X(x), Y(y), r);
+          g.addColorStop(0, rgba(i % 2 ? th['border-strong'] : ink.dim, 0.13 * lit * vis));
+          g.addColorStop(1, rgba(th['border-strong'], 0));
+          ctx.fillStyle = g;
+          ctx.fillRect(X(x) - r, Y(y) - r, 2 * r, 2 * r);
+        }
+        if (!G || T < w1) return;
+        for (const side of [1, -1])
+          OM.c1.burst(T, w1 + 0.06, 22, 0xc18 + side, { x: X(side > 0 ? G.MX1 + 20 : G.MX0 - 10), y: Y(GROUND - 4), speed: side > 0 ? 300 : 170, spread: 1.1, dir: side > 0 ? -0.35 : -Math.PI + 0.35, g: -40, life: 1.0 }, (px, py, u, i) => {
+            ctx.globalAlpha = 0.55 * (1 - u) * Math.min(1, u * 10) * vis;
+            ctx.fillStyle = i % 3 ? th['text-muted'] : th['border-strong'];
+            const d = (2 + 6 * u) * s;
+            ctx.fillRect(px - d / 2, py - d / 2, d, d);
+          });
+        ctx.globalAlpha = 1;
+      };
+
+      return OM.c1.post({
         render(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
@@ -307,7 +361,7 @@ OM.ownWords.add('c1-08');
             const xa = sn(X(x)), ya = sn(Y(y)), xb = sn(X(x + w)), yb = sn(Y(y + h));
             ctx.fillRect(xa, ya, xb - xa, yb - ya);
           };
-          const vis = 1 - OM.prog(T, 114.7, OUT); // words legible to ~114.70, then gone with the push
+          const vis = 1 - OM.smooth(OM.prog(T, 114.7, 115.0)); // words legible to ~114.70, then gone with the push
           const glow = T >= DB2 ? T - DB2 : -1;
           ctx.fillStyle = ink.bg;
           ctx.fillRect(0, 0, 1920, 1080);
@@ -333,6 +387,7 @@ OM.ownWords.add('c1-08');
           if (glow >= 0) floor = 0.3 + 0.3 * Math.exp(-glow / 0.2);
           if (floor > 0) pool(ctx, 960, GROUND, 500, 92, ink.lit, floor * vis);
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+          smoke(ctx, T, X, Y, s, vis); // behind the machine, so it never crosses the words
 
           if (T >= w1) {
             const { MX0, MW, MY0 } = G;
@@ -456,7 +511,7 @@ OM.ownWords.add('c1-08');
           }
         },
         release: () => c.release(),
-      };
+      }, fx, look);
     },
   });
 })();

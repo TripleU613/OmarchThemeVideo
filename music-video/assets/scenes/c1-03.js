@@ -22,6 +22,32 @@ OM.ownWords.add('c1-03');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      // Ink bleed and paper grain under the presses: fresh ink feathers out into the paper (never into the
+      // letters), and the sheet shows its tooth and fibre while the impressions are fresh.
+      const fx = OM.post(el, c, {
+        effect: `vec4 effect(vec2 uv) {
+  vec2 q = cam(uv);
+  vec4 b = src(q);
+  if (uAmount <= 0.0) return b;
+  float css = uRes.y / 1080.0;
+  vec2 px = css / uRes;
+  vec2 sp = q * uRes / css;
+  float n = vnoise(sp * 0.09);
+  float r = (2.5 + 5.5 * n) * (0.4 + 0.6 * uP0.x);
+  float h = 0.0;
+  for (int i = 0; i < 8; i++) {
+    float a = 0.7854 * float(i) + 2.0 * n;
+    vec4 s = src(q + vec2(cos(a), sin(a)) * r * px);
+    h = max(h, smoothstep(0.32, 0.62, s.g) * step(s.b + 0.05, s.g));
+  }
+  float l = dot(b.rgb, vec3(0.3, 0.59, 0.11));
+  float paper = 1.0 - smoothstep(0.2, 0.4, l);
+  vec3 c = mix(b.rgb, mix(vec3(0.224, 0.282, 0.180), vec3(0.404, 0.522, 0.286), n), h * paper * 0.75 * uAmount);
+  float tooth = hash(floor(q * uRes)) - 0.5, fibre = vnoise(sp * vec2(0.04, 0.6)) - 0.5;
+  c += vec3(0.145, 0.157, 0.231) * (0.45 * tooth + 0.45 * fibre) * (1.0 - smoothstep(0.08, 0.25, l)) * uP0.y * uAmount;
+  return vec4(c, 1.0);
+}`,
+      });
       const L = OM.HOME;
       const H = { x0: L.x0, y0: L.y0, cw: L.cw / 2, ch: L.ch / 2 }; // the type's half lattice, on HOME's origin
       const ink = OM.fieldInks('tokyo-night');
@@ -131,7 +157,41 @@ OM.ownWords.add('c1-03');
         for (const [q, r] of cells) if (OM.threshold(q + off, r + off) < 0.2 + 0.8 * near) OM.cell(ctx, G, q + off, r + off, dpr);
       };
 
-      return {
+      // ---- camera: a punch in on every press, overshooting back; then a slow push carried through the cut ----
+      const th = OM.theme('tokyo-night');
+      const PUSH = OM.c1.push34, T0 = END - (2 * (PUSH.ZOOM - 1)) / PUSH.SPEED;
+      const PUNCH = [[on[0], 0.022], [on[1], 0.018], [on[2], 0.026], [MAR, 0.026], [KICK, 0.06]];
+      const punch = (a) => (a < 0 ? 0 : (1 - Math.exp(-a / 0.018)) * Math.exp(-a / 0.16) * Math.cos((2 * Math.PI * a) / 0.42));
+      const look = (T) => {
+        let zoom = 1 + 0.022 * OM.smooth(OM.prog(T, on[0] - 0.15, on[0])) * (1 - OM.smooth(OM.prog(T, 91.6, 92.4)));
+        for (const [hit, A] of PUNCH) zoom += A * punch(T - hit);
+        if (T > T0) zoom += (PUSH.SPEED * (T - T0) ** 2) / (2 * (END - T0));
+        const amount = OM.post.envelope(T, on[0] - 0.02, END - 0.1, { ramp: 0.3, hold: 0.02 });
+        let fresh = 0;
+        for (const [hit] of PUNCH) if (T >= hit) fresh = Math.max(fresh, Math.pow(0.5, (T - hit) / 0.3));
+        return { amount, cam: { zoom: Math.max(1, zoom) }, p0: [fresh, 0.55 + 0.45 * fresh, 0, 0] };
+      };
+      // ---- extras: ink droplets thrown off every block's edges, a puff of paper dust along its foot ----
+      const splash = (ctx, T, p) => {
+        const big = !!p.big, hw = ((p.box.c1 - p.box.c0 + 1) * L.cw) / 2, foot = L.y0 + (p.box.r1 + 1) * L.ch;
+        for (const side of [-1, 1]) {
+          OM.c1.burst(T, p.hit, big ? 22 : 9, Math.round(p.hit * 1000) + side, { x: p.cx + side * hw, y: p.cy, speed: big ? 620 : 380, spread: 1.3, dir: side > 0 ? -0.5 : -Math.PI + 0.5, g: 2200, life: 0.45 }, (x, y, u, i) => {
+            ctx.globalAlpha = 1 - u;
+            ctx.fillStyle = u < 0.3 ? ink.crest : i % 2 ? ink.lit : ink.hover;
+            const d = i % 3 ? 3 : 4;
+            ctx.fillRect(x - d / 2, y - d / 2, d, d);
+          });
+          OM.c1.burst(T, p.hit, big ? 18 : 8, Math.round(p.hit * 1000) + 7 + side, { x: p.cx + side * hw * 0.8, y: foot, speed: big ? 260 : 150, spread: 0.6, dir: side > 0 ? -0.15 : -Math.PI + 0.15, g: -60, life: 0.7 }, (x, y, u, i) => {
+            ctx.globalAlpha = 0.5 * (1 - u) * Math.min(1, u * 8);
+            ctx.fillStyle = i % 2 ? th['border-strong'] : ink.dim;
+            const d = 2 + 5 * u;
+            ctx.fillRect(x - d / 2, y - d / 2, d, d);
+          });
+        }
+        ctx.globalAlpha = 1;
+      };
+
+      return OM.c1.post({
         render(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
@@ -200,9 +260,10 @@ OM.ownWords.add('c1-03');
             const u = OM.prog(T, l.at, l.at + LIFTED);
             if (u > 0 && u < 1) block(ctx, H, l.cells, l.cx, l.cy, OM.ease.inCubic(1 - u), 2.6);
           }
+          for (const p of presses) splash(ctx, T, p);
         },
         release: () => c.release(),
-      };
+      }, fx, look);
     },
   });
 })();

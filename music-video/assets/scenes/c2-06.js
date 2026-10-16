@@ -18,6 +18,20 @@ OM.ownWords.add('c2-06');
   const B = A.slice(0, 9).concat(['....##......##......', '....#.#....#.#......', '...#...#..#...#.....']);
   const HC = 7; // horse cell px: a horse is 140 x 84
 
+  const FX = `vec4 effect(vec2 uv) {
+    vec2 p = cam(uv);
+    if (uAmount <= 0.0) return src(p);
+    // Dust-haze motion blur: the plain and the dust smear with the gallop; the bright letters and the herd stay crisp.
+    vec4 c0 = src(p);
+    vec3 acc = vec3(0.0);
+    for (int i = 0; i < 9; i++) acc += min(src(p - vec2(float(i) * 0.0016 * uAmount, 0.0)).rgb, vec3(0.3)); // bright letters never smear
+    acc /= 9.0;
+    float keep = smoothstep(0.45, 0.7, dot(c0.rgb, vec3(0.3, 0.59, 0.11)));
+    vec3 col = mix(acc, c0.rgb, keep);
+    col += vec3(0.404, 0.522, 0.286) * vnoise(vec2(p.x * 4.0 - uTime * 1.2, p.y * 3.0)) * 0.07 * uAmount * smoothstep(0.65, 0.0, p.y);
+    return vec4(col, 1.0);
+  }`;
+
   OM.scene({
     id: 'c2-06',
     build(el, { start, duration }) {
@@ -25,6 +39,7 @@ OM.ownWords.add('c2-06');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      const fx = OM.post(el, c, { effect: FX });
       const END = start + duration;
       const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
       const words = OM.sung('c2-06');
@@ -70,7 +85,7 @@ OM.ownWords.add('c2-06');
       };
 
       return {
-        render(t, T) {
+        draw(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + 0.05) return OM.handoff('field', ctx, T, dpr);
@@ -131,7 +146,34 @@ OM.ownWords.add('c2-06');
             }
           }
         },
-        release: () => c.release(),
+        render(t, T) {
+          this.draw(t, T);
+          const ctx = c.ensure();
+          if (OM.c2.live(T, start, END)) {
+          // Grass flying up off the hooves of each herd.
+          const herds = get().filter(Boolean).map((r) => [r.p.x + (T - on[r.k]) * r.v + 50, r.foot]);
+          if (T > HERD0) herds.push([(T - HERD0) * HV - 40, lineY]);
+          for (const [xh, foot] of herds) {
+            if (xh < -100 || xh > 2400) continue;
+            for (let n = 0; n < 14; n++) {
+              const slot = Math.floor(T * 20) - (n % 5), a = T - slot / 20, h = OM.hash(slot, n, 61);
+              const x = xh - 60 - 300 * h * a * 3 - 40 * n, y = foot - 300 * a * (0.5 + h) + 900 * a * a;
+              ctx.fillStyle = OM.c2.rgba(n % 2 ? ink.mid : ink.lit, 1 - a * 3);
+              ctx.save();
+              ctx.translate(x, y);
+              ctx.rotate(h * 6);
+              ctx.fillRect(-1, -5, 2, 10);
+              ctx.restore();
+            }
+          }
+          }
+          // Fast lateral tracking alongside the herd, with the gallop's bob.
+          OM.c2.apply(fx, T, start, END, { amount: 0.85, x: 30 - 60 * OM.prog(T, start, END), y: 3 * Math.abs(Math.sin((Math.PI * T) / (OM.SPB / 2))) });
+        },
+        release: () => {
+          fx.release();
+          c.release();
+        },
       };
     },
   });

@@ -15,6 +15,21 @@ OM.scene({
     cv.className = 'om-fill';
     el.appendChild(cv);
     const c = OM.canvas(cv, { alpha: false });
+    const fx = OM.post(el, c, { effect: `vec4 effect(vec2 uv) {
+  vec2 q = cam(uv);
+  vec4 base = src(q);
+  float f = 0.5 * vnoise(vec2(uTime * 7.0, 1.3)) + 0.5 * vnoise(vec2(uTime * 13.0, 4.1));
+  float ex = 1.0 + (f - 0.5) * 0.3 + uP0.x * 0.22;
+  vec3 h = vec3(0.0);
+  for (int i = 0; i < 12; i++) {
+    float a = float(i) * 0.5236;
+    vec2 o = vec2(cos(a) / 1920.0, sin(a) / 1080.0) * (8.0 + 10.0 * float(i % 2));
+    h += max(src(q + o).rgb - 0.5, 0.0);
+  }
+  h /= 12.0;
+  vec3 col = base.rgb * ex + h * vec3(0.73, 0.87, 0.59) * 1.3;
+  return mix(base, vec4(col, 1.0), uAmount);
+}` });
     const END = start + duration;
     const ink = OM.fieldInks('tokyo-night');
     const th = OM.theme('tokyo-night');
@@ -84,7 +99,7 @@ OM.scene({
     };
 
     return {
-      render(t, T) {
+      draw(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
         if (T < start + 0.05 || T >= END - 0.1) return OM.handoff(T < start + 0.05 ? 'glow' : 'spot', ctx, T, dpr);
@@ -139,7 +154,38 @@ OM.scene({
         });
         ctx.globalAlpha = 1;
       },
-      release: () => c.release(),
+      render(t, T) {
+          this.draw(t, T);
+          const e = B.env(T, start, END);
+          const ctx = c.ensure();
+          ctx.globalAlpha = 1;
+          if (e > 0) {
+
+            const { candles } = lay();
+            const ik = OM.fieldInks('tokyo-night'), tk = OM.theme('tokyo-night');
+            // Embers rising off every lit flame; smoke wisps once the flames lift away.
+            for (let ci = 0; ci < candles.length; ci++) {
+              const cd = candles[ci];
+              if (T < cd.at) continue;
+              for (let i = 0; i < 3; i++) {
+                const a = ((T * 0.9 + OM.hash(ci, i, 6)) % 1 + 1) % 1;
+                if (T - a / 0.9 < cd.at) continue;
+                ctx.globalAlpha = e * (1 - a) * 0.9;
+                ctx.fillStyle = a < 0.3 ? ik.crest : ik.hover;
+                ctx.fillRect(cd.x + Math.sin(a * 6 + ci) * 10, cd.top - 30 - a * 160, 3, 3);
+              }
+              const sm = OM.prog(T, RISE, RISE + 0.6);
+              if (sm > 0) B.pool(ctx, cd.x + Math.sin(T * 2 + ci) * 12, cd.top - 20 - sm * 90, 14 + sm * 20, tk['text-muted'], 0.16 * e * Math.sin(sm * Math.PI));
+            }
+          }
+          ctx.globalAlpha = 1;
+          fx.apply(T, {
+            amount: e,
+            cam: { zoom: 1 + e * 0.07, x: e * (60 - 120 * OM.smooth(OM.prog(T, start + 0.2, END - 0.4))) },
+            p0: [OM.pulse(STOPS, T, 0.08), 0, 0, 0],
+          });
+        },
+        release: () => { fx.release(); c.release(); },
     };
   },
 });

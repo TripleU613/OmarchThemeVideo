@@ -24,6 +24,34 @@ OM.ownWords.add('c1-06');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
+      // Neon bloom with a horizontal glare: the lit bars and letters bloom into the dark around them, and the
+      // check sweep throws an anamorphic streak off everything near its front. The letters stay crisp: the
+      // light only falls on the ground between them.
+      const fx = OM.post(el, c, {
+        effect: `vec4 effect(vec2 uv) {
+  vec2 q = cam(uv);
+  vec4 b = src(q);
+  if (uAmount <= 0.0) return b;
+  vec2 px = (uRes.y / 1080.0) / uRes;
+  float bl = 0.0;
+  for (int i = 0; i < 12; i++) {
+    float a = 2.39996 * float(i), r = 5.0 + 28.0 * sqrt(float(i) / 12.0);
+    vec4 s = src(q + vec2(cos(a), sin(a)) * r * px);
+    bl += smoothstep(0.55, 0.85, s.g) * step(s.b + 0.05, s.g) * (1.0 - float(i) / 14.0);
+  }
+  bl /= 7.0;
+  float gl = 0.0;
+  for (int i = 1; i <= 10; i++) {
+    float o = 1.8 * float(i * i), w = 1.0 - float(i) / 11.0;
+    gl += (smoothstep(0.7, 0.9, src(q + vec2(o * px.x, 0.0)).g) + smoothstep(0.7, 0.9, src(q - vec2(o * px.x, 0.0)).g)) * w;
+  }
+  gl *= uP0.y * (0.25 + 0.75 * exp(-pow((uv.x - uP0.x) * 4.0, 2.0))) / 8.0;
+  float l = dot(b.rgb, vec3(0.3, 0.59, 0.11)), ground = 1.0 - smoothstep(0.2, 0.5, l);
+  vec3 c = mix(b.rgb, vec3(0.733, 0.867, 0.592), clamp(bl * 0.4 * ground * uAmount, 0.0, 0.6));
+  c = mix(c, vec3(0.855, 0.925, 0.776), clamp(gl * 0.55 * ground * uAmount, 0.0, 0.7));
+  return vec4(c, 1.0);
+}`,
+      });
       const L = OM.HOME;
       const ink = OM.fieldInks('tokyo-night');
       const th = OM.theme('tokyo-night');
@@ -121,7 +149,7 @@ OM.ownWords.add('c1-06');
       const DRAIN = OM.beatsIn(FOLD - OM.SPB - 0.05, FOLD - 0.05)[0] ?? FOLD - OM.SPB;
       const SPREAD = KICKS.find((k) => k >= FOLD && k < FOLD + 0.2) ?? FOLD + 0.04;
       const OUT = Math.min(SPREAD + 0.3, END - HOLD);
-      const RISE = start + HOLD;
+      const RISE = start + HOLD, GROW = Math.max(0.28, on[0] + 0.03 - RISE); // the chart grows in, eased, arriving with word 0
       // The check: a front from off-left to off-right, fast off the downbeat; passed(x) is when it crosses x.
       const front = (T) => OM.lerp(-80, 2000, OM.ease.outCubic(OM.prog(T, CHECK, CHECK + SWEEP)));
       const passed = (x) => CHECK + SWEEP * (1 - Math.cbrt(1 - OM.clamp((x + 80) / 2080)));
@@ -132,7 +160,20 @@ OM.ownWords.add('c1-06');
         ctx.fillRect(x, y, Math.round((L.x0 + c1 * L.cw) * dpr) / dpr - x, Math.round((L.y0 + r1 * L.ch) * dpr) / dpr - y);
       };
 
-      return {
+      // ---- camera: a step in on every merge level, overshooting and settling; home before the line runs out ----
+      const STEP = 0.075 / Math.max(1, K);
+      const back = (x) => 1 + 2.70158 * (x - 1) ** 3 + 1.70158 * (x - 1) ** 2;
+      const look = (T) => {
+        let z = 0;
+        for (const t0 of LEVELS) if (T > t0) z += STEP * back(OM.clamp((T - t0) / 0.26));
+        z *= 1 - OM.smooth(OM.prog(T, CHECK + SWEEP, DRAIN));
+        const zoom = 1 + z * OM.post.envelope(T, start, OUT, { ramp: 0.3, hold: HOLD });
+        const peak = OM.smooth(OM.prog(T, CHECK - 0.06, CHECK + 0.1)) * (1 - OM.smooth(OM.prog(T, CHECK + SWEEP, CHECK + SWEEP + 0.35)));
+        const amount = OM.post.envelope(T, start, OUT, { ramp: 0.4, hold: HOLD }) * (0.45 + 0.55 * peak);
+        return { amount, cam: { zoom }, p0: [front(T) / 1920, peak, 0, 0] };
+      };
+
+      return OM.c1.post({
         render(t, T) {
           const ctx = c.ensure();
           const dpr = c.dpr;
@@ -170,11 +211,11 @@ OM.ownWords.add('c1-06');
           const kick = OM.pulse(KICKS, T, 0.09);
           const drain = OM.ease.inCubic(OM.prog(T, DRAIN, FOLD));
           const fold = 1 - OM.ease.inCubic(OM.prog(T, FOLD, FOLD + 0.1));
-          const uRise = OM.ease.outExpo(OM.prog(T, RISE, RISE + 0.2));
+          const uRise = OM.ease.inOutCubic(OM.prog(T, RISE, RISE + GROW));
 
           // Bars: height is the letter's place in the line, jumping with the spectrum while unsorted.
           for (let v = 0; v < N; v++) {
-            const rise = OM.ease.outExpo(OM.prog(T, RISE + delay[v], RISE + delay[v] + 0.14));
+            const rise = OM.ease.inOutCubic(OM.prog(T, RISE + delay[v], RISE + delay[v] + GROW - 0.03));
             const band = a.bands[Math.min(15, Math.floor((at[v] / N) * 16))];
             const jump = 1 + calm * (band * 0.9 - 0.35 + kick * 0.3);
             const h = OM.clamp(Math.round(height(v) * jump * rise * (1 - drain)), 0, HMAX + 5);
@@ -201,7 +242,7 @@ OM.ownWords.add('c1-06');
           for (let v = 0; v < N; v++) {
             const { ch, word } = chars[v];
             if (!ch || fold <= 0) continue;
-            const rise = OM.ease.outExpo(OM.prog(T, RISE + delay[v], RISE + delay[v] + 0.16));
+            const rise = OM.ease.inOutCubic(OM.prog(T, RISE + delay[v], RISE + delay[v] + GROW));
             const since = T - on[word];
             const xc = L.x0 + (cols[v] + BW / 2) * L.cw;
             const band = a.bands[Math.min(15, Math.floor((at[v] / N) * 16))];
@@ -259,9 +300,24 @@ OM.ownWords.add('c1-06');
             ctx.fillText(`runs ${runsAt[level].length}`, L.x0 + COL1 * L.cw, yLab);
             ctx.restore();
           }
+
+          // Bit-sparks: every bar that swaps throws a couple of lattice bits off its top.
+          const swaps = level > 0 ? [[LEVELS[level - 1], movedAt[level]]] : wild.filter((w) => w.t > -Infinity && T - w.t < 0.35).map((w) => [w.t, w.hot]);
+          const bit = L.cw / 3;
+          for (const [t0, mv] of swaps)
+            for (let v = 0; v < N; v++) {
+              if (!mv[v]) continue;
+              const x = L.x0 + (cols[v] + BW / 2) * L.cw, y = L.y0 + (BB - height(v) + 1) * L.ch;
+              OM.c1.burst(T, t0, 3, v * 131 + Math.round(t0 * 100), { x, y, speed: 420, spread: 1.6, g: 1500, life: 0.35 }, (px, py, u) => {
+                ctx.globalAlpha = 1 - u;
+                ctx.fillStyle = u < 0.4 ? ink.crest : ink.lit;
+                ctx.fillRect(Math.round(px * dpr) / dpr, Math.round(py * dpr) / dpr, bit, bit);
+              });
+            }
+          ctx.globalAlpha = 1;
         },
         release: () => c.release(),
-      };
+      }, fx, look);
     },
   });
 })();

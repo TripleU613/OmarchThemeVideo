@@ -54,7 +54,27 @@ OM.scene({
       return -300 + ((T - last[0] - 0.5) * 2600) % 2600;
     };
 
-    return {
+    // Camera: a sweeping crane across the stands. Effect: a fisheye lens (the centre magnified, the
+    // edges held) with floodlight glare from the roof, flaring on the downbeat.
+    const FX = `vec4 effect(vec2 uv) {
+  vec2 p = cam(uv);
+  vec2 q = (p - 0.5) * vec2(1.7778, 1.0);
+  float k = 0.07 * uAmount;
+  q *= 1.0 - k * (1.0 - dot(q, q) / 1.04);
+  vec3 c = src(0.5 + q / vec2(1.7778, 1.0)).rgb;
+  vec3 glare = vec3(0.0);
+  for (int i = 0; i < 2; i++) {
+    vec2 l = vec2(i == 0 ? 0.1 : 0.9, 0.97);
+    vec2 d = (p - l) * vec2(1.7778, 1.0);
+    glare += exp(-length(d) * 9.0) * 0.5 + exp(-abs(d.y) * 60.0) * exp(-abs(d.x) * 2.5) * 0.18;
+  }
+  return vec4(c + uAmount * glare * (0.6 + uP0.x) * vec3(0.75, 0.79, 0.96), 1.0);
+}`;
+    const fxAt = (T) => ({
+      amount: 1, p0: [1.4 * C.decay(T, FLARE, 0.18), 0, 0, 0],
+      cam: { zoom: 1.1, x: 60 * Math.sin((T - start) * 0.6), y: -25 * Math.sin((T - start) * 0.45) },
+    });
+    return OM.c3.withFx(el, c, start, END, FX, fxAt)({
       render(t, T) {
         const ctx = c.ensure();
         const dpr = c.dpr;
@@ -138,8 +158,31 @@ OM.scene({
           ctx.restore();
           ctx.restore();
         }
+        // Green confetti from the key word on, a second burst on the flare; camera flashes popping in the stands.
+        const xa = crowdA * (1 - melt);
+        if (xa > 0.01) {
+          for (let j = 0; j < 220; j++) {
+            const h = OM.hash(j, 1, 44), t0 = j < 150 ? on[KEY] + h * 1.6 : FLARE + h * 0.2;
+            const age = T - t0;
+            if (age < 0) continue;
+            const y = -20 + age * (200 + 220 * OM.hash(j, 2, 44)) + (j >= 150 ? -300 * Math.max(0, 0.4 - age) : 0);
+            if (y > 1100) continue;
+            const x = OM.hash(j, 3, 44) * 1920 + 40 * Math.sin(T * 2 + j);
+            const w = Math.max(1, 9 * Math.abs(Math.cos(T * 5 + j)));
+            ctx.fillStyle = C.rgba([ink.lit, ink.hover, ink.crest][j % 3], xa);
+            ctx.fillRect(Math.round(x - w / 2), Math.round(y), Math.round(w), 5);
+          }
+          for (let j = 0; j < 4; j++) {
+            const ph = T * 8 + j * 0.31, slot = Math.floor(ph), life = ph - slot;
+            const x = 80 + OM.hash(slot, j, 45) * 1760, y = 160 + OM.hash(slot, j, 46) * 560;
+            if (!STANDS(x, y)) continue;
+            C.pool(ctx, x, y, 34, ink.crest, 0.55 * (1 - life) * xa);
+            ctx.fillStyle = C.rgba(ink.crest, (1 - life) * xa);
+            ctx.fillRect(Math.round(x - 3), Math.round(y - 3), 6, 6);
+          }
+        }
       },
       release: () => c.release(),
-    };
+    });
   },
 });
