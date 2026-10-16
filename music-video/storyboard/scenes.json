@@ -711,8 +711,8 @@
       "world": "home",
       "theme": "tokyo-night",
       "tech": "canvas+dom",
-      "idea": "Back home. The wordmark fires each sung word out of itself in lattice type onto a line beneath it, the key word storming in from every edge; on the hard stop a vortex spirals field, wordmark and words into the frame centre, kicked by the snares, until one lit pixel is left.",
-      "device": "clockwise drain into the last pixel",
+      "idea": "Back home. The wordmark fires each sung word out of itself in lattice type onto a line beneath it, the key word storming in from every edge; on the hard stop a vortex spirals field, wordmark and words into the frame centre, kicked by the snares, into a dense glowing core that keeps spinning through the cut, specks still falling in.",
+      "device": "clockwise drain into a spinning core",
       "sync": "headline on word 1, buttons on word 4",
       "trans": "cut"
     },
@@ -722,10 +722,11 @@
       "world": "home",
       "theme": "tokyo-night",
       "tech": "canvas",
-      "idea": "The last pixel charges on the hi-hat roll, then the snare and kick blow it apart: the owner's dot-matrix portrait of DHH flies out tile by tile on spirals unwinding the vortex, face first, and holds as the final image.",
-      "device": "unwinding spiral burst into the DHH portrait",
+      "idea": "The spinning core charges on the hi-hat roll, drawing in the last specks, then the snare and kick blow it apart: a frame-filling field of specks flies out on spirals unwinding the vortex and settles slowly; as the music ends DHH emerges in it only as a soft, blurred, low-contrast drift in speck brightness, an optical illusion that holds through the silence and then dissolves back into the even field.",
+      "device": "unwinding spiral burst into a speck-field DHH illusion",
       "sync": "drain to 297.6, final blink off on 299.8",
       "trans": "cut"
     }
-  ]
+  ],
+  "tail": 6
 }

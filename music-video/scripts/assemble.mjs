@@ -6,11 +6,13 @@ import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 
 const here = (p) => new URL(p, import.meta.url)
-const { scenes } = JSON.parse(readFileSync(here('../storyboard/scenes.json'), 'utf8'))
+const { scenes, tail = 0 } = JSON.parse(readFileSync(here('../storyboard/scenes.json'), 'utf8'))
 const lines = Object.fromEntries(JSON.parse(readFileSync(here('../../analysis/lines.json'), 'utf8')).map((l) => [l.id, l]))
 const map = JSON.parse(readFileSync(here('../../analysis/audiomap.json'), 'utf8'))
 const beats = map.grid.beats_sec
-const DURATION = map.audio.duration_sec
+const SONG = map.audio.duration_sec
+// The film may run `tail` seconds past the song (scenes.json): the last scene holds on in silence.
+const DURATION = SONG + tail
 const r3 = (x) => Math.round(x * 1000) / 1000
 
 // A hard cut must land at or before the first sung word, so cut scenes take no late-beat tolerance.
@@ -127,7 +129,7 @@ const html = `<!doctype html>
   <body>
     <div id="root" data-composition-id="main" data-width="1920" data-height="1080" data-duration="${r3(DURATION)}">
 ${sections}
-      <audio id="song" src="assets/audio/song.wav" data-start="0" data-duration="${r3(DURATION)}" data-track-index="10" data-volume="1"></audio>
+      <audio id="song" src="assets/audio/song.wav" data-start="0" data-duration="${r3(SONG)}" data-track-index="10" data-volume="1"></audio>
     </div>
 ${scripts}
     <script>

@@ -11,7 +11,7 @@
     const start = +el.dataset.start;
     return { el, id: el.id.slice(2), start, end: start + +el.dataset.duration, ...meta[el.id.slice(2)] };
   });
-  const D = window.OM_TIMING.duration;
+  const D = Math.max(window.OM_TIMING.duration, ...scenes.map((s) => s.end)); // the film can outrun the song
   const $ = (s) => document.querySelector(s);
   const fmt = (t) => `${Math.floor(t / 60)}:${(t % 60).toFixed(2).padStart(5, '0')}`;
   const sceneAt = (t) => scenes.findLast((s) => t >= s.start && t < s.end) || scenes[scenes.length - 1];
@@ -93,6 +93,7 @@
   }
 
   function seek(time) {
+    tailFrom = null;
     t = Math.min(D - 0.001, Math.max(0, time));
     audio.currentTime = t;
     if (loop && (t < loop.start || t >= loop.end)) loop = null;
@@ -100,8 +101,15 @@
     history.replaceState(null, '', `#t=${t.toFixed(2)}`);
   }
 
+  // The film can run past the song (scenes.json `tail`): when the audio ends, keep the clock going on wall time.
+  let tailFrom = null;
+  audio.addEventListener('ended', () => { if (t < D - 0.01) tailFrom = performance.now() - (t - audio.duration) * 1000; });
   function frame() {
-    if (!audio.paused) {
+    if (tailFrom !== null) {
+      t = Math.min(D - 0.001, audio.duration + (performance.now() - tailFrom) / 1000);
+      if (t >= D - 0.001) tailFrom = null;
+      show(t);
+    } else if (!audio.paused) {
       t = audio.currentTime;
       if (loop && t >= loop.end) { audio.currentTime = loop.start; t = loop.start; }
       show(t);
@@ -109,7 +117,7 @@
     requestAnimationFrame(frame);
   }
 
-  const toggle = () => (audio.paused ? audio.play() : (audio.pause(), history.replaceState(null, '', `#t=${t.toFixed(2)}`)));
+  const toggle = () => (tailFrom !== null ? (tailFrom = null) : audio.paused ? audio.play() : (audio.pause(), history.replaceState(null, '', `#t=${t.toFixed(2)}`)));
   $('#play').onclick = toggle;
   $('#loop').onclick = () => { loop = loop ? null : { start: current.start, end: current.end }; show(t); };
   audio.addEventListener('play', () => $('#play').classList.add('on'));

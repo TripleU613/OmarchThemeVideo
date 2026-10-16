@@ -1,11 +1,11 @@
-// o-01 · Drain to the last pixel. Home: the field and the wordmark, as x-o1
+// o-01 · Drain into the core. Home: the field and the wordmark, as x-o1
 // leaves them. The wordmark fires each sung word out of itself in lattice type,
 // the cells slamming into a line beneath it on the word's onset and lighting the
 // field where they land; the key word storms in from every edge and flashes the
 // whole line. On the hard stop a vortex grabs everything, field cells, wordmark
 // and words, spiralling them clockwise into the frame centre, accelerating, the
-// three snares kicking the spin, until all of it is one lit pixel on the night:
-// the shared cut frame x-end explodes from.
+// three snares kicking the spin, until all of it is a dense glowing core still
+// turning, specks falling into it: the shared state x-end carries on from.
 OM.ownWords.add('o-01');
 (() => {
   const TYPE = "800 100px 'JetBrains Mono'";
@@ -16,13 +16,61 @@ OM.ownWords.add('o-01');
   const CX = 960, CY = 540;
   /** The finale, shared with x-end: the cut frame and the vortex's turning sense. */
   OM.finale = {
-    /** Night, and one lit device pixel at the frame centre. */
-    pixel(ctx, dpr) {
+    /**
+     * The cut state both scenes draw (o-01 into it, x-end out of it): a dense, glowing core still spinning
+     * at the frame centre, specks spiralling into it, charging tighter and brighter on the hi-hat roll until
+     * the snare at 295.079. A pure function of T; it fades in over the vortex from 292.95. bg: clear to night.
+     */
+    core(ctx, T, dpr, bg = true) {
       const ink = OM.fieldInks('tokyo-night');
-      ctx.fillStyle = ink.bg;
-      ctx.fillRect(0, 0, 1920, 1080);
-      ctx.fillStyle = ink.lit;
-      ctx.fillRect(Math.round(CX * dpr) / dpr, Math.round(CY * dpr) / dpr, 1 / dpr, 1 / dpr);
+      const C0 = 293.2, END = 295.079, SPIN = OM.finale.SPIN;
+      if (bg) {
+        ctx.fillStyle = ink.bg;
+        ctx.fillRect(0, 0, 1920, 1080);
+      }
+      const a = OM.smooth(OM.prog(T, 292.95, 293.4));
+      if (a <= 0) return;
+      const p = OM.prog(T, C0, END), tau = T - C0;
+      const turn = 7 * tau + 1.6 * tau * Math.abs(tau); // the spin, speeding up as it charges
+      // Flicker on the hats: an ever faster seeded strobe through the inks.
+      const ph = 5 * tau + 0.5 * ((30 - 5) / (END - C0)) * tau * Math.abs(tau);
+      const f = OM.hash(Math.floor(ph), 0, 517), lvl = tau < 0 ? 1 : f > 0.82 ? 2 : f > 0.3 ? 1 : 0;
+      const Rc = 64 - 38 * p;
+      const sn = (v) => Math.round(v * dpr) / dpr;
+      ctx.globalAlpha = a;
+      // The last specks falling in: no new ones set off in the final 0.35 s, so the core draws the last of them in.
+      for (let i = 0; i < 140; i++) {
+        const h1 = OM.hash(i, 1, 523), h2 = OM.hash(i, 2, 523), h3 = OM.hash(i, 3, 523);
+        const per = 0.5 + 0.55 * h2, x = (T - C0) / per + h3, n = Math.floor(x), u = x - n;
+        if (C0 + (n - h3) * per > END - 0.35) continue;
+        const r = Rc * 0.8 + (110 + 420 * h1) * Math.pow(1 - u, 2);
+        const th = h1 * 6.283 + n * 2.1 + SPIN * (0.5 * turn + 3.5 * u * u);
+        ctx.fillStyle = u > 0.75 ? ink.crest : h2 > 0.5 ? ink.lit : ink.mid;
+        const s = u > 0.6 ? 3 : 4;
+        ctx.fillRect(sn(960 + r * Math.cos(th)), sn(540 + r * Math.sin(th)), s, s);
+      }
+      // The glow, swelling and strobing.
+      const glow = (0.5 + 0.4 * p) * (lvl === 0 ? 0.55 : lvl === 2 ? 1.25 : 1);
+      const rad = Rc * 3.8;
+      const [r0, g0, b0] = OM.rgb(ink.lit);
+      const gr = ctx.createRadialGradient(960, 540, 0, 960, 540, rad);
+      gr.addColorStop(0, `rgba(${r0},${g0},${b0},${Math.min(0.9, glow)})`);
+      gr.addColorStop(1, `rgba(${r0},${g0},${b0},0)`);
+      ctx.fillStyle = gr;
+      ctx.fillRect(960 - rad, 540 - rad, 2 * rad, 2 * rad);
+      // The disc: specks on orbits, the inner ones faster, brighter toward the middle.
+      for (let i = 0; i < 260; i++) {
+        const h1 = OM.hash(i, 1, 529), h2 = OM.hash(i, 2, 529);
+        const rn = Math.sqrt(h1), r = Rc * rn;
+        const th = h2 * 6.283 + SPIN * turn * (1.4 - 0.6 * rn);
+        ctx.fillStyle = rn < 0.35 ? ink.crest : rn < 0.7 ? ink.hover : ink.lit;
+        const s = rn < 0.5 ? 4 : 3;
+        ctx.fillRect(sn(960 + r * Math.cos(th) - s / 2), sn(540 + r * Math.sin(th) - s / 2), s, s);
+      }
+      const k = sn(4 + 6 * p);
+      ctx.fillStyle = lvl === 2 ? ink.crest : ink.hover;
+      ctx.fillRect(sn(960 - k / 2), sn(540 - k / 2), k, k);
+      ctx.globalAlpha = 1;
     },
     /** +1: the vortex turns clockwise on screen (x-end unwinds it the other way). */
     SPIN: 1,
@@ -68,7 +116,7 @@ vec4 effect(vec2 uv) {
       const on = OM.words('o-01');
       const last = on.length - 1;
       const STOP = 292.107; // the hard stop: the line has read, the vortex grabs
-      const COLL = 293.5; // the last snare snaps it shut: one pixel from here to the cut
+      const COLL = 293.5; // the last snare snaps the vortex into the core: from here to the cut, the core alone
       const SNARES = [293.2, 293.38, 293.5];
       const DUR = (w) => (w === last ? 0.16 : 0.1);
       const P = 9; // lattice type pitch
@@ -261,8 +309,11 @@ vec4 effect(vec2 uv) {
           const dpr = c.dpr;
           ctx.globalAlpha = 1;
           if (T < Math.min(on[0], start + 0.07)) OM.handoff('word', ctx, T, dpr);
-          else if (T >= COLL) OM.finale.pixel(ctx, dpr);
-          else if (T >= STOP) vortex(ctx, T, dpr);
+          else if (T >= COLL) OM.finale.core(ctx, T, dpr);
+          else if (T >= STOP) {
+            vortex(ctx, T, dpr);
+            OM.finale.core(ctx, T, dpr, false);
+          }
           else home(ctx, T, dpr);
           // Camera: a slow push home with a kick on the key word, then a roll that follows the spin; at rest on both cuts.
           const env = OM.post.envelope(T, start, end, { ramp: 0.4 });

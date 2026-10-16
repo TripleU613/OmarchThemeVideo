@@ -1,19 +1,19 @@
-// x-end · The last pixel bursts into the portrait. From o-01's cut frame (the
-// whole home drained into one lit pixel) the pixel charges on the hi-hat roll,
-// flickering faster as sparks keep spiralling into it. The snare cracks it open
-// and the kick blows it apart: the owner's dot-matrix portrait of DHH, arms
-// folded, the Omarchy mark on his shirt, flies out of it tile by tile on spiral
-// paths that unwind the vortex the other way, the face landing first, every
-// tile cooling from crest into its own shade as it settles. By 297.7 the whole
-// portrait has formed, and it holds, steady, to the end.
+// x-end · The core bursts into the portrait. From o-01's cut state (the whole
+// home drained into a glowing core, still spinning) the core charges on the
+// hi-hat roll, tighter and brighter, drawing in the last specks. The snare cracks it open
+// and the kick blows it apart: tiles of a frame-filling field of specks fly out
+// of it on spiral paths that unwind the vortex the other way and land edge to
+// edge, settling slowly. The owner's DHH portrait then emerges in that field as
+// the music ends, only as a soft, heavily blurred, low-contrast drift in each
+// speck's brightness: up close just specks, at a glance the man. It holds through
+// the silence, then dissolves back into the even field, which stays to the end.
 (() => {
   // The owner's portrait: 220 x 346 dots, nibble-packed 4-bit shades (0 = no dot), used as given.
   const COLS = 220, ROWS = 346;
   const ENCODED = '';
-  // Its own geometry and ordered dither, kept from the file: 4 x 3.08 px pitch, 2.65 x 2.25 px dots, centred.
+  // Its own speck geometry, kept from the file: 4 x 3.08 px pitch, 2.65 x 2.25 px dots, centred.
   const PIX_X = 4.0, PIX_Y = 3.08, DOT_W = 2.65, DOT_H = 2.25;
   const OX = Math.round((1920 - COLS * PIX_X) / 2), OY = Math.round((1080 - ROWS * PIX_Y) / 2);
-  const BAYER = [0, 48, 12, 60, 3, 51, 15, 63, 32, 16, 44, 28, 35, 19, 47, 31, 8, 56, 4, 52, 11, 59, 7, 55, 40, 24, 36, 20, 43, 27, 39, 23, 2, 50, 14, 62, 1, 49, 13, 61, 34, 18, 46, 30, 33, 17, 45, 29, 10, 58, 6, 54, 9, 57, 5, 53, 42, 26, 38, 22, 41, 25, 37, 21];
   const decode = () => {
     const raw = atob(ENCODED);
     const shades = new Uint8Array(COLS * ROWS);
@@ -24,20 +24,44 @@
     }
     return shades;
   };
-  /** Whether the dot at (col, row) is drawn: the file's density against its own permuted 8x8 threshold. */
-  const dotOn = (shade, col, row) => {
-    if (!shade) return false;
-    const s = (shade - 1) / 14;
-    const th = (BAYER[(row & 7) * 8 + ((col + Math.floor(row / 64)) & 7)] + 0.5) / 64;
-    return 0.14 + 0.86 * Math.pow(s, 0.8) > th;
+  const TS = 8; // a flying tile: 8 x 8 specks
+  // The field: one speck grid over the whole frame on the portrait's own pitch, aligned to its dots.
+  const GC = 130, GR = 3; // the portrait's (0, 0) dot sits at grid (130, 3)
+  const GX = Math.ceil(1920 / PIX_X), GY = Math.ceil((1080 + GR * PIX_Y - OY) / PIX_Y) + 1, Y0 = OY - GR * PIX_Y;
+  const BLUR = 3, CONTRAST = 0.45, BASE = 0.4, GRAIN = 0.14;
+  /** Each speck's face offset from the field's mean (blurred shade map, portrait background and outside at the mean). */
+  const faceMap = () => {
+    const sh = decode();
+    let sum = 0, n = 0;
+    for (const v of sh) if (v) { sum += v / 15; n++; }
+    const m = sum / n;
+    let A = new Float32Array(GX * GY).fill(m);
+    for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) if (sh[r * COLS + c]) A[(r + GR) * GX + c + GC] = sh[r * COLS + c] / 15;
+    const box = (src, rad, horiz) => {
+      const out = new Float32Array(GX * GY);
+      for (let y = 0; y < GY; y++)
+        for (let x = 0; x < GX; x++) {
+          let s = 0, k = 0;
+          for (let d = -rad; d <= rad; d++) {
+            const xx = horiz ? x + d : x, yy = horiz ? y : y + d;
+            if (xx < 0 || yy < 0 || xx >= GX || yy >= GY) continue;
+            s += src[yy * GX + xx];
+            k++;
+          }
+          out[y * GX + x] = s / k;
+        }
+      return out;
+    };
+    for (let p = 0; p < 2; p++) A = box(box(A, BLUR, true), Math.round(BLUR * 1.3), false);
+    for (let i = 0; i < A.length; i++) A[i] -= m;
+    return A;
   };
-  const TC = 4, TR = 4; // a tile: two 2x4 glyph clusters side by side
   const CX = 960, CY = 540;
-  const FACE = { x: OX + 112 * PIX_X, y: OY + 95 * PIX_Y }; // where the face sits: it lands first
-  const SNARE = 295.079, KICK = 295.381, FORMED = 297.7;
+  const FACE = { x: OX + 112 * PIX_X, y: OY + 95 * PIX_Y }; // where the face sits: its tiles land first
+  const SNARE = 295.079, KICK = 295.381, FORMED = 299.5; // the field has settled by FORMED
 
-  // Phosphor: lit dots bloom green while they fly (uP0.y bloom), and once the portrait rests a
-  // very faint flicker runs through its dots (uP0.x shimmer). Off, it is the raw frame.
+  // Phosphor: lit specks bloom green while they fly (uP0.y bloom), and once the field rests a
+  // barely visible flicker runs through it (uP0.x shimmer). Off, it is the raw frame.
   const FX = `
 vec4 effect(vec2 uv) {
   vec2 p = cam(uv);
@@ -75,138 +99,102 @@ vec4 effect(vec2 uv) {
       const ink = OM.fieldInks('tokyo-night');
       const end = start + duration;
       const HOLD0 = start + 0.07;
-      const SHADE = Array.from({ length: 16 }, (_, k) => {
-        const s = k / 15;
-        const stops = [[0, ink.dim], [0.22, ink.mid], [0.5, ink.lit], [0.78, ink.hover], [1, ink.crest]];
+      const STOPS = [[0, OM.mix(ink.bg, ink.dim, 0.55)], [0.3, ink.dim], [0.6, ink.mid], [0.85, ink.lit], [1, ink.hover]].map(([t, h]) => [t, OM.rgb(h)]);
+      const BGP = OM.rgb(ink.bg), CREST = OM.rgb(ink.crest);
+      const tone = (L) => {
+        L = OM.clamp(L);
         let i = 0;
-        while (i < stops.length - 2 && s > stops[i + 1][0]) i++;
-        return OM.mix(stops[i][1], stops[i + 1][1], OM.prog(s, stops[i][0], stops[i + 1][0]));
-      });
+        while (i < STOPS.length - 2 && L > STOPS[i + 1][0]) i++;
+        const [a, ca] = STOPS[i], [b, cb] = STOPS[i + 1], f = (L - a) / (b - a);
+        return ca.map((v, k) => v + (cb[k] - v) * f);
+      };
 
-      // ---- the portrait, prepainted once per device scale: its dots, a crest-hot copy, a soft halo ----
+      // ---- the field, prepainted once per device scale: with the face, without it, and crest-hot for flight ----
       let PRE = null;
       const prepaint = (dpr) => {
         if (PRE && PRE.dpr === dpr) return PRE;
-        const data = decode();
-        const W = Math.round(COLS * PIX_X * dpr), H = Math.round((OY + ROWS * PIX_Y) * dpr) - Math.round(OY * dpr);
-        const mk = () => {
+        const D = faceMap();
+        const W = Math.round(1920 * dpr), H = Math.round(1080 * dpr);
+        const sheets = [0, 1, 2].map(() => {
           const k = document.createElement('canvas');
           k.width = W;
           k.height = H;
-          return k;
-        };
-        const dots = mk(), hot = mk(), halo = mk();
-        const g = dots.getContext('2d'), gh = hot.getContext('2d');
-        gh.fillStyle = ink.crest;
-        const oy = Math.round(OY * dpr);
-        const yAt = (row) => Math.round((OY + row * PIX_Y) * dpr) - oy;
+          const g = k.getContext('2d');
+          const im = g.createImageData(W, H);
+          const px = new Uint32Array(im.data.buffer);
+          px.fill((255 << 24) | (BGP[2] << 16) | (BGP[1] << 8) | BGP[0]);
+          return { k, g, im, px };
+        });
         const dw = Math.max(1, Math.round(DOT_W * dpr)), dh = Math.max(1, Math.round(DOT_H * dpr));
-        const used = new Uint8Array(Math.ceil(COLS / TC) * Math.ceil(ROWS / TR));
-        for (let row = 0; row < ROWS; row++)
-          for (let col = 0; col < COLS; col++) {
-            const sh = data[row * COLS + col];
-            if (!dotOn(sh, col, row)) continue;
-            const x = Math.round(col * PIX_X * dpr), y = yAt(row);
-            g.fillStyle = SHADE[sh];
-            g.fillRect(x, y, dw, dh);
-            gh.fillRect(x, y, dw, dh);
-            used[Math.floor(row / TR) * Math.ceil(COLS / TC) + Math.floor(col / TC)] = 1;
+        const yAt = (gy) => Math.round((Y0 + gy * PIX_Y) * dpr);
+        const pack = ([r, g, b]) => (255 << 24) | (Math.round(b) << 16) | (Math.round(g) << 8) | Math.round(r);
+        for (let gy = 0; gy < GY; gy++) {
+          const y0 = yAt(gy);
+          for (let gx = 0; gx < GX; gx++) {
+            const grain = GRAIN * (OM.hash(gx, gy, 709) - 0.5);
+            const face = tone(BASE + CONTRAST * D[gy * GX + gx] + grain), flat = tone(BASE + grain);
+            const hot = face.map((v, k) => v + (CREST[k] - v) * 0.65);
+            const cols = [pack(face), pack(flat), pack(hot)];
+            const x0 = Math.round(gx * PIX_X * dpr);
+            for (let y = Math.max(0, y0); y < Math.min(H, y0 + dh); y++)
+              for (let x = x0; x < Math.min(W, x0 + dw); x++) for (let s = 0; s < 3; s++) sheets[s].px[y * W + x] = cols[s];
           }
-        const gl = halo.getContext('2d');
-        gl.filter = `blur(${5 * dpr}px)`;
-        gl.globalAlpha = 0.32;
-        gl.drawImage(dots, 0, 0);
+        }
+        for (const s of sheets) s.g.putImageData(s.im, 0, 0);
         // The tiles: device-pixel source rects, each flight seeded and timed.
-        const tiles = [];
-        const nx = Math.ceil(COLS / TC), ny = Math.ceil(ROWS / TR);
-        const ox = Math.round(OX * dpr);
-        const ds = [];
-        for (let ty = 0; ty < ny; ty++)
-          for (let tx = 0; tx < nx; tx++) {
-            if (!used[ty * nx + tx]) continue;
-            const sx = Math.round(tx * TC * PIX_X * dpr), sx2 = Math.round(Math.min(COLS, (tx + 1) * TC) * PIX_X * dpr);
-            const sy = yAt(ty * TR), sy2 = ty + 1 < ny ? yAt((ty + 1) * TR) : H;
-            const hx = (ox + (sx + sx2) / 2) / dpr, hy = (oy + (sy + sy2) / 2) / dpr;
+        const tiles = [], ds = [];
+        for (let ty = 0; ty * TS < GY; ty++)
+          for (let tx = 0; tx * TS < GX; tx++) {
+            const sx = Math.round(tx * TS * PIX_X * dpr), sx2 = Math.min(W, Math.round((tx + 1) * TS * PIX_X * dpr));
+            const sy = Math.max(0, yAt(ty * TS)), sy2 = Math.min(H, yAt((ty + 1) * TS));
+            if (sx2 <= sx || sy2 <= sy) continue;
+            const hx = (sx + sx2) / 2 / dpr, hy = (sy + sy2) / 2 / dpr;
             ds.push(Math.hypot(hx - FACE.x, (hy - FACE.y) * 0.85));
-            tiles.push({ sx, sy, sw: sx2 - sx, sh: sy2 - sy, hx, hy, i: tiles.length });
+            tiles.push({ sx, sy, sw: sx2 - sx, sh: sy2 - sy, hx, hy });
           }
-        // Landing order: nearest the face first, with a seeded shuffle so the image resolves as a cloud, not a ring.
+        // Landing order: nearest the face first, with a seeded shuffle so the field resolves as a cloud, not a ring.
         const rank = ds.map((d, i) => [d, i]).sort((a, b) => a[0] - b[0]);
         rank.forEach(([, i], k) => {
           const t = tiles[i], h = OM.hash(i, 1, 613), h2 = OM.hash(i, 2, 613);
           const order = OM.clamp(0.62 * (k / rank.length) + 0.38 * h);
           t.s = order < 0.33 ? SNARE + 0.03 * h2 : KICK + 0.035 * h2; // the inner cloud cracks out on the snare, the rest on the kick
-          t.e = 295.85 + (FORMED - 0.05 - 295.85) * order;
+          t.e = 295.9 + (FORMED - 0.05 - 295.9) * Math.pow(order, 0.8);
           t.r = Math.hypot(t.hx - CX, t.hy - CY);
           t.th = Math.atan2(t.hy - CY, t.hx - CX);
           t.turn = 2.4 + 1.8 * h2; // radians of unwinding on the way out
           t.cool = 0.22 + 0.4 * OM.hash(i, 3, 613);
         });
-        PRE = { dpr, dots, hot, halo, tiles, ox, oy, W, H };
+        PRE = { dpr, face: sheets[0].k, flat: sheets[1].k, hot: sheets[2].k, tiles };
         return PRE;
       };
 
-      // ---- the charge: the pixel flickers ever faster, sparks still spiralling into it ----
-      const charge = (ctx, T, dpr) => {
-        OM.finale.pixel(ctx, dpr);
-        if (T < HOLD0) return;
-        const p = OM.prog(T, HOLD0, SNARE);
-        const tau = T - HOLD0, rate = (30 - 5) / (SNARE - HOLD0);
-        const phase = 5 * tau + 0.5 * rate * tau * tau;
-        const f = OM.hash(Math.floor(phase), 0, 517);
-        const lvl = f > 0.82 ? 2 : f > 0.3 ? 1 : 0;
-        // Sparks: the vortex's last debris, still turning clockwise as it falls in.
-        const n = Math.round(6 + 34 * p);
-        for (let i = 0; i < n; i++) {
-          const h1 = OM.hash(i, 1, 523), h2 = OM.hash(i, 2, 523), h3 = OM.hash(i, 3, 523);
-          const per = 0.45 + 0.5 * h2;
-          const a = (T - HOLD0 + h3 * per) / per;
-          const u = a - Math.floor(a);
-          if (T - HOLD0 < (1 - h3) * per * 0.2) continue;
-          const r = (60 + 260 * h1) * Math.pow(1 - u, 2.2);
-          const th = h1 * 6.283 + Math.floor(a) * 2.1 + OM.finale.SPIN * 4 * u * u;
-          ctx.fillStyle = u > 0.8 ? ink.crest : h2 > 0.5 ? ink.lit : ink.mid;
-          const s = (h2 > 0.8 ? 2 : 1) * (u > 0.7 ? 1 : 1.5);
-          ctx.fillRect(Math.round((CX + r * Math.cos(th)) * dpr) / dpr, Math.round((CY + r * Math.sin(th)) * dpr) / dpr, s, s);
-        }
-        // The core: a halo that swells with the charge, the pixel growing and flickering through the inks.
-        const glow = (0.3 + 0.5 * p) * (lvl === 0 ? 0.35 : lvl === 2 ? 1.25 : 1);
-        const rad = 16 + 120 * p * p;
-        const [r0, g0, b0] = OM.rgb(ink.lit);
-        const gr = ctx.createRadialGradient(CX, CY, 0, CX, CY, rad);
-        gr.addColorStop(0, `rgba(${r0},${g0},${b0},${Math.min(0.85, glow)})`);
-        gr.addColorStop(1, `rgba(${r0},${g0},${b0},0)`);
-        ctx.fillStyle = gr;
-        ctx.fillRect(CX - rad, CY - rad, 2 * rad, 2 * rad);
-        const sz = Math.round((1 + 5 * Math.pow(p, 1.5)) * dpr) / dpr;
-        ctx.fillStyle = lvl === 2 ? ink.crest : lvl === 1 ? ink.hover : ink.lit;
-        const x = Math.round((CX - sz / 2) * dpr) / dpr, y = Math.round((CY - sz / 2) * dpr) / dpr;
-        ctx.fillRect(x, y, sz, sz);
-      };
-
-      // ---- the burst: tiles fly out of the core on unwinding spirals and land in place ----
+      // ---- the burst: tiles fly out of the core on unwinding spirals and land edge to edge ----
+      // The face emerges as the music ends, holds through the silence, then dissolves into the even field,
+      // which holds still for the last frames.
+      const EM0 = 299.3, EM1 = 301.2, DISS0 = end - 1.95, DISS1 = end - 0.35;
       const burst = (ctx, T, dpr) => {
         const P = prepaint(dpr);
-        ctx.fillStyle = ink.bg;
-        ctx.fillRect(0, 0, 1920, 1080);
-        const formed = OM.smooth(OM.prog(T, 296.4, FORMED));
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.imageSmoothingEnabled = false;
-        if (formed > 0) {
-          ctx.globalAlpha = formed;
-          ctx.drawImage(P.halo, P.ox, P.oy);
-          ctx.globalAlpha = 1;
-        }
         if (T >= FORMED) {
-          ctx.drawImage(P.dots, P.ox, P.oy);
+          const face = OM.ease.inOutSine(OM.prog(T, EM0, EM1)) * (1 - OM.ease.inOutSine(OM.prog(T, DISS0, DISS1)));
+          ctx.globalAlpha = 1;
+          ctx.drawImage(face < 1 ? P.flat : P.face, 0, 0);
+          if (face > 0 && face < 1) {
+            ctx.globalAlpha = face;
+            ctx.drawImage(P.face, 0, 0);
+            ctx.globalAlpha = 1;
+          }
         } else {
+          ctx.fillStyle = ink.bg;
+          ctx.fillRect(0, 0, 1920 * dpr, 1080 * dpr);
           const cx = CX * dpr, cy = CY * dpr;
           for (const t of P.tiles) {
             if (T < t.s) continue;
             const u = OM.prog(T, t.s, t.e);
-            const src = u < t.cool ? P.hot : P.dots;
+            const src = u < t.cool ? P.hot : T < EM0 ? P.flat : P.face;
             if (u >= 1) {
-              ctx.drawImage(src, t.sx, t.sy, t.sw, t.sh, P.ox + t.sx, P.oy + t.sy, t.sw, t.sh);
+              ctx.drawImage(src, t.sx, t.sy, t.sw, t.sh, t.sx, t.sy, t.sw, t.sh);
               continue;
             }
             const q = 1 - Math.pow(1 - u, 3.2);
@@ -221,7 +209,7 @@ vec4 effect(vec2 uv) {
         // What is left of the core after the crack: a crest knot that the kick blows out.
         if (T < KICK + 0.35) {
           const a = T < KICK ? 1 : Math.exp(-(T - KICK) / 0.08);
-          const rad = (T < KICK ? 90 + 40 * Math.exp(-(T - SNARE) / 0.05) : 90 + 260 * (T - KICK));
+          const rad = T < KICK ? 90 + 40 * Math.exp(-(T - SNARE) / 0.05) : 90 + 260 * (T - KICK);
           const [r0, g0, b0] = OM.rgb(ink.hover);
           const gr = ctx.createRadialGradient(CX, CY, 0, CX, CY, rad);
           gr.addColorStop(0, `rgba(${r0},${g0},${b0},${0.75 * a})`);
@@ -241,22 +229,22 @@ vec4 effect(vec2 uv) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           ctx.globalAlpha = 1;
-          if (T < SNARE) charge(ctx, T, dpr);
+          if (T < SNARE) OM.finale.core(ctx, T, dpr);
           else burst(ctx, T, dpr);
-          // Camera: a slow push on the charging pixel, a punch on the snare, then the kick throws it back
-          // with a counter-roll that unwinds to rest as the portrait forms. Held still from 297.9.
+          // Camera: a slow push on the charging core, a punch on the snare, then the kick throws it back
+          // with a counter-roll that unwinds to rest as the field settles. Held still from FORMED.
           let z = 1, rot = 0;
-          if (T < SNARE) z = 1 + 0.08 * OM.ease.inCubic(OM.prog(T, HOLD0, SNARE));
+          if (T < SNARE) z = 1 + 0.08 * OM.ease.inCubic(OM.prog(T, start, SNARE));
           else if (T < KICK) z = 1.08 + 0.025 * (1 - Math.exp(-(T - SNARE) / 0.04));
           else {
             const zk = 1.08 + 0.025 * (1 - Math.exp(-(KICK - SNARE) / 0.04));
-            const e = 1 - OM.ease.outCubic(OM.prog(T, KICK, 297.9));
+            const e = 1 - OM.ease.outCubic(OM.prog(T, KICK, FORMED));
             z = 1 + (zk - 1) * e;
             rot = -OM.finale.SPIN * 0.04 * e;
           }
-          // Effect: bloom from the late charge through the flight, then only the faint shimmer, still by 299.7.
-          const bloom = T < SNARE ? 0.6 * OM.smooth(OM.prog(T, 294.3, SNARE)) : 1 - 0.85 * OM.smooth(OM.prog(T, KICK, FORMED)) - 0.15 * OM.smooth(OM.prog(T, FORMED, 298.4));
-          const shim = OM.smooth(OM.prog(T, 297.0, 297.9)) * 0.35 * (1 - OM.smooth(OM.prog(T, 299.2, 299.7)));
+          // Effect: bloom from the late charge through the flight, then only a barely visible shimmer, still before the end.
+          const bloom = T < SNARE ? 0.6 * OM.smooth(OM.prog(T, 294.3, SNARE)) : 1 - OM.smooth(OM.prog(T, KICK, FORMED));
+          const shim = OM.smooth(OM.prog(T, 298.5, FORMED)) * 0.2 * (1 - OM.smooth(OM.prog(T, DISS0, DISS1)));
           const cut = T < HOLD0 || T >= end - 0.07;
           fx.apply(T, {
             amount: !cut && (bloom > 0 || shim > 0) ? 1 : 0,
