@@ -29,11 +29,11 @@ OM.scene({
     for (const [mc, mr] of OM.cells(OM.LOGO))
       for (let b = 0; b < 2; b++) for (let a = 0; a < 2; a++) mark.push([home.col - 15 + mc * 2 + a, home.row - 15 + mr * 2 + b]);
     const WM = OM.cells(OM.WORDMARK);
-    const STEP = Math.round(L.cw / 2);
+    const STEP = 9; // the film's lattice type: JetBrains Mono 800 in 8px cells on a 9px pitch
 
     const type = C.lazy(() => {
       const ks = words.map((_, k) => k).filter((k) => k !== NAME);
-      const place = C.layout(words, [{ ks, cap: 120, cy: 500 }]);
+      const place = C.layout(words, [{ ks, cap: 120, minCap: 70, cy: 500 }]);
       const pts = C.wordPts(words, place, 800, STEP);
       const cells = [];
       ks.forEach((k) => {

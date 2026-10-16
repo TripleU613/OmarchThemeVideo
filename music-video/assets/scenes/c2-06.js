@@ -45,7 +45,7 @@ OM.ownWords.add('c2-06');
       const words = OM.sung('c2-06');
       const on = words.map((w) => w.t0);
       const HM = OM.HOME, cR = OM.cellAt(HM, 960, 540).row, lineY = HM.y0 + cR * HM.ch;
-      const CS = 8, V = 2600;
+      const CS = 9, V = 2600; // letter cells: 8px on a 9px pitch
       const DROP = 180.95, HERD = OM.downbeatsIn(182.3, 182.7)[0] || 182.486, HV = 2900;
       const HERD0 = HERD - 2050 / HV; // the final herd's lead reaches the right edge on the downbeat
       const FRAME = OM.SPB / 4;
@@ -119,7 +119,7 @@ OM.ownWords.add('c2-06');
               if (land) {
                 const col = Math.floor((cl.x + CS / 2 - HM.x0) / HM.cw);
                 OM.cell(ctx, HM, col, cR, dpr);
-              } else ctx.fillRect(x, y + 1, CS, CS - 2); // the tidy lines: each cell a dash, a seam between rows
+              } else ctx.fillRect(x, y, CS - 1, CS - 1);
             }
           }
 
@@ -164,7 +164,7 @@ OM.ownWords.add('c2-06');
               if (T > 180.5 && T < DROP) {
                 const hat = OM.audio(T).bands[13] || 0, slot = Math.floor(T / (OM.SPB / 4));
                 for (const r of rows6)
-                  for (const cl of r.cells) if (OM.hash(cl.i, cl.j, slot) < 0.03 * hat) { ctx.fillStyle = ink.crest; ctx.fillRect(cl.x, cl.y + 1, CS, CS - 2); }
+                  for (const cl of r.cells) if (OM.hash(cl.i, cl.j, slot) < 0.03 * hat) { ctx.fillStyle = ink.crest; ctx.fillRect(cl.x, cl.y, CS - 1, CS - 1); }
               }
             }
           // Grass flying up off the hooves of each herd.

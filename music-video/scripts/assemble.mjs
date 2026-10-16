@@ -68,7 +68,12 @@ const scripts = timed
   .map((s) => (built(s.id) ? `    <script src="assets/scenes/${s.id}.js"></script>` : `    <script>OM.slate(${JSON.stringify({ id: s.id, device: s.device, theme: s.theme, line: s.line || null })})</script>`))
   .join('\n') +
   // Captions load only once scripts/build-lyrics.mjs has written lyrics.js from your lyrics.txt.
-  (existsSync(here('../assets/lib/lyrics.js')) ? '\n    <script src="assets/lib/lyrics.js"></script>\n    <script src="assets/lib/captions.js"></script>' : '')
+  (existsSync(here('../assets/lib/lyrics.js')) ? '\n    <script src="assets/lib/lyrics.js"></script>\n    <script src="assets/lib/captions.js"></script>' : '') +
+  // Frame effects sit above the scenes and below the captions. NO_FRAMES=1 leaves them out, for the
+  // draft renders scripts/edge-need.mjs measures (they must not see the layer they decide).
+  (process.env.NO_FRAMES !== '1' && existsSync(here('../assets/lib/frame-need.js'))
+    ? '\n    <script src="assets/lib/frame-need.js"></script>\n    <script src="assets/lib/frames.js"></script>'
+    : '')
 
 const html = `<!doctype html>
 <html lang="en">

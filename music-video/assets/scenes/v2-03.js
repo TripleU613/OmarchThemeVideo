@@ -1,23 +1,81 @@
-// v2-03 · Break it, [line]. Each of the first words stamps into its
-// window and the window breaks out of the tiling, the word's letters coming
-// apart from it as it tumbles away. On the snare the tape catches: rewind
-// marks, tracking lines, and through the accelerating roll everything runs back
-// up the path it fell, the letters re-forming their words in their tiles. The
-// last words stamp into the one window that never broke, the line reads whole,
-// and the words clear to the empty desk for v2-04.
+// Lattice type (OM.v2lat), shared with v2-04: words in JetBrains Mono 800
+// rasterized into square cells on a 9 px pitch (8 px cell, 1 px gap), banded
+// crest / hover / lit from the top of each row.
+//
+// v2-03 · Shatter and scrub. The desk from v2-02 fades to a bare lattice and
+// the first words stamp onto it in lattice type. The third word cracks the
+// frame like glass from where it lands; on the snare the whole picture bursts
+// into shards that spin away through the accelerating roll. Then a snapshot
+// timeline comes up, its playhead scrubs back in steps on the hits, a reversed
+// clock counting down, and every shard flies back along its own path, trailing
+// the way it came. The last word lands as the last shard locks in: the
+// restore, the biggest hit. The line reads whole, then dissolves to night.
 OM.ownWords.add('v2-03');
+(() => {
+  const P = 9, CELL = 8;
+  /** Rasterize words laid out by OM.v2.layout into cells on the 9 px grid: [{ cells: [[x, y]], top, bot }]. */
+  const raster = (words, L) => {
+    const S = 2;
+    return words.map((w, k) => {
+      const a = L.at[k];
+      if (!w.text) return { cells: [], top: 0, bot: 0 };
+      const x0 = Math.floor(a.x / P) * P - P, y0 = Math.floor((a.base - L.capPx * 1.2) / P) * P;
+      const cols = Math.ceil((a.w + 3 * P) / P), rows = Math.ceil((L.capPx * 1.55) / P);
+      const cnv = document.createElement('canvas');
+      cnv.width = cols * P * S;
+      cnv.height = rows * P * S;
+      const x = cnv.getContext('2d', { willReadFrequently: true });
+      x.scale(S, S);
+      x.font = L.font;
+      x.fillStyle = '#fff';
+      x.textBaseline = 'alphabetic';
+      x.fillText(w.text, a.x - x0, a.base - y0);
+      const px = x.getImageData(0, 0, cnv.width, cnv.height).data;
+      const cells = [];
+      for (let j = 0; j < rows; j++)
+        for (let i = 0; i < cols; i++) {
+          let sum = 0, n = 0;
+          for (let yy = j * P * S + 2; yy < (j + 1) * P * S - 2; yy += 2)
+            for (let xx = i * P * S + 2; xx < (i + 1) * P * S - 2; xx += 2) { sum += px[(yy * cnv.width + xx) * 4 + 3]; n++; }
+          if (sum / n > 110) cells.push([x0 + i * P, y0 + j * P]);
+        }
+      const top = cells.length ? Math.min(...cells.map((c) => c[1])) : 0, bot = cells.length ? Math.max(...cells.map((c) => c[1])) : 0;
+      return { cells, top, bot };
+    });
+  };
+  /** Band ink for a cell at y in a word spanning [top, bot]. */
+  const band = (ink, y, top, bot) => {
+    const f = (y - top) / Math.max(1, bot - top);
+    return f < 0.34 ? ink.crest : f < 0.64 ? ink.hover : ink.lit;
+  };
+  /** Draw a rasterized word: crest on its landing, cooling to its bands; `keep(x, y)` may drop cells. */
+  const draw = (ctx, ink, R, age, { alpha = 1, keep = null, dx = 0, dy = 0 } = {}) => {
+    if (!R.cells.length || alpha <= 0) return;
+    ctx.globalAlpha = alpha;
+    const hot = Math.exp(-age / 0.12);
+    for (const [x, y] of R.cells) {
+      if (keep && !keep(x, y)) continue;
+      ctx.fillStyle = hot > 0.5 ? ink.crest : OM.mix(band(ink, y, R.top, R.bot), ink.crest, hot * 2);
+      ctx.fillRect(x + dx, y + dy, CELL, CELL);
+    }
+    ctx.globalAlpha = 1;
+  };
+  OM.v2lat = { P, CELL, raster, band, draw };
+})();
+
 OM.scene({
   id: 'v2-03',
   build(el, { start, duration }) {
-    const V = OM.v2;
+    const V = OM.v2, LT = OM.v2lat;
     const cv = document.createElement('canvas');
     cv.className = 'om-fill';
     el.appendChild(cv);
-    // Rewind: tracking bands that shear sideways, a scrub blur along x, a green cast; all off outside the rewind.
+    // Rewind: tracking bands that shear sideways, a scrub blur along x, a green cast; held off the line's band (uP1.xy).
     const FX = `vec4 effect(vec2 uv) {
       vec2 q = cam(uv);
       vec4 base = src(q);
       float rw = uP0.x * uAmount;
+      if (q.y > uP1.x && q.y < uP1.y) rw *= 0.12;
       if (rw <= 0.0) return base;
       float band = floor(q.y * 18.0 + uTime * 30.0);
       float sh = step(0.72, hash(vec2(band, 3.0))) * (hash(vec2(band, 7.0)) - 0.5) * 0.03;
@@ -31,142 +89,240 @@ OM.scene({
     }`;
     const c = OM.canvas(cv, { alpha: false });
     const fx = OM.post(el, c, { effect: FX });
+    const off = document.createElement('canvas'); // the intact picture, printed onto the shards
+    const oc = OM.canvas(off, { alpha: false });
     const ink = V.ink(), th = V.th();
     const sung = OM.sung('v2-03');
+    const N = sung.length;
     const on = sung.map((w) => w.t0);
     const END = start + duration;
-    const SLOT = V.grid(7);
-    const NB = Math.min(6, sung.length); // words that break their window
-    const REST = sung.slice(NB).map((w, i) => ({ ...w, i: NB + i })); // words stamped into the last window
-    const R0 = Math.max(on[NB - 1] + 0.03, 124.761), R1 = 125.504; // the snare and its accelerating roll
-    const DB = V.hitsIn(OM.T && OM.T.downbeats, start, END, [125.039, 127.176]);
-    const CL0 = END - 0.26, CL1 = END - 0.09;
-    const G = 2600;
-    const rng = OM.rng(2303);
-    const PHYS = SLOT.map(() => ({ vx: (rng() - 0.5) * 560, vy: -200 - rng() * 220, w: (rng() - 0.5) * 2.4 }));
-    let F = null;
-    const fit = () => {
-      const r6 = SLOT[6];
-      return {
-        tile: SLOT.slice(0, NB).map((r, k) => V.fitWord(sung[k].text, r.x + r.w / 2, r.y + r.h / 2 + 10, r.w - 44, 112)),
-        rest: V.layout(REST, { cap: 96, maxW: r6.w - 50, cx: r6.x + r6.w / 2, cy: r6.y + r6.h / 2 + 10, lead: 1.5 }),
-        lp: sung.slice(0, NB).map((w, k) => [...w.text].map(() => ({ vx: (rng() - 0.5) * 300, vy: (rng() - 0.6) * 260, w: (rng() - 0.5) * 9 }))),
-      };
-    };
-    const back = (T) => OM.ease.inOutCubic(OM.prog(T, R0, R1));
-    /** Seconds a window has fallen at T, running back to 0 through the rewind. */
-    const tau = (k, T) => Math.max(0, Math.min(T, R0) - (on[k] + 0.08)) * (1 - back(T));
+    const NB = Math.min(6, N); // words that are in the picture when it breaks
+    const KB = Math.min(2, N - 1); // the word that cracks it
+    const SH = Math.max(on[NB - 1] + 0.03, 124.761); // the snare: the burst
+    const GLINT = 125.16; // the kick inside the burst
+    // The scrub back: a step on each hit, the last word the lock.
+    const RW = [on[Math.min(6, N - 1)], 125.945, 126.224, on[Math.min(7, N - 1)], on[N - 1]].filter((x, i, a) => i === 0 || x > a[i - 1]);
+    const LOCK = on[N - 1];
+    const ARR = RW.slice(1); // each scrub step lands on a hit
+    const STEP = ARR.map((_, i) => 1 - (i + 1) / ARR.length);
+    const CL0 = END - 0.44, CL1 = END - 0.1;
+    const TM = 1.1;
 
-    const letters = (ctx, k, cx, cy, ta, rot, alpha, col) => {
-      const L = F.tile[k], text = sung[k].text, n = text.length;
-      ctx.save();
-      ctx.globalAlpha = alpha;
-      ctx.font = L.font;
-      ctx.fillStyle = col;
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'alphabetic';
-      for (let j = 0; j < n; j++) {
-        const P = F.lp[k][j];
-        const lx = (j - (n - 1) / 2) * L.A;
-        ctx.save();
-        ctx.translate(cx + Math.cos(rot) * lx + P.vx * ta, cy + Math.sin(rot) * lx + P.vy * ta + 600 * ta * ta);
-        ctx.rotate(rot + P.w * ta);
-        ctx.fillText(text[j], 0, L.capPx / 2);
-        ctx.restore();
+    let F = null, mesh = null, printed = false, pat = null;
+    const plan = () => {
+      const L = V.layout(sung, { cap: 92, maxW: 1700, cx: 960, cy: 450, lead: 1.42 });
+      F = { L, R: LT.raster(sung, L) };
+      // The glass: rings of jittered points around the impact, quads between them split into shards.
+      const a = L.at[KB], ix = a.cx, iy = a.cy;
+      const rng = OM.rng(2333);
+      const RAD = [0, 80, 190, 340, 560, 850, 1250, 1900], NA = 16;
+      const pt = RAD.map((r, i) => Array.from({ length: NA }, (_, j) => {
+        const t = ((j + (i ? (rng() - 0.5) * 0.7 : 0)) / NA) * Math.PI * 2;
+        const rr = r * (i ? 0.88 + rng() * 0.24 : 0);
+        return [ix + Math.cos(t) * rr, iy + Math.sin(t) * rr];
+      }));
+      const shards = [];
+      for (let i = 0; i < RAD.length - 1; i++)
+        for (let j = 0; j < NA; j++) {
+          const A = pt[i][j], B = pt[i][(j + 1) % NA], Cc = pt[i + 1][(j + 1) % NA], D = pt[i + 1][j];
+          const polys = i === 0 ? [[A, Cc, D]] : [[A, B, Cc], [A, Cc, D]];
+          for (const poly of polys) {
+            const cx = poly.reduce((s, p) => s + p[0], 0) / poly.length, cy = poly.reduce((s, p) => s + p[1], 0) / poly.length;
+            const dx = cx - ix, dy = cy - iy, d = Math.hypot(dx, dy) || 1;
+            const sp = (1100 - i * 110) * (0.55 + 0.45 * rng());
+            shards.push({ poly, cx, cy, r: Math.hypot(...[0, 1].map((k) => Math.max(...poly.map((p) => Math.abs(p[k] - [cx, cy][k]))))),
+              vx: (dx / d) * sp + (rng() - 0.5) * 160, vy: (dy / d) * sp + (rng() - 0.5) * 160 - 120, w: (rng() - 0.5) * 7, ring: i });
+          }
+        }
+      // Crack edges for the foreshadowing, with the radius each reaches.
+      const edges = [];
+      for (let i = 0; i < RAD.length - 1; i++)
+        for (let j = 0; j < NA; j++) {
+          edges.push([pt[i][j], pt[i + 1][j], RAD[i + 1]]);
+          if (i) edges.push([pt[i][j], pt[i][(j + 1) % NA], RAD[i]]);
+        }
+      mesh = { shards, edges, ix, iy };
+      printed = false;
+    };
+    /** Fraction of the burst still to undo: 1 until the scrub, stepping to 0 on the hits. */
+    const remain = (T) => {
+      let f = 1;
+      ARR.forEach((h, i) => {
+        const from = Math.max(i ? ARR[i - 1] : RW[0], h - 0.2);
+        if (T < from) return;
+        f = OM.lerp(i ? STEP[i - 1] : 1, STEP[i], OM.ease.inOutCubic(OM.prog(T, from, h)));
+      });
+      return f;
+    };
+    const tau0 = TM * (1 - Math.exp(-(RW[0] - SH) / 0.45));
+    /** Shard time: running out from the burst, then scrubbed back along the same path. */
+    const tau = (T) => (T < SH ? 0 : T < RW[0] ? TM * (1 - Math.exp(-(T - SH) / 0.45)) : tau0 * remain(T));
+    const pose = (s, ta) => ({ x: s.vx * ta, y: s.vy * ta + 260 * ta * ta, r: s.w * ta });
+
+    /** The lattice behind the words: faint lines on the 9 px pitch, every 6th, so the glass has something to break. */
+    const lattice = (x, a) => {
+      if (a <= 0) return;
+      x.fillStyle = V.rgba(th['border-subtle'], a);
+      for (let gx = 0; gx <= 1920; gx += LT.P * 6) x.fillRect(gx, 0, 1, 1080);
+      for (let gy = 0; gy <= 1080; gy += LT.P * 6) x.fillRect(0, gy, 1920, 1);
+    };
+    /** The picture as it is just before the burst: lattice and the first words. */
+    const picture = (x, T, { desk = 0 } = {}) => {
+      if (desk > 0) {
+        V.still(x, 7);
+        x.fillStyle = V.rgba(ink.bg, 1 - desk);
+        x.fillRect(0, 0, 1920, 1080);
+      } else {
+        x.fillStyle = ink.bg;
+        x.fillRect(0, 0, 1920, 1080);
       }
-      ctx.restore();
+      lattice(x, 1 - desk);
+      for (let k = 0; k < NB; k++) if (T >= on[k]) LT.draw(x, ink, F.R[k], T - on[k]);
     };
 
     return {
       render(t, T) {
         const ctx = c.ensure();
-        if (T < start + V.HOLD_IN || T >= END - V.HOLD_OUT) return fx.apply(T), V.still(ctx, 7);
-        if (!F || !V.met().ok) F = fit();
-        ctx.fillStyle = ink.bg;
-        ctx.fillRect(0, 0, 1920, 1080);
-        const clear = OM.ease.inCubic(OM.prog(T, CL0, CL1));
-        const rew = T >= R0 && T < R1 + 0.08;
-        const db = OM.pulse(DB, T, 0.1);
-        // Tiles: the unbroken ones settle, the broken ones tumble; draw the fallen on top.
-        const order = [...SLOT.keys()].sort((a, b) => (a < NB ? tau(a, T) : 0) - (b < NB ? tau(b, T) : 0));
-        for (const k of order) {
-          const r = SLOT[k];
-          const ta = k < NB ? tau(k, T) : 0;
-          const P = PHYS[k];
-          const x = P.vx * ta, y = P.vy * ta + 0.5 * G * ta * ta, rot = P.w * ta * ta * 1.4;
-          const age = T - (k < NB ? on[k] : REST.length ? on[NB] : Infinity);
-          const stamp = age >= 0 ? Math.exp(-age / 0.12) : 0;
-          const brd = OM.mix(rew ? ink.mid : th['border-strong'], ink.crest, stamp);
-          V.win(ctx, r, { x, y, rot, border: OM.mix(brd, th['border-strong'], clear), face: OM.mix(th.bg, ink.dim, 0.5 * stamp) });
-          if (db > 0.05 && ta === 0) V.ring(ctx, r, 6, 2, ink.lit, db * 0.7 * (1 - clear));
-          if (k >= NB || T < on[k]) continue;
-          // The word rides its window, its letters coming apart as it falls.
-          const s = 1 + 0.2 * Math.exp(-(T - on[k]) / 0.07);
-          const col = OM.mix(ink.crest, th.text, OM.clamp((T - on[k]) / 0.35));
-          const cx = r.x + r.w / 2 + x, cy = r.y + r.h / 2 + 10 + y;
-          if (ta === 0) V.drawWord(ctx, sung[k].text, cx, cy, F.tile[k], rew ? ink.hover : col, { s, alpha: 1 - clear });
-          else letters(ctx, k, cx, cy, ta, rot, 1 - clear, rew ? ink.hover : col);
-        }
-        // The last window: the remaining words stamp in, one per row.
-        REST.forEach((w, j) => {
-          if (T < w.t0) return;
-          const a = F.rest.at[j], age = T - w.t0;
-          const col = OM.mix(ink.crest, th.text, OM.clamp(age / 0.35));
-          V.drawWord(ctx, w.text, a.cx, a.cy, F.rest, col, { s: 1 + 0.2 * Math.exp(-age / 0.07), alpha: 1 - clear });
-          if (age < 0.25) V.ring(ctx, SLOT[6], 4 + 22 * OM.ease.outCubic(age / 0.25), 3, ink.crest, 1 - age / 0.25);
-        });
-        // The tape catching: rewind marks and tracking lines while time runs back.
-        if (rew) {
-          const p = OM.prog(T, R0, R1 + 0.08);
-          const hic = T >= 125.16 ? Math.exp(-(T - 125.16) / 0.1) : 0; // sprinkle: the tape hiccups on the kick
-          const fl = Math.max(Math.floor(T * 30) % 2 ? 1 : 0.55, hic);
-          if (hic > 0.03) {
-            ctx.fillStyle = OM.v2.rgba(ink.crest, 0.35 * hic);
-            ctx.fillRect(0, 300 + 420 * OM.hash(1, 2, 3), 1920, 4 + 10 * hic);
+        const dpr = c.dpr;
+        if (T < start + V.HOLD_IN) return fx.apply(T), V.still(ctx, 7);
+        if (T >= END - V.HOLD_OUT) return fx.apply(T), OM.handoff('night', ctx, T, dpr);
+        if (!F || !V.met().ok) plan();
+        const desk = 1 - OM.ease.inOutCubic(OM.prog(T, start + V.HOLD_IN, on[0] + 0.3));
+        const ta = tau(T);
+        const lockA = T >= LOCK ? Math.exp(-(T - LOCK) / 0.22) : 0;
+        const clear = OM.ease.inOutSine(OM.prog(T, CL0, CL1));
+
+        if (T < SH || (T >= LOCK && ta === 0)) {
+          // Whole: before the burst, and again once restored.
+          if (T < SH) picture(ctx, T, { desk });
+          if (T >= LOCK) {
+            // Restored: the clear dissolves cells in dither order, the lattice fades out.
+            ctx.fillStyle = ink.bg;
+            ctx.fillRect(0, 0, 1920, 1080);
+            lattice(ctx, 1 - clear);
+            const keep = (x, y) => OM.threshold(x / LT.P, y / LT.P) > clear;
+            for (let k = 0; k < N; k++) LT.draw(ctx, ink, F.R[k], k >= NB ? T - on[k] : 9, { keep, alpha: 1 });
+            if (lockA > 0.02) for (let k = 0; k < N; k++) LT.draw(ctx, { crest: ink.crest, hover: ink.crest, lit: ink.crest }, F.R[k], 9, { alpha: lockA * 0.8, keep });
           }
-          ctx.fillStyle = OM.v2.rgba(ink.crest, fl);
-          for (let i = 0; i < 2; i++) {
+          // The crack: hairlines running out from the breaking word, all the way at the burst.
+          if (T >= on[KB] && T < SH) {
+            const cr = OM.lerp(0, 380, OM.ease.outExpo(OM.prog(T, on[KB], on[KB] + 0.2))) + 260 * OM.prog(T, on[KB] + 0.2, SH);
+            ctx.strokeStyle = V.rgba(ink.crest, 0.75);
+            ctx.lineWidth = 1.5;
             ctx.beginPath();
-            const hs = 1 + 0.5 * hic;
-            ctx.moveTo(150 + i * 44 * hs, 930 - 30 * hs);
-            ctx.lineTo(150 + (i * 44 - 44) * hs, 930);
-            ctx.lineTo(150 + i * 44 * hs, 930 + 30 * hs);
-            ctx.closePath();
-            ctx.fill();
+            for (const [A, B, r] of mesh.edges) if (r <= cr) { ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); }
+            ctx.stroke();
           }
-          for (let i = 0; i < 3; i++) {
-            const yy = ((1 - p) * 1400 + i * 380) % 1180 - 50;
-            ctx.fillStyle = OM.v2.rgba(ink.hover, 0.18);
-            ctx.fillRect(0, yy, 1920, 6 + i * 3);
-            ctx.fillStyle = OM.v2.rgba(ink.bg, 0.5);
-            ctx.fillRect(0, yy + 10 + i * 3, 1920, 18);
+        } else {
+          // Broken: the intact picture printed once, then carried on every shard.
+          if (!printed) {
+            const x = oc.ensure();
+            picture(x, SH - 0.001);
+            pat = ctx.createPattern(off, 'no-repeat');
+            pat.setTransform(new DOMMatrix().scale(1920 / off.width, 1080 / off.height));
+            printed = true;
           }
-        }
-        // Debris: chips knocked off each window as it breaks, flying with it and back again in the rewind.
-        for (let k = 0; k < NB; k++) {
-          const ta = tau(k, T);
-          if (ta <= 0) continue;
-          const r = SLOT[k];
-          for (let i = 0; i < 10; i++) {
-            const hx = OM.hash(k, i, 31), hv = OM.hash(k, i, 32), hw = OM.hash(k, i, 33);
-            const x = r.x + r.w * hx + (hv - 0.5) * 700 * ta, y = r.y + r.h + (-300 - 300 * hw) * ta + 0.5 * G * ta * ta;
+          ctx.fillStyle = ink.bg;
+          ctx.fillRect(0, 0, 1920, 1080);
+          const scrub = T >= RW[0];
+          const glint = T >= GLINT && T < RW[0] ? Math.exp(-(T - GLINT) / 0.12) : 0; // sprinkle: shard glint on the kick
+          for (const s of mesh.shards) {
+            const p = pose(s, ta);
+            if (s.cx + p.x < -s.r * 2 - 200 || s.cx + p.x > 2120 + s.r * 2 || s.cy + p.y > 1280 + s.r * 2 || s.cy + p.y < -200 - s.r * 2) continue;
+            // Its trail: where it came from, shown while it flies back.
+            if (scrub && ta > 0.02) {
+              const q = pose(s, Math.min(tau0, ta + 0.22));
+              ctx.strokeStyle = V.rgba(ink.lit, 0.28);
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.moveTo(s.cx + p.x, s.cy + p.y);
+              ctx.lineTo(s.cx + q.x, s.cy + q.y);
+              ctx.stroke();
+            }
             ctx.save();
-            ctx.translate(x, y);
-            ctx.rotate(hw * 6 + ta * (hv - 0.5) * 20);
-            ctx.fillStyle = i % 2 ? th['border-strong'] : ink.mid;
-            ctx.fillRect(-6, -3, 12 + 10 * hv, 6);
+            ctx.translate(s.cx + p.x, s.cy + p.y);
+            ctx.rotate(p.r);
+            ctx.translate(-s.cx, -s.cy);
+            ctx.beginPath();
+            s.poly.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+            ctx.closePath();
+            ctx.fillStyle = pat;
+            ctx.fill();
+            ctx.strokeStyle = V.rgba(ink.crest, OM.clamp(0.25 + 0.6 * glint + ta * 0.4));
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
             ctx.restore();
           }
+          // Small glass chips riding the same clock.
+          for (let i = 0; i < 40; i++) {
+            const hx = OM.hash(i, 3, 41), hy = OM.hash(i, 3, 42), hz = OM.hash(i, 3, 43);
+            const a = hx * Math.PI * 2, v = 600 + 900 * hy;
+            const x = mesh.ix + Math.cos(a) * v * ta, y = mesh.iy + Math.sin(a) * v * ta + 300 * ta * ta;
+            ctx.fillStyle = V.rgba(i % 2 ? ink.hover : ink.crest, OM.clamp(ta * 3) * 0.8);
+            ctx.fillRect(x - 2, y - 2, 3 + 3 * hz, 3 + 3 * hz);
+          }
         }
+
+        // The words after the break land on the scrubbing picture.
+        if (T < LOCK || ta > 0) for (let k = NB; k < N; k++) if (T >= on[k]) LT.draw(ctx, ink, F.R[k], T - on[k]);
+
+        // The snapshot timeline: up with the burst, its playhead scrubbing back in steps to the snapshot before the break.
+        const ui = OM.ease.inOutCubic(OM.prog(T, SH, SH + 0.3)) * (1 - OM.ease.inOutCubic(OM.prog(T, LOCK + 0.1, LOCK + 0.5)));
+        if (ui > 0.01) {
+          const x0 = 300, x1 = 1620, y = 980;
+          ctx.globalAlpha = ui;
+          ctx.fillStyle = th['border-strong'];
+          ctx.fillRect(x0, y, x1 - x0, 3);
+          const ticks = [0, 0.18, 0.36, 0.55, 0.74, 0.86];
+          ticks.forEach((f, i) => {
+            ctx.fillStyle = i === 4 ? ink.lit : th['text-muted'];
+            ctx.fillRect(x0 + f * (x1 - x0) - 4, y - 8, 8, 19);
+          });
+          const live = T < RW[0] ? OM.prog(T, SH, RW[0]) : 1;
+          const ph = OM.lerp(0.74, 0.86 + 0.1 * live, T < RW[0] ? 1 : remain(T));
+          const hx = x0 + ph * (x1 - x0);
+          ctx.fillStyle = ink.crest;
+          ctx.fillRect(hx - 3, y - 26, 6, 55);
+          ctx.font = "600 26px 'JetBrains Mono'";
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'alphabetic';
+          ctx.fillStyle = th['text-secondary'];
+          const secs = T < RW[0] ? ta : ta;
+          ctx.fillText((scrubbing(T) ? '-' : '+') + secs.toFixed(2) + 's', hx + 16, y - 14);
+          if (scrubbing(T)) {
+            ctx.fillStyle = ink.crest;
+            for (let i = 0; i < 2; i++) {
+              ctx.beginPath();
+              ctx.moveTo(x0 - 40 - i * 34, y - 18);
+              ctx.lineTo(x0 - 74 - i * 34, y + 2);
+              ctx.lineTo(x0 - 40 - i * 34, y + 22);
+              ctx.closePath();
+              ctx.fill();
+            }
+          }
+          ctx.globalAlpha = 1;
+        }
+        // The restore: a ring of light out of the impact as the last shard locks.
+        if (lockA > 0.02) {
+          ctx.strokeStyle = V.rgba(ink.crest, lockA);
+          ctx.lineWidth = 6 * lockA + 1;
+          ctx.beginPath();
+          ctx.arc(mesh.ix, mesh.iy, 40 + 900 * (1 - lockA), 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
         const ce = V.camEnv(T, start, END);
-        const fall = OM.ease.inOutSine(OM.prog(T, on[0], R0)) * (1 - back(T));
+        const roll = (ta / TM) * (T < RW[0] ? 1 : 1);
+        const band0 = 1 - (Math.max(...F.R.map((r) => r.bot)) + 20) / 1080, band1 = 1 - (Math.min(...F.R.map((r) => r.top)) - 20) / 1080;
         fx.apply(T, {
           amount: V.env(T, start, END),
-          cam: { zoom: 1 + ce * (0.015 + 0.03 * fall), rot: ce * 0.03 * fall, y: ce * 10 * fall },
-          p0: [Math.sin(Math.PI * OM.prog(T, R0, R1 + 0.08)), 0, 0, 0],
+          cam: { zoom: 1 + ce * (0.015 + 0.03 * roll + 0.03 * lockA), rot: ce * 0.03 * roll },
+          p0: [Math.sin(Math.PI * OM.prog(T, RW[0], LOCK + 0.1)), 0, 0, 0],
+          p1: [band0, band1, 0, 0],
         });
       },
-      release: () => { fx.release(); c.release(); },
+      release: () => { fx.release(); c.release(); oc.release(); },
     };
+    function scrubbing(T) { return T >= RW[0] && T < LOCK + 0.05; }
   },
 });

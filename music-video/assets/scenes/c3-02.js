@@ -34,9 +34,9 @@ OM.scene({
       return up ? -a : a;
     };
     const type = C.lazy(() => {
-      const rows = [{ ks: [...Array(back).keys()], cap: 88, cy: 0, maxW: 1620 }, { ks: [...Array(n - back).keys()].map((i) => i + back), cap: 88, cy: 0, maxW: 1620 }];
+      const rows = [{ ks: [...Array(back).keys()], cap: 88, cy: 0, maxW: 1620, minCap: 70 }, { ks: [...Array(n - back).keys()].map((i) => i + back), cap: 88, cy: 0, maxW: 1620, minCap: 70 }];
       const place = C.layout(words, rows);
-      const step = 7;
+      const step = 9; // the film's lattice type: 8px cells on a 9px pitch
       // Letters one by one, each standing upright on the band at its own angle.
       const segs = words.map((wd, k) => {
         const p = place[k];
@@ -181,7 +181,7 @@ OM.scene({
               const v = q.hit + (q.locked ? 0.55 : 0.2) + 0.3 * power + runner(L.ang);
               ctx.fillStyle = v > 1.05 ? ink.crest : v > 0.5 ? ink.hover : ink.lit;
               const x0 = lx - L.w / 2, y0 = ly + sg.cap / 2;
-              for (let i = 0; i < L.d.length; i += 2) ctx.fillRect(Math.round(x0 + L.d[i] - 3), Math.round(y0 + L.d[i + 1] - 3), 6, 6);
+              for (let i = 0; i < L.d.length; i += 2) ctx.fillRect(Math.round(x0 + L.d[i] - 4), Math.round(y0 + L.d[i + 1] - 4), 8, 8);
             }
             // Bolts at the seams on the lock.
             // Seam re-strike: the pause snares spark every seam of the closed ring again.

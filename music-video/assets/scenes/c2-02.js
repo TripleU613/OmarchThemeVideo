@@ -44,7 +44,7 @@ OM.ownWords.add('c2-02');
       const KICKS = [164.374, 164.676, 164.792, 164.862];
       const RUN = 164.98, DB2 = OM.downbeatsIn(165.3, 165.7)[0] || 165.489;
       const HM = OM.HOME, cR = OM.cellAt(HM, 960, 540).row;
-      const CS = 6, PADX = 30, PADY = 30, GAP = 36, NECK = 22, MAXW = 1840;
+      const CS = 9, PADX = 30, PADY = 30, GAP = 36, NECK = 22, MAXW = 1840;
       const rowY = (r) => HM.y0 + r * HM.ch;
       const DROP = 0.26;
 
@@ -112,7 +112,7 @@ OM.ownWords.add('c2-02');
         const kick = KICKS.reduce((a, t0) => Math.max(a, decay(T, t0, 0.08)), 0);
         const big = decay(T, on[K], 0.14);
         ctx.fillStyle = age < 0.1 || big > 0.35 || kick > 0.5 ? ink.crest : k === K ? ink.crest : ink.hover;
-        for (const cl of mc.cells) ctx.fillRect(cl.x + dx, cl.y + dy, CS - 0.5, CS - 0.5);
+        for (const cl of mc.cells) ctx.fillRect(cl.x + dx, cl.y + dy, CS - 1, CS - 1);
       };
 
       return {

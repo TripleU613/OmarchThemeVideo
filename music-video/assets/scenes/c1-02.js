@@ -31,15 +31,15 @@ OM.ownWords.add('c1-02'); // this scene draws its own words, so the caption bar 
   // ---- the machine, in world units: x right, y up, z toward the viewer, the base centred on the origin ----
   const W = 1008, D = 700, X0 = -W / 2, Z0 = -D / 2;
   const Y_DECK = 22, Y_TOP = 32; // the case is 0..22, the deck 22..32
-  const TH = 100 * DEG; // lid opening
+  const TH = 110 * DEG; // lid opening: leaned back so the screen faces the reading camera, near 16:9 on the frame
   const UP = [0, Math.sin(TH), Math.cos(TH)]; // up the lid
   const OUT = [0, -Math.cos(TH), Math.sin(TH)]; // out of the screen
   const LID = 640; // the 960 x 540 panel sits at t 56..596: at scale 2, seen square on, it is the frame
   const lidPt = (x, t, n) => [x, Y_TOP + t * UP[1] + n * OUT[1], Z0 + t * UP[2] + n * OUT[2]];
   const DISP_TL = lidPt(-480, 596, -3); // the panel's top-left corner: the frame's (0, 0) at the end
   const DISP_C = lidPt(0, 326, -3);
-  const READ_PITCH = 60; // the camera's elevation while the whole line reads, square on to the deck
-  const STRETCH = 1.27; // legends are cut tall on the deck so they read upright from the camera's 40-60 degree elevations
+  const READ_PITCH = 45; // the camera's elevation while the whole line reads: screen and deck both in true proportion
+  const STRETCH = 1 / Math.sin(READ_PITCH * DEG); // legends are cut tall on the deck so they read upright from the reading elevation
 
   /** Orthographic camera: the machine turned by yaw, seen from `pitch` above, `s` px per unit, `tg` at the frame centre. */
   const camera = (s, pitch, yaw, tg, dy) => {
@@ -119,8 +119,10 @@ OM.ownWords.add('c1-02'); // this scene draws its own words, so the caption bar 
       const LIT_ON = 87.4, LIT_FULL = 87.8, GO = 88.19; // snares: the field sweeps up, it is full, the push
 
       // ---- inks ----
-      const FACE_LO = OM.mix(ink.bg, ink.dim, 0.08), FACE_HI = OM.mix(ink.bg, ink.dim, 0.6);
-      const EDGE = ink.mid, KEY_EDGE = OM.mix(ink.bg, ink.mid, 0.6), GLASS = OM.mix(ink.bg, '#000000', 0.25);
+      // Clean dark bodies in the theme's surfaces (no green wash), their edges lit green.
+      const TK = OM.theme('tokyo-night');
+      const FACE_LO = TK['bg-deep'], FACE_HI = TK['surface-2'];
+      const EDGE = OM.mix(ink.mid, ink.lit, 0.5), KEY_EDGE = ink.mid, GLASS = OM.mix(ink.bg, '#000000', 0.25);
       const RANK = [ink.mid, ink.lit, ink.hover, ink.crest];
       const rank = (I) => RANK[I > 0.62 ? 3 : I > 0.4 ? 2 : I > 0.22 ? 1 : 0];
 
@@ -165,7 +167,7 @@ OM.ownWords.add('c1-02'); // this scene draws its own words, so the caption bar 
       // ---- the keyboard: one row per sung word, its letters on tight keycap tiles so each row reads as the word ----
       const glyphs = sung.map((w) => [...w.text.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, '').toUpperCase()]);
       const maxLen = glyphs.reduce((m, g) => Math.max(m, g.length), 1);
-      const fk = Math.min(1, 940 / (maxLen * 72), 650 / (N * 116.5)); // shrinks only for very long words or many rows
+      const fk = Math.min(1, 940 / (maxLen * 72), 650 / (N * (76 * STRETCH + 20))); // shrinks only for very long words or many rows
       const TP = 72 * fk, GX = 5 * fk; // tile pitch along a row: about one letter's advance
       const CAP_W = 76 * fk; // cap height on the deck, before the stretch
       const TD = CAP_W * STRETCH + 14 * fk, RP = TD + 6 * fk; // tile depth, row pitch
@@ -189,7 +191,7 @@ OM.ownWords.add('c1-02'); // this scene draws its own words, so the caption bar 
         [SLAM, 0.64, 46, -8, [0, 175, -60]],
         [SLAM + 0.36, READ_S, READ_PITCH, 0, READ_T],
         [GO, READ_S * 1.015, READ_PITCH, 0, add(READ_T, [0, 8, 0])],
-        [OUT_AT, 2, 10, 0, DISP_C],
+        [OUT_AT, 2, TH / DEG - 90, 0, DISP_C], // square on to the panel: it is the frame
       ];
       const SEG = [ease.outCubic, ease.inOutSine, ease.outExpo, ease.inOutSine, ease.inOutCubic];
       const camAt = (T, dy = 0) => {
@@ -377,7 +379,7 @@ OM.ownWords.add('c1-02'); // this scene draws its own words, so the caption bar 
         fa: smooth(prog(m, 0.3, 1)),
         ea: clamp(m * 3),
         edge: m < 1 ? OM.mix(ink.crest, EDGE, smooth(m)) : fl > 0.01 ? OM.mix(EDGE, ink.crest, fl) : EDGE,
-        lw: 1.25,
+        lw: 1.5,
       });
 
       /** One key row: keycaps (pressed down a little on the lock) and their legends. */

@@ -49,6 +49,10 @@ ideas    ──► storyboard/        one idea per line              IDEAS.md, s
    (`assets/lib/post.js`, planned per scene in `storyboard/FX.md`). The canvas
    runs through that shader on the GPU. At the cuts both ease to rest and the
    pass switches itself off, so the handoff frames stay pixel exact.
+   Around the picture, a frame-effects layer (`assets/lib/frames.js`) adds one
+   beat-synced border idea per section. It appears only where a scene leaves its
+   edges empty. To find those scenes, `scripts/edge-need.mjs` measures a draft
+   rendered without the layer (`NO_FRAMES=1 npm run assemble`).
 6. **Watch and check.** `npm run serve` opens the live player at
    `http://localhost:3123/dev.html`. Snapshots render exact frames, and seams are
    checked by comparing the frames either side of every cut.
@@ -96,6 +100,7 @@ then checked every cut and scene and sent fixes back.
 | `npm run verify` | Repo hygiene: scenes, words, nothing local tracked |
 | `npm run snapshot -- --at 81.2,85.0 -o .hyperframes/check` | Exact frames as a contact sheet |
 | `npm run render:preview` | Draft 1080p render at 24 fps |
+| `node scripts/edge-need.mjs <draft.mp4>` | Re-measure which scenes need frame effects (render that draft with `NO_FRAMES=1`) |
 | `npm run render:4k` | Final 4K render at 60 fps, checked before and after (`-- --dry-run`, `-- --workers 4`, `-- --probe <file>`) |
 
 The live player's keys: space to play or pause, arrows to move 2 s, Shift+arrows

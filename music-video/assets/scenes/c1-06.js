@@ -76,6 +76,14 @@ OM.ownWords.add('c1-06');
       m.font = FONT;
       const adv = m.measureText('M').width / 100, capEm = m.measureText('H').actualBoundingBoxAscent / 100;
       const FS = Math.min(130, (PITCH * L.cw - 6) / adv), CAP = FS * capEm;
+      // Each letter's lattice glyph, centred on x 0 with its baseline at CAP / 2 (built once the face is in).
+      const glyphs = new Map();
+      const glyph = (ch) => {
+        const ok = document.fonts.check(FONT);
+        let g = glyphs.get(ch);
+        if (!g || g.ok !== ok) glyphs.set(ch, (g = Object.assign(OM.c1.type(ch, -(adv * FS) / 2, CAP / 2, CAP), { ok })));
+        return g;
+      };
       const yLine = L.y0 + (UL + 0.5) * L.ch, yClip = L.y0 + (UL + 1) * L.ch;
       const yBase = L.y0 + (UL + 2) * L.ch + CAP;
       const BB = UL - 2; // the bars' bottom row
@@ -258,13 +266,17 @@ OM.ownWords.add('c1-06');
             const checked = sw > 0 && xc < xs, flash = since >= 0 && since < 0.12;
             const tick = checked ? 0.1 * Math.pow(0.5, (T - passed(xc)) / 0.06) : 0;
             const pop = (since >= 0 ? 1 + 0.16 * Math.pow(0.5, since / 0.07) : 1) + tick;
-            ctx.fillStyle = checked || flash ? ink.crest : since >= 0 ? ink.hover : ink.mid;
+            // Omarchy lattice type: each letter is 8 px squares on a 9 px pitch, inked down its cap.
+            const gl = glyph(ch);
             ctx.save();
-            ctx.translate(xc, yLine);
+            ctx.translate(Math.round(xc), yLine);
             ctx.scale(1, fold);
-            ctx.translate(0, yMid - yLine);
+            ctx.translate(0, Math.round(yMid - yLine));
             ctx.scale(pop, pop);
-            ctx.fillText(ch, 0, CAP / 2);
+            for (const [x, y, f] of gl.cells) {
+              ctx.fillStyle = checked || flash ? ink.crest : since >= 0 ? OM.c1.typeInk(f, ink) : ink.mid;
+              ctx.fillRect(x, y, 8, 8);
+            }
             ctx.restore();
           }
           ctx.restore();

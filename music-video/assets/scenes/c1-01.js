@@ -60,6 +60,39 @@ OM.c1 = {
       dot(x + Math.cos(ang) * v * a, y + Math.sin(ang) * v * a + 0.5 * g * a * a, a / li, i);
     }
   },
+  /**
+   * Omarchy lattice type, the film's shared spec: JetBrains Mono 800 rasterized into 8 px squares on a 9 px
+   * pitch (frame grid, 1080p px), cap `cap` px, baseline `base`, starting at `x`. Returns
+   * { cells: [x, y, f] (each square's top-left, f its depth down the cap 0..1), w, top, base, cap }.
+   */
+  type(text, x, base, cap = 72) {
+    const P = 9, S = 4;
+    const m = document.createElement('canvas').getContext('2d');
+    m.font = "800 100px 'JetBrains Mono'";
+    const px = (cap * 100) / (m.measureText('H').actualBoundingBoxAscent || 73);
+    const font = `800 ${px.toFixed(2)}px 'JetBrains Mono'`;
+    m.font = font;
+    const w = m.measureText(text).width, top = base - cap;
+    const i0 = Math.floor(x / P) - 1, i1 = Math.ceil((x + w) / P) + 1, j0 = Math.floor((top - 0.35 * cap) / P), j1 = Math.ceil((base + 0.35 * cap) / P);
+    const cv = document.createElement('canvas');
+    cv.width = (i1 - i0) * S;
+    cv.height = (j1 - j0) * S;
+    const o = cv.getContext('2d', { willReadFrequently: true });
+    o.setTransform(S / P, 0, 0, S / P, (-i0 * P * S) / P, (-j0 * P * S) / P);
+    o.font = font;
+    o.fillStyle = '#fff';
+    o.fillText(text, x, base);
+    const d = o.getImageData(0, 0, cv.width, cv.height).data, cells = [];
+    for (let j = 0; j < j1 - j0; j++)
+      for (let i = 0; i < i1 - i0; i++) {
+        let sum = 0;
+        for (let yy = 0; yy < S; yy++) for (let xx = 0; xx < S; xx++) sum += d[((j * S + yy) * cv.width + i * S + xx) * 4 + 3];
+        if (sum / (S * S) > 0.45 * 255) cells.push([(i0 + i) * P, (j0 + j) * P, ((j0 + j + 0.5) * P - top) / cap]);
+      }
+    return { cells, w, top, base, cap, x };
+  },
+  /** The lattice type's field inks down the cap: crest on top, hover, lit at the foot. */
+  typeInk: (f, ink) => (f < 0.42 ? ink.crest : f < 0.72 ? ink.hover : ink.lit),
   /** The c1-03 -> c1-04 cut: a slow push carried through it, at zoom ZOOM moving at SPEED per second. */
   push34: { ZOOM: 1.035, SPEED: 0.075 },
   /** The c1-07 -> c1-08 cut: the camera held high above the stage (content shifted down), at rest. */

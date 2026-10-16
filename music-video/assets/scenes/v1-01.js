@@ -4,9 +4,9 @@
 // the dead end beside it on the word's onset; the hedge is clipped away from
 // the point of contact, leaving the word standing in the wall, and the dead
 // end's padlock snaps shut. Every path ends at a lock. Then the camera rises
-// (accel roll into the 41.517 kick): the maze shrinks into a phone's screen,
-// the bezel lands on the kick and the maze resolves into the app grid that
-// v1-02 opens on.
+// (accel roll into the 41.517 kick): the maze shrinks into a laptop's display,
+// the laptop lands round it on the kick and the maze fades to the bright screen
+// that v1-02 opens on.
 //
 // Also defines OM.v1, the section's shared helpers (scene files load in
 // timeline order, so v1-02..v1-08 use them).
@@ -128,62 +128,139 @@ OM.ownWords.add('v1-01');
   /** A CSS-px box as a uv rect (origin bottom-left) for uP1. */
   V.rect = (x0, y0, x1, y1) => [x0 / 1920, 1 - y1 / 1080, x1 / 1920, 1 - y0 / 1080];
 
-  // ---------- the phone: v1-01's last frame and v1-02's first ----------
+  // ---------- the laptop: v1-01's last frame and v1-02's first ----------
+  // A thin silver unibody laptop: black bezel with a notch, rounded lid, hinge,
+  // black keys, a wide trackpad. Blank lid side never shown, no marks, no names.
   const W = OM.theme('white'), WI = OM.fieldInks('white');
-  const PH = { w: 800, h: 450, bez: 26, r: 46 }; // the screen (landscape), its bezel and corner
-  const ICON_INKS = [W['border-subtle'], WI.dim, W['border-strong'], WI.mid, WI.lit];
+  const LAP = { x: 440, y: 150, w: 1040, h: 650 }; // the display
+  const LCY = LAP.y + LAP.h / 2;
+  V.LAP = LAP;
+  V.LCY = LCY;
+  const at = (ctx, dy, k) => {
+    ctx.translate(960, LCY + dy);
+    ctx.scale(k, k);
+    ctx.translate(-960, -LCY);
+  };
   const rrect = (ctx, x, y, w, h, r) => {
     ctx.beginPath();
     ctx.roundRect(x, y, w, h, r);
   };
-  /** The app grid's icons, in screen-local px (screen at 0,0, PH.w x PH.h). */
-  V.ICONS = (() => {
-    const out = [], cols = 7, rows = 3, s = 74, gx = (PH.w - cols * s) / (cols + 1), top = 58, gy = 40;
-    for (let r = 0; r < rows; r++)
-      for (let q = 0; q < cols; q++) out.push({ x: gx + q * (s + gx), y: top + r * (s + gy), s, ink: ICON_INKS[Math.floor(OM.hash(q, r, 11) * ICON_INKS.length)] });
-    return out;
-  })();
-  V.PHONE = PH;
-  /** The phone body around a screen at (sx, sy) of PH size, scaled k about its centre. */
-  V.phoneBody = (ctx, cx, cy, k = 1, alpha = 1) => {
-    const w = (PH.w + 2 * PH.bez) * k, h = (PH.h + 2 * PH.bez) * k;
+  const B = 22, RIM = 6;
+  const LID = { x: LAP.x - B - RIM, y: LAP.y - B - RIM, w: LAP.w + 2 * (B + RIM), h: LAP.h + 2 * (B + RIM) };
+  const DTOP = LID.y + LID.h + 6, DFRONT = DTOP + 150;
+  V.LID = LID;
+  V.DECK = { top: DTOP, front: DFRONT, half0: 575, half1: 660 };
+  /** The body: shadow, deck with keyboard and trackpad, hinge, the lid's rim and bezel (display left empty). */
+  V.laptop = (ctx, dy = 0, k = 1, alpha = 1) => {
     ctx.save();
     ctx.globalAlpha = alpha;
+    at(ctx, dy, k);
+    const cx = 960;
+    const sh = ctx.createRadialGradient(cx, DFRONT + 30, 0, cx, DFRONT + 30, 760);
+    sh.addColorStop(0, V.rgba(W['field-crest'], 0.16));
+    sh.addColorStop(1, V.rgba(W['field-crest'], 0));
+    ctx.save();
+    ctx.translate(0, DFRONT + 30);
+    ctx.scale(1, 0.05);
+    ctx.translate(0, -(DFRONT + 30));
+    ctx.fillStyle = sh;
+    ctx.fillRect(cx - 760, DFRONT + 30 - 760, 1520, 1520);
+    ctx.restore();
+    // The deck, seen from above the front.
+    const dg = ctx.createLinearGradient(0, DTOP, 0, DFRONT);
+    dg.addColorStop(0, W['border-subtle']);
+    dg.addColorStop(1, W['surface-2']);
+    ctx.fillStyle = dg;
+    ctx.beginPath();
+    ctx.moveTo(cx - 575, DTOP);
+    ctx.lineTo(cx + 575, DTOP);
+    ctx.lineTo(cx + 660, DFRONT);
+    ctx.lineTo(cx - 660, DFRONT);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = W['border-strong'];
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = W['border-strong'];
+    rrect(ctx, cx - 660, DFRONT, 1320, 12, [0, 0, 10, 10]);
+    ctx.fill();
+    ctx.fillStyle = WI.mid;
+    rrect(ctx, cx - 70, DFRONT, 140, 5, [0, 0, 4, 4]);
+    ctx.fill();
+    // The keyboard: black keys in six rows, a wide space bar on the last.
+    const half = (y) => OM.lerp(575, 660, (y - DTOP) / 150) * 0.8;
+    ctx.fillStyle = W.text;
+    for (let i = 0; i < 6; i++) {
+      const y = DTOP + 12 + i * 14, hw = half(y + 6), x0 = cx - hw, span = 2 * hw;
+      const keys = i === 0 ? Array(16).fill(1) : i === 5 ? [1, 1, 1, 1.3, 5.6, 1.3, 1, 1, 1] : Array(14).fill(1);
+      const tot = keys.reduce((a, b) => a + b, 0);
+      let x = x0;
+      for (const kw of keys) {
+        const w = (kw / tot) * span;
+        rrect(ctx, x + 2, y, w - 4, i === 0 ? 7 : 10, 2);
+        ctx.fill();
+        x += w;
+      }
+    }
+    // The wide trackpad.
     ctx.fillStyle = W['border-subtle'];
-    rrect(ctx, cx - w / 2 + 6, cy - h / 2 + 10, w, h, PH.r * k);
+    ctx.strokeStyle = W['border-strong'];
+    ctx.beginPath();
+    ctx.moveTo(cx - 215, DTOP + 100);
+    ctx.lineTo(cx + 215, DTOP + 100);
+    ctx.lineTo(cx + 228, DTOP + 140);
+    ctx.lineTo(cx - 228, DTOP + 140);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // The hinge, then the lid: an aluminium rim round a black bezel.
+    ctx.fillStyle = W['text-secondary'];
+    rrect(ctx, cx - 540, LID.y + LID.h - 4, 1080, 12, 4);
+    ctx.fill();
+    const lg = ctx.createLinearGradient(0, LID.y, 0, LID.y + LID.h);
+    lg.addColorStop(0, W['border-subtle']);
+    lg.addColorStop(1, WI.dim);
+    ctx.fillStyle = lg;
+    rrect(ctx, LID.x, LID.y, LID.w, LID.h, 30);
     ctx.fill();
     ctx.fillStyle = W.text;
-    rrect(ctx, cx - w / 2, cy - h / 2, w, h, PH.r * k);
+    rrect(ctx, LID.x + RIM, LID.y + RIM, LID.w - 2 * RIM, LID.h - 2 * RIM, 24);
     ctx.fill();
     ctx.restore();
   };
-  /** The screen's app grid (status bar, icons, dock) at screen origin (x, y), scale k. */
-  V.appGrid = (ctx, x, y, k = 1, icons = V.ICONS, alpha = 1) => {
+  /** The display's own content: a soft, bright, empty screen. */
+  V.desk = (ctx, dy = 0, k = 1, alpha = 1) => {
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.translate(x, y);
-    ctx.scale(k, k);
-    ctx.fillStyle = W.bg;
-    ctx.fillRect(0, 0, PH.w, PH.h);
-    ctx.fillStyle = WI.mid;
-    ctx.fillRect(22, 16, 54, 8);
-    ctx.fillRect(PH.w - 78, 16, 56, 8);
-    for (const ic of icons) {
-      ctx.fillStyle = ic.ink;
-      rrect(ctx, ic.x, ic.y + (ic.dy || 0), ic.s, ic.s, 18);
-      ctx.fill();
-    }
-    ctx.fillStyle = W['border-subtle'];
-    rrect(ctx, 150, PH.h - 66, PH.w - 300, 50, 22);
+    at(ctx, dy, k);
+    const g = ctx.createRadialGradient(960, LCY - 120, 60, 960, LCY, 720);
+    g.addColorStop(0, W.bg);
+    g.addColorStop(1, W['border-subtle']);
+    ctx.fillStyle = g;
+    ctx.fillRect(LAP.x, LAP.y, LAP.w, LAP.h);
+    ctx.restore();
+  };
+  /** The notch, over the top of the display. */
+  V.notch = (ctx, dy = 0, k = 1, alpha = 1) => {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    at(ctx, dy, k);
+    ctx.fillStyle = W.text;
+    rrect(ctx, 960 - 88, LAP.y - 2, 176, 32, [0, 0, 14, 14]);
+    ctx.fill();
+    ctx.fillStyle = WI.hover;
+    ctx.beginPath();
+    ctx.arc(960, LAP.y + 12, 4, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   };
-  /** The cut frame: white page, the phone centred, its app grid lit. */
-  V.phoneFrame = (ctx) => {
+  /** The cut frame: white page, the laptop, its screen bright and empty. */
+  V.laptopFrame = (ctx) => {
     ctx.fillStyle = W.bg;
     ctx.fillRect(0, 0, 1920, 1080);
-    V.phoneBody(ctx, 960, 540);
-    V.appGrid(ctx, 960 - PH.w / 2, 540 - PH.h / 2);
+    V.laptop(ctx);
+    V.desk(ctx);
+    V.notch(ctx);
   };
 
   // ---------- v1-01 ----------
@@ -365,14 +442,15 @@ vec4 effect(vec2 uv) {
           const ctx = c.ensure();
           const dpr = c.dpr;
           if (T < start + H) return OM.handoff('white', ctx, T, dpr);
-          if (T >= END - H || T >= SETTLE) return V.phoneFrame(ctx);
+          if (T >= END - H || T >= SETTLE) return V.laptopFrame(ctx);
           const M = get();
           // Camera: the rise from the whole maze into the phone's screen.
-          const z = OM.lerp(1, PH.w / 1904, OM.ease.inOutCubic(OM.prog(T, RISE0, KICK)));
+          const rz = OM.ease.inOutCubic(OM.prog(T, RISE0, KICK));
+          const z = OM.lerp(1, V.LAP.w / 1904, rz);
           ctx.fillStyle = W.bg;
           ctx.fillRect(0, 0, 1920, 1080);
           ctx.save();
-          ctx.translate(960, 540);
+          ctx.translate(960, OM.lerp(540, V.LCY, rz)); // the maze lands in the display
           ctx.scale(z, z);
           ctx.translate(-960, -540);
           // The maze draws in from the white page in the dither order.
@@ -428,27 +506,23 @@ vec4 effect(vec2 uv) {
           }
           ctx.globalAlpha = 1;
           ctx.restore();
-          // The bezel lands on the kick; the maze resolves into the app grid in dither order.
+          // The laptop lands round the maze on the kick; the maze fades into its bright, empty screen.
           if (T >= KICK - 0.02) {
             const p = OM.ease.outExpo(OM.prog(T, KICK - 0.02, KICK + 0.16));
-            const sx = 960 - PH.w / 2, sy = 540 - PH.h / 2;
+            const Lp = V.LAP;
             ctx.save();
             ctx.beginPath();
             ctx.rect(0, 0, 1920, 1080);
-            ctx.roundRect(sx, sy, PH.w, PH.h, 4);
+            ctx.rect(Lp.x, Lp.y, Lp.w, Lp.h);
             ctx.clip('evenodd');
             ctx.fillStyle = W.bg;
+            ctx.globalAlpha = OM.clamp(p * 2);
             ctx.fillRect(0, 0, 1920, 1080);
-            V.phoneBody(ctx, 960, 540, OM.lerp(1.12, 1, p), OM.clamp(p * 2));
+            ctx.globalAlpha = 1;
+            V.laptop(ctx, 0, OM.lerp(1.12, 1, p), OM.clamp(p * 2));
             ctx.restore();
-            const q = OM.prog(T, KICK + 0.02, SETTLE - 0.04);
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(sx, sy, PH.w, PH.h);
-            ctx.clip();
-            ctx.globalAlpha = OM.smooth(q);
-            V.appGrid(ctx, sx, sy);
-            ctx.restore();
+            V.desk(ctx, 0, 1, OM.smooth(OM.prog(T, KICK + 0.02, SETTLE - 0.04)));
+            V.notch(ctx, 0, 1, OM.clamp(p * 2));
           }
         },
         release: () => {

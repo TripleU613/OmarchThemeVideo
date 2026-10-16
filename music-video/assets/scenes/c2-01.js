@@ -184,7 +184,7 @@ OM.ownWords.add('c2-01');
       const K = words.length - 1; // the key word: the biggest shards, closing the pane
       const SNARES = [159.591, 160.218, 160.798];
       const DB2 = OM.downbeatsIn(161, 161.5)[0] || 161.239;
-      const PX = 320, PY = 140, PW = 1280, PH = 800, CS = 6;
+      const PX = 320, PY = 140, PW = 1280, PH = 800, CS = 9; // the film's letter cells: 8px on a 9px pitch
 
       // ---- the shards: a jittered 16x10 mesh over the pane, each quad cut on a random diagonal ----
       const NX = 16, NY = 10, rng = OM.rng(0xc201);
@@ -300,7 +300,7 @@ OM.ownWords.add('c2-01');
               if (T < on[k] || h < fade) continue;
               const age = T - on[k];
               ctx.fillStyle = age < 0.08 || (k === K && slam > 0.4) ? ink.crest : k === K ? (age < 0.3 ? ink.hover : ink.crest) : age < 0.25 ? ink.crest : ink.hover;
-              ctx.fillRect(x, y, CS - 0.6, CS - 0.6);
+              ctx.fillRect(x, y, CS - 1, CS - 1);
             }
             ctx.restore();
           }

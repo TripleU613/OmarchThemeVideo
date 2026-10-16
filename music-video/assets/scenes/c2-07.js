@@ -39,12 +39,12 @@ OM.ownWords.add('c2-07');
       const on = words.map((w) => w.t0);
       const K = words.length - 1;
       const HM = OM.HOME, sp = OM.cellAt(HM, 960, 540), cR = sp.row, lineY = HM.y0 + cR * HM.ch;
-      const CS = 6, FLY = 0.3;
+      const CS = 9, FLY = 0.3; // letter cells: 8px on a 9px pitch
       const TR0 = on[K] + 0.02, TR1 = Math.max(words[K].t1, on[K] + 0.8); // the train crosses the key word's hold
       const DIM = 185.9, DB2 = OM.downbeatsIn(186.6, 186.9)[0] || 186.735, PULL = DB2 - 0.42;
 
       const get = OM.c2.lazy(W, () => {
-        const L = OM.c2.layout(words, { weight: W, cap: 92, maxW: 1480, cy: 400, rows: 2, lead: 1.3 });
+        const L = OM.c2.layout(words, { weight: W, cap: 92, maxW: 1480, cy: 400, rows: 2, lead: 1.3, minCap: 72 });
         let bottom = -Infinity;
         for (const k in L.place) bottom = Math.max(bottom, L.place[k].base);
         const shift = lineY - 6 - bottom; // the lowest row stands on the deck
@@ -158,7 +158,7 @@ OM.ownWords.add('c2-07');
             for (const cl of lt.cells) {
               if (OM.hash(cl.i, cl.j, 5) < dim) continue;
               ctx.fillStyle = u < 1 ? ink.mid : a < 0.1 || near ? ink.crest : lt.k === K ? ink.crest : ink.hover;
-              ctx.fillRect(cl.x, cl.y, CS - 0.5, CS - 0.5);
+              ctx.fillRect(cl.x, cl.y, CS - 1, CS - 1);
             }
             ctx.restore();
           }

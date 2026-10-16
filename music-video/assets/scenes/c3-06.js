@@ -26,10 +26,10 @@ OM.scene({
 
     const flock = C.lazy(() => {
       // Three formations: the first word alone, the second alone, then the whole line.
-      const solo = (k) => C.layout(words, [{ ks: [k], cap: 190, cy: 470 }]);
+      const solo = (k) => C.layout(words, [{ ks: [k], cap: 190, minCap: 70, cy: 470 }]);
       const half = Math.ceil(n / 2);
-      const full = C.layout(words, [{ ks: [...Array(half).keys()], cap: 112, cy: 370 }, { ks: [...Array(n - half).keys()].map((i) => i + half), cap: 112, cy: 620 }]);
-      const step = (p) => Math.max(7, Math.round(p.cap / 13));
+      const full = C.layout(words, [{ ks: [...Array(half).keys()], cap: 112, minCap: 70, cy: 370 }, { ks: [...Array(n - half).keys()].map((i) => i + half), cap: 112, minCap: 70, cy: 620 }]);
+      const step = () => 9; // the film's lattice type: each formed bird an 8px cell on a 9px pitch
       const F = [];
       const add = (place, ks, tin, lead, tout, fromStart) => {
         const pts = C.wordPts(words, place, 800, step);
@@ -141,7 +141,7 @@ OM.scene({
             y = OM.lerp(y, ty, wk) - sw * 0.5;
             if (wk > 0.9) {
               inForm = k;
-              sz = st - 2;
+              sz = st - 1;
               v = 0.75 + 1.2 * C.decay(T, Math.max(on[k], F[f].tin), 0.12) + 0.5 * down;
             }
           }

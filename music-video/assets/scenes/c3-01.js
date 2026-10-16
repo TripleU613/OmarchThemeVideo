@@ -76,7 +76,7 @@ OM.ownWords.add('c3-01');
   };
   /**
    * Lay words out in centred rows: rows = [{ ks: [word indices], cap, cy, cx?, maxW? }].
-   * A row shrinks to fit maxW but never under a 60px cap. Returns place[k] = { x, base, px, w, cap, cx, cy }.
+   * A row shrinks to fit maxW but never under a 60px cap (or the row's minCap). Returns place[k] = { x, base, px, w, cap, cx, cy }.
    */
   C.layout = (words, rows, { weight = 800, maxW = 1680 } = {}) => {
     const cr = C.capRatio(weight), place = [];
@@ -84,7 +84,7 @@ OM.ownWords.add('c3-01');
       const ks = row.ks.filter((k) => words[k]);
       const width = (px) => ks.reduce((s, k, n) => s + (n && words[k].space ? C.measure(' ', weight, px) : 0) + C.measure(words[k].text, weight, px), 0);
       let px = row.cap / cr;
-      while (width(px) > (row.maxW || maxW) && px * cr > 60) px *= 0.97;
+      while (width(px) > (row.maxW || maxW) && px * cr > (row.minCap || 60)) px *= 0.97;
       let x = (row.cx ?? 960) - width(px) / 2;
       const base = row.cy + (px * cr) / 2;
       ks.forEach((k, n) => {

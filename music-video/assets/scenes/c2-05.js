@@ -37,7 +37,7 @@ OM.ownWords.add('c2-05');
       const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
       const words = OM.sung('c2-05');
       const on = words.map((w) => w.t0);
-      const HM = OM.HOME, CS = 7;
+      const HM = OM.HOME, CS = 9; // letter cells: 8px on a 9px pitch
       const GRIME = [th['bg-deep'], th.surface, th['surface-2'], th.selection];
       const WIPES = [177.02, 177.14, 177.26]; // the roll's clear-up strokes
       const FADE = 177.06, CLEAR = 177.5;
@@ -97,7 +97,7 @@ OM.ownWords.add('c2-05');
               if (cl.x > xb || OM.hash(cl.i, cl.j, 3) < fade) continue;
               const near = xb - cl.x;
               ctx.fillStyle = near < 60 || decay(T, s.t0, 0.1) > 0.5 ? ink.crest : lt.k === 0 ? ink.crest : ink.hover;
-              ctx.fillRect(cl.x, cl.y, CS - 0.5, CS - 0.5);
+              ctx.fillRect(cl.x, cl.y, CS - 1, CS - 1);
             }
           }
 

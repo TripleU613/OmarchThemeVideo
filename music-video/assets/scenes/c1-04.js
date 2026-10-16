@@ -110,7 +110,8 @@ OM.ownWords.add('c1-04');
       const L = OM.HOME;
       // The home lattice with rows above and below the frame: the laptop screen is 16:10.
       const LX = { ...L, rMin: L.rMin - 4, rows: L.rows + 8 };
-      const HW = L.cw / 2, HH = L.ch / 2; // the words sit on half-cells of the same lattice
+      // The words in Omarchy lattice type: squares on a 9 px frame pitch at the reading distance (kc = F / mean(DW, DS)).
+      const HW = 9 / ((2 * 0.3625) / 1.86), HH = HW, GAP = 8 / 9;
       const ink = OM.fieldInks('tokyo-night');
       const th = OM.theme('tokyo-night');
       const WM = OM.cells(OM.WORDMARK);
@@ -201,7 +202,7 @@ OM.ownWords.add('c1-04');
         m.font = font(100);
         const capR = m.measureText('H').actualBoundingBoxAscent / 100;
         const spR = m.measureText(' ').width / 100;
-        const CAP = [175, 175, 225], MID = [215, 520, 815];
+        const CAP = [185, 185, 235], MID = [215, 520, 815]; // caps of 72 px and more on the frame at the reading distance
         const out = [];
         ROWS.forEach((ids, ri) => {
           if (!ids.length) return;
@@ -288,12 +289,7 @@ OM.ownWords.add('c1-04');
             }
             let f = t2 > cool || t2 > flare ? ink.crest : cl.ink;
             if (hi > 0.15 && OM.hash(cl.q, cl.r, tick) < 0.16 * hi) f = f === ink.crest ? ink.hover : ink.crest;
-            const x1 = snap(w.cx + (L.x0 + (cl.q + 1) * HW - w.cx) * k);
-            if (row === cl.r && end === cl.q - 1 && fill === f) {
-              xb = x1;
-              end = cl.q;
-              continue;
-            }
+            const x1 = snap(w.cx + (L.x0 + (cl.q + GAP) * HW - w.cx) * k);
             flush();
             row = cl.r;
             end = cl.q;
@@ -301,7 +297,7 @@ OM.ownWords.add('c1-04');
             xa = snap(w.cx + (L.x0 + cl.q * HW - w.cx) * k);
             xb = x1;
             ya = snap(w.cy + (L.y0 + cl.r * HH - w.cy) * k);
-            yb = snap(w.cy + (L.y0 + (cl.r + 1) * HH - w.cy) * k);
+            yb = snap(w.cy + (L.y0 + (cl.r + GAP) * HH - w.cy) * k);
           }
           flush();
         }

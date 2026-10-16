@@ -371,26 +371,18 @@
           ctx.fillRect(px - r, w.cy - r, 2 * r, 2 * r);
           ctx.restore();
         }
-        ctx.font = font(800, w.s);
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'alphabetic';
-        const g = ctx.createLinearGradient(0, w.top, 0, w.base);
-        g.addColorStop(0, ink.crest);
-        g.addColorStop(0.42, ink.crest);
-        g.addColorStop(1, OM.mix(ink.hover, ink.crest, flash));
-        ctx.fillStyle = g;
-        ctx.shadowColor = rgba(ink.lit, Math.min(1, (0.45 + 0.5 * flash + amp) * cool));
-        ctx.shadowBlur = (14 + (w.k === 2 ? 30 : 20) * flash) * dpr;
-        ctx.fillText(w.text, w.x, w.base);
-        if (glint) {
-          const gl = ctx.createLinearGradient(w.x - w.cap * 0.4, w.top, w.x + w.w + w.cap * 0.4, w.base);
-          gl.addColorStop(OM.clamp(u - 0.09), rgba(ink.crest, 0));
-          gl.addColorStop(OM.clamp(u), rgba(ink.crest, 1));
-          gl.addColorStop(OM.clamp(u + 0.09), rgba(ink.crest, 0));
-          ctx.fillStyle = gl;
-          ctx.shadowBlur = 0;
-          ctx.shadowColor = 'transparent';
-          ctx.fillText(w.text, w.x, w.base);
+        // The word in Omarchy lattice type: crest-topped squares on the 9 px pitch, a soft pool of its light behind.
+        if (!w.lt || w.lt.ok !== lay.ok) w.lt = Object.assign(OM.c1.type(w.text, w.x, w.base, w.cap), { ok: lay.ok });
+        const ga = Math.min(1, (0.3 + 0.35 * flash + amp) * cool);
+        const pg = ctx.createRadialGradient(w.cx, w.cy, 0, w.cx, w.cy, w.w * 0.6 + w.cap);
+        pg.addColorStop(0, rgba(ink.lit, 0.22 * ga));
+        pg.addColorStop(1, rgba(ink.lit, 0));
+        ctx.fillStyle = pg;
+        ctx.fillRect(w.cx - w.w, w.cy - w.w, 2 * w.w, 2 * w.w);
+        const gx = glint ? w.x - w.cap * 0.4 + (w.w + w.cap * 0.8) * u : -1e9, gw = 0.09 * (w.w + w.cap * 0.8);
+        for (const [x, y, f] of w.lt.cells) {
+          ctx.fillStyle = flash > 0.5 || Math.abs(x + 4 - gx) < gw ? ink.crest : OM.c1.typeInk(f, ink);
+          ctx.fillRect(x, y, 8, 8);
         }
         ctx.restore();
       };
