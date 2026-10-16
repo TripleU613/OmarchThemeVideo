@@ -69,7 +69,7 @@ const out = `renders/omarchy-4k-${tag}.mp4`
 const workers = opt('--workers', '6')
 if (!/^\d+$/.test(workers) || +workers < 1) die(`--workers needs a whole number, got ${workers}`)
 
-const render = ['-n', '19', 'npx', '--yes', 'hyperframes@0.8.162', 'render', '--resolution', '4k', '--fps', '60', '--quality', 'delivery', '--workers', workers, '--player-ready-timeout', '120000', '--strict', '-o', out]
+const render = ['-n', '19', 'npx', '--yes', 'hyperframes@0.8.166', 'render', '--resolution', '4k', '--fps', '60', '--quality', 'delivery', '--workers', workers, '--player-ready-timeout', '120000', '--strict', '-o', out]
 console.log(`render-final: nice ${render.join(' ')}`)
 if (args.includes('--dry-run')) process.exit(0)
 console.log('render-final: this takes a while; the machine stays usable at low priority.')

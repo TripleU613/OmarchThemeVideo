@@ -39,4 +39,4 @@ jobs:
         run: node scripts/placeholder-audio.mjs
 
       - name: HyperFrames lint
-        run: npx --yes hyperframes@0.8.162 lint
+        run: npx --yes hyperframes@0.8.166 lint

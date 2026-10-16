@@ -56,7 +56,7 @@ vec4 effect(vec2 uv) {
       // The cross-peen hammer, drawn with its striking face centred on the origin, face down, the
       // handle running out along +x. It swings rigidly about a shoulder off-frame at the upper right.
       const SC = 1.2, REST = 0.17, PIV = [1100, -700];
-      const HEAD = new Path2D('M-50 0L50 0L56-6L56-40L48-50L48-150L40-168L12-222L8-226L-8-226L-12-222L-40-168L-48-150L-48-50L-56-40L-56-6Z');
+      const HEAD = new Path2D('M-56 0L56 0L64-8L64-34L48-48L43-132L20-177L-20-177L-43-132L-48-48L-64-34L-64-8Z');
       const HANDLE = new Path2D('M30-119Q120-114 200-116L430-122L604-126Q632-128 640-114L640-96Q632-82 604-84L430-88L200-94Q120-96 30-91Z');
       const part = (ctx, path, body, rim, rx, ry) => {
         ctx.fillStyle = rim;
@@ -97,17 +97,20 @@ vec4 effect(vec2 uv) {
       };
       const ANVIL = (() => {
         const p = new Path2D();
-        p.moveTo(119, FACE + 14);
-        p.lineTo(438, FACE);
+        p.moveTo(119, FACE + 20);
+        p.quadraticCurveTo(270, FACE - 7, 438, FACE);
         p.lineTo(1656, FACE);
         p.lineTo(1656, FACE + 44);
-        p.lineTo(1279, FACE + 70);
-        p.lineTo(1192, FACE + 170);
-        p.lineTo(1380, FACE + 230);
-        p.lineTo(540, FACE + 230);
-        p.lineTo(728, FACE + 170);
-        p.lineTo(641, FACE + 70);
-        p.lineTo(438, FACE + 44);
+        p.lineTo(1330, FACE + 55);
+        p.bezierCurveTo(1240, FACE + 69, 1210, FACE + 116, 1210, FACE + 164);
+        p.lineTo(1350, FACE + 208);
+        p.lineTo(1350, FACE + 230);
+        p.lineTo(570, FACE + 230);
+        p.lineTo(570, FACE + 208);
+        p.lineTo(710, FACE + 164);
+        p.bezierCurveTo(710, FACE + 113, 674, FACE + 65, 598, FACE + 59);
+        p.lineTo(438, FACE + 52);
+        p.quadraticCurveTo(266, FACE + 44, 119, FACE + 20);
         p.closePath();
         return p;
       })();
@@ -166,6 +169,17 @@ vec4 effect(vec2 uv) {
           ctx.strokeStyle = th['border-strong'];
           ctx.lineWidth = 2;
           ctx.stroke(ANVIL);
+          ctx.fillStyle = th['surface-2'];
+          ctx.beginPath();
+          ctx.moveTo(438, FACE + 4);
+          ctx.lineTo(1652, FACE + 4);
+          ctx.lineTo(1622, FACE + 22);
+          ctx.lineTo(458, FACE + 22);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = th['border-strong'];
+          ctx.fillRect(582, FACE + 211, 756, 4);
+          ctx.fillRect(1308, FACE + 7, 34, 10);
           ctx.fillStyle = ink.mid;
           ctx.fillRect(438, FACE, 1218, 3);
           // Anvil ring: the face rings on the kicks in the mid-line gap, its rim shivering crest.
@@ -311,16 +325,20 @@ vec4 effect(vec2 uv) {
             }
             part(ctx, HEAD, th['border-strong'], rim, rx, ry);
             ctx.fillStyle = th['surface-2'];
-            ctx.fillRect(22, -148, 20, 96); // the shadowed cheek
-            ctx.fillRect(-40, -170, 80, 3); // where the peen starts its wedge
-            ctx.fillRect(-48, -52, 96, 3); // the face's shoulder
+            ctx.beginPath();
+            ctx.moveTo(24, -131); ctx.lineTo(42, -131);
+            ctx.lineTo(48, -48); ctx.lineTo(62, -34);
+            ctx.lineTo(40, -34); ctx.closePath(); ctx.fill();
+            ctx.fillRect(-42, -133, 84, 3);
+            ctx.fillRect(-58, -33, 116, 3);
             ctx.fillStyle = th['text-muted'];
-            ctx.fillRect(-42, -146, 5, 90); // a cold glint down the steel
+            ctx.fillRect(-39, -126, 5, 75);
+            ctx.fillRect(-18, -177, 36, 3);
             // The striking face glows with the blow.
             if (hot > 0.01) {
               ctx.globalAlpha = world * hot;
               ctx.fillStyle = ink.crest;
-              ctx.fillRect(-52, -7, 104, 7);
+              ctx.fillRect(-56, -7, 112, 7);
             }
             ctx.restore();
             // The flash at the contact point.

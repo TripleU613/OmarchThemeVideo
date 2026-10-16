@@ -95,7 +95,7 @@ OM.scene({
     const K = 3; // the key word, on the 210.257 downbeat
     const KICKS = [209.816, 211.278, 212.904];
     const MELT = 213.0, ASSEMBLED = 213.9; // the melt over the end of the riser, from the 212.97 snare
-    const S1 = 0.36, CX = 960, CY = 222; // the machine's screen at rest: scale and centre
+    const S1 = 0.32, CX = 960, CY = 238; // keep the lid inside the camera crop and the deck at the pour's height
     const POUR = start + 0.08, IMPACT = { x: 960, y: 452 };
 
     const lay = B.lazy(() => {
@@ -153,17 +153,33 @@ OM.scene({
       const x = OM.lerp(320, CX - w / 2, (1 - s) / (1 - S1)), yf = OM.lerp(140, CY - hf / 2, (1 - s) / (1 - S1));
       const h = hf * (1 - lid), y = yf + hf * lid;
       if (alphaDeck > 0) {
+        const q = s / S1;
         ctx.globalAlpha = alphaDeck;
         ctx.fillStyle = th['surface-2'];
         ctx.beginPath();
-        ctx.moveTo(x - 30 * s / S1, y + h + 4);
-        ctx.lineTo(x + w + 30 * s / S1, y + h + 4);
-        ctx.lineTo(x + w + 70 * s / S1, y + h + 40 * s / S1);
-        ctx.lineTo(x - 70 * s / S1, y + h + 40 * s / S1);
+        ctx.moveTo(x - 8 * q, y + h + 4);
+        ctx.lineTo(x + w + 8 * q, y + h + 4);
+        ctx.lineTo(x + w + 40 * q, y + h + 40 * q);
+        ctx.lineTo(x - 40 * q, y + h + 40 * q);
         ctx.closePath();
         ctx.fill();
         ctx.fillStyle = th['border-strong'];
-        ctx.fillRect(x - 70 * s / S1, y + h + 40 * s / S1 - 3, w + 140 * s / S1, 3);
+        ctx.fillRect(x - 40 * q, y + h + 40 * q - 3, w + 80 * q, 3);
+        ctx.fillRect(x + w * 0.1, y + h + 2, w * 0.8, 3 * q);
+        ctx.globalAlpha = alphaDeck * (1 - lid);
+        ctx.fillStyle = ink.bg;
+        for (let r = 0; r < 4; r++) {
+          const ky = y + h + (8 + r * 4) * q, kw = w * (0.78 + r * 0.025) / 14;
+          for (let k = 0; k < 14; k++) ctx.fillRect(x + w / 2 + (k - 7) * kw, ky, kw - 2 * q, 2.5 * q);
+        }
+        ctx.fillRect(x + w * 0.35, y + h + 24 * q, w * 0.3, 2.5 * q);
+        ctx.strokeStyle = th['text-muted'];
+        ctx.lineWidth = q;
+        ctx.strokeRect(x + w * 0.35, y + h + 29 * q, w * 0.3, 7 * q);
+        ctx.fillStyle = th['surface-2'];
+        ctx.fillRect(x - 6 * q, y - 7 * q, w + 12 * q, h + 11 * q);
+        ctx.fillStyle = th['text-muted'];
+        ctx.fillRect(x + w / 2 - q, y - 5 * q, 2 * q, 2 * q);
         ctx.globalAlpha = 1;
       }
       ctx.fillStyle = th.bg;

@@ -313,18 +313,42 @@ OM.ownWords.add('v1-01');
     ctx.fillRect(-680, -14, 1360, 28);
     ctx.fillRect(-14, -230, 28, 300);
     ctx.fillStyle = W.text;
+    // A tapered wrist and palm, with the fingers curled over the control bar.
     ctx.beginPath();
-    ctx.roundRect(-110, -250, 220, 190, 34);
+    ctx.moveTo(-66, -520);
+    ctx.lineTo(62, -520);
+    ctx.lineTo(58, -215);
+    ctx.bezierCurveTo(58, -181, 108, -154, 110, -114);
+    ctx.lineTo(96, -30);
+    ctx.lineTo(-94, -28);
+    ctx.bezierCurveTo(-116, -94, -103, -146, -82, -183);
+    ctx.quadraticCurveTo(-60, -214, -66, -250);
+    ctx.closePath();
     ctx.fill();
     for (let f = 0; f < 4; f++) {
+      const x = -100 + f * 48, y = -63 + [12, 0, 4, 20][f];
       ctx.beginPath();
-      ctx.roundRect(-104 + f * 54, -80, 46, 112, 20);
+      ctx.roundRect(x, y, 43, 86 - [8, 0, 4, 14][f], 18);
       ctx.fill();
+      ctx.strokeStyle = WI.dim;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + 10, y + 54);
+      ctx.quadraticCurveTo(x + 22, y + 59, x + 33, y + 53);
+      ctx.stroke();
     }
+    // The thumb crosses the index finger instead of reading as a fifth parallel finger.
     ctx.beginPath();
-    ctx.roundRect(96, -190, 54, 120, 24);
+    ctx.moveTo(79, -148);
+    ctx.bezierCurveTo(111, -137, 140, -104, 132, -77);
+    ctx.quadraticCurveTo(124, -53, 71, -29);
+    ctx.bezierCurveTo(43, -16, 22, -45, 43, -64);
+    ctx.lineTo(83, -98);
+    ctx.closePath();
     ctx.fill();
-    ctx.fillRect(-90, -520, 180, 280);
+    ctx.stroke();
+    ctx.fillStyle = W['text-secondary'];
+    ctx.fillRect(-72, -260, 140, 18);
     ctx.restore();
   };
   /** Strings, bar and hand from V.RIG0 on: string feet move from the laptop's corners to the meter's, below frame. */

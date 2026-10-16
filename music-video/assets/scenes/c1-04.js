@@ -380,15 +380,29 @@ OM.ownWords.add('c1-04');
         // Keys catch the light, the rows nearest the screen most.
         for (let i = 0; i < 5; i++) {
           ctx.fillStyle = rgba(ink.mid, 0.5 * g * (1 - i / 6));
-          for (let j = 0; j < 14; j++) {
-            const u0 = -SW * 0.42 + j * SW * 0.06, w0 = -100 - i * 130;
-            const p = [pt(u0, w0), pt(u0 + SW * 0.048, w0), pt(u0 + SW * 0.048, w0 - 100), pt(u0, w0 - 100)];
+          const widths = i === 4 ? [1, 1, 1, 6, 1, 1, 1, 2] : Array(14).fill(1);
+          let u0 = -SW * 0.42;
+          for (const width of widths) {
+            const kw = width * SW * 0.06, w0 = -100 - i * 130;
+            const p = [pt(u0, w0), pt(u0 + kw - SW * 0.012, w0), pt(u0 + kw - SW * 0.012, w0 - 100), pt(u0, w0 - 100)];
             ctx.beginPath();
             ctx.moveTo(p[0][0], p[0][1]);
             for (let n = 1; n < 4; n++) ctx.lineTo(p[n][0], p[n][1]);
             ctx.fill();
+            u0 += kw;
           }
         }
+        const pad = [pt(-SW * 0.17, -820), pt(SW * 0.17, -820), pt(SW * 0.17, -1130), pt(-SW * 0.17, -1130)];
+        ctx.beginPath(); ctx.moveTo(pad[0][0], pad[0][1]);
+        for (let n = 1; n < 4; n++) ctx.lineTo(pad[n][0], pad[n][1]);
+        ctx.closePath();
+        ctx.fillStyle = rgba(ink.dim, 0.22 * g); ctx.fill();
+        ctx.strokeStyle = rgba(ink.mid, 0.55 * g); ctx.lineWidth = 1; ctx.stroke();
+        ctx.fillStyle = rgba(ink.dim, 0.45 * g);
+        ctx.beginPath();
+        ctx.moveTo(d[0], d[1]); ctx.lineTo(e[0], e[1]);
+        ctx.lineTo(e[0], e[1] + 10 * e[2]); ctx.lineTo(d[0], d[1] + 10 * d[2]);
+        ctx.closePath(); ctx.fill();
         ctx.strokeStyle = rgba(ink.hover, 0.55 * Math.min(g, 1));
         ctx.lineWidth = 1.5;
         ctx.beginPath();
@@ -418,7 +432,10 @@ OM.ownWords.add('c1-04');
         const hx2 = sx + ux * reach, hy2 = sy + uy * reach;
         segment(owner.P, owner.work, sx, sy, exx, eyy, 66);
         segment(owner.P, owner.work, exx, eyy, hx2, hy2, 54);
-        segment(owner.P, owner.work, hx2 - 10, hy2 - 10, hx2 + 70, hy2 + 20, 62);
+        const length = Math.hypot(hx2 - exx, hy2 - eyy), dx = (hx2 - exx) / length, dy = (hy2 - eyy) / length;
+        segment(owner.P, owner.work, hx2 - dx * 10, hy2 - dy * 10, hx2 + dx * 60, hy2 + dy * 60, 38);
+        segment(owner.P, owner.work, hx2 + dx * 40, hy2 + dy * 40, hx2 + dx * 86, hy2 + dy * 86, 28);
+        segment(owner.P, owner.work, hx2 - dy * 24, hy2 + dx * 24, hx2 + dx * 46 - dy * 54, hy2 + dy * 46 + dx * 54, 23);
       };
       /** Paint one person: a body darker than the room, rim light by distance from the edge that faces the screen. */
       const person = (ctx, dpr, o, lit, fromLeft, topK) => {
