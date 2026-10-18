@@ -343,13 +343,18 @@
     const B = beatOnsets(), downs = new Set(((T && T.downbeatsOn) || []).map((t) => Math.round(t * 1000)));
     const cuts = wins.map((w) => w.start).filter((t) => t > 0.5);
     // Builds: the measured drum fills that run into a downbeat, snapping off on it
-    // (the rest, and the hat patterns, are grooves inside the bar), and one bar into
-    // each chorus's first beat. Each snap is a drop: that beat hits hardest.
+    // (the rest, and the hat patterns, are grooves inside the bar; a hat roll counts
+    // only into a section's opening downbeat), and one bar into each chorus's first
+    // beat. Each snap is a drop: that beat hits hardest.
     const DB = (T && T.downbeatsOn) || [];
     const builds = [];
-    for (const [t0, t1, , drum] of (T && T.fills) || []) {
+    const entries = wins.filter((w) => /-01$/.test(w.id) || /^x-/.test(w.id)).map((w) => w.start);
+    for (const [t0, t1, kind, drum] of (T && T.fills) || []) {
       const db = DB.find((d) => t1 - d > -0.25 && t1 - d < 0.12);
       if (db && db - t0 > 0.3 && drum !== 'hihat') builds.push({ t0, t1: db, k: 1 });
+      // A hat roll counts only when it runs into the downbeat that opens a section.
+      const de = drum === 'hihat' && kind === 'accel-roll' && DB.find((d) => d - t1 > -0.12 && d - t1 < 0.35 && entries.some((c) => Math.abs(c - d) < 0.15));
+      if (de && de - t0 > 0.8) builds.push({ t0, t1: de, k: 0.7 });
     }
     for (const w of wins) {
       if (!/^c\d-01$/.test(w.id)) continue;
@@ -358,8 +363,11 @@
     }
     const drops = builds.map((f) => f.t1);
     const ev = [];
-    let pos = -1, n = 0;
+    // A jolt's side and angle belong to its beat (index k in the song), so a skip
+    // anywhere never changes another beat's throw; backbeats alternate sides.
+    let pos = -1, k = -1;
     for (const t of B) {
+      k++;
       if (downs.has(Math.round(t * 1000))) pos = 0;
       else if (pos >= 0) pos++;
       if (pos < 0 || !playing(t)) continue;
@@ -367,7 +375,7 @@
       if (!p || p.skip.some((h) => Math.abs(h - t) < 0.1)) continue;
       const s = weight(Math.max(at('kick', t), at('snare', t), 0.2));
       const boost = (cuts.some((c) => Math.abs(c - t) < 0.1) ? p.cut : 1) * (drops.some((d) => Math.abs(d - t) < 0.03) ? p.drop : 1);
-      const th = OM.hash(n, 7, 53) * 0.9 - 0.45, side = n++ % 2 ? 1 : -1;
+      const th = OM.hash(k, 7, 53) * 0.9 - 0.45, side = (k >> 1) % 2 ? 1 : -1;
       if (pos % 2 === 0) ev.push({ t, punch: p.punch * (pos % 4 === 0 ? p.down : 1) * s * boost, max: p.max });
       else {
         ev.push({ t, jolt: s * boost, dx: p.back * side * Math.cos(th), dy: p.back * 0.6 * Math.sin(th), r: p.roll * side });
@@ -380,9 +388,10 @@
       if (p && !p.skip.some((h) => Math.abs(h - t) < 0.1)) ev.push({ t, punch: p.punch * p.offbeat * weight(e), max: p.max });
     }
     ev.sort((a, b) => a.t - b.t);
+    // A build whose snap a scene skips (its own designed hit lands there) is dropped whole.
     const fills = builds.map(({ t0, t1, k }) => {
       const p = planAt(t1 - 0.08);
-      return p && { t0, t1, zoom: p.fill * k, shake: p.shake * k, max: p.max };
+      return p && !p.skip.some((h) => Math.abs(h - t1) < 0.1) && { t0, t1, zoom: p.fill * k, shake: p.shake * k, max: p.max };
     }).filter(Boolean);
     return { wins, ev, fills };
   };

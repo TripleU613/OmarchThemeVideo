@@ -2,19 +2,20 @@
 // draws only in a 40px band along the frame's edges, all the way round, in every
 // sentence that leaves a margin empty (assets/lib/frame-need.js, measured by
 // scripts/edge-need.mjs), and subtler where only some margins are empty. One
-// idea per section, synced to the kicks, snares and the corrected beat grid,
+// idea per section, synced to the kicks, snares and beats measured on the song,
 // each with its own way in and out. Every pixel is a pure function of song time
 // T: the on/off schedule is fixed at load, and the envelope is 0 at every edge
 // of an on stretch, so nothing steps at a cut.
 (() => {
   const N = window.OM_FRAME_NEED;
   if (!N || !OM.T) return;
-  /** The beat grid runs 46 ms late against the drums. Set to 0 once the grid is fixed upstream. */
+  /** The beat grid runs 46 ms late against the drums: used only if the measured beats are missing. */
   const BEAT_FIX = 0.046;
   const W = 1920, H = 1080, C = 10, DEPTH = 4, B = C * DEPTH, P = 2 * (W + H);
   const SPB = OM.SPB;
   const clamp = OM.clamp, E = OM.ease;
-  const beats = OM.T.beats.map((b) => b - BEAT_FIX), downs = OM.T.downbeats.map((b) => b - BEAT_FIX);
+  // Beats and downbeats on the drum, as measured on the song (OM.T.beatsOn, analysis/refine_events.py).
+  const beats = OM.T.beatsOn || OM.T.beats.map((b) => b - BEAT_FIX), downs = OM.T.downbeatsOn || OM.T.downbeats.map((b) => b - BEAT_FIX);
   const KICK = N.kick.map((e) => e[0]), KICK_E = N.kick.map((e) => e[1]);
   const SNARE = N.snare.map((e) => e[0]), HAT = N.hihat.map((e) => e[0]);
 
