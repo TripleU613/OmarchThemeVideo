@@ -35,7 +35,7 @@ OM.scene({
     const H0 = OM.cellAt(OM.HOME, 960, 540);
     const TOP = OM.HOME.y0 + H0.row * OM.HOME.ch; // the line's top edge: the ground
     const STOP = on[0];
-    const SURGE = V.hitsIn(OM.T && OM.T.downbeats, on[Math.min(3, N - 1)], END, [142.083])[0];
+    const SURGE = OM.beatOnset(V.hitsIn(OM.T && OM.T.downbeats, on[Math.min(3, N - 1)], END, [142.083])[0]);
     const FOLD0 = END - 0.42, FOLD1 = END - 0.12;
     const RX0 = 330; // where the runner plants
 
@@ -192,10 +192,10 @@ OM.scene({
             V.pool(ctx, a.x + a.w / 2, a.top, a.w * 0.7, 50, ink.lit, 0.6 * g);
           }
         });
-        // The surge: a bar of light running the length of the path on the downbeat.
+        // The surge: a bar of light running the length of the path on the downbeat, as far as the last word landed.
         if (surge > 0.02) {
           const p = OM.ease.outCubic(OM.prog(T, SURGE, SURGE + 0.5));
-          const f = p * (N - 1), i0 = Math.floor(f), i1 = Math.min(N - 1, i0 + 1), m = f - i0;
+          const last = Math.max(0, OM.hitCount(on, SURGE) - 1), f = p * last, i0 = Math.floor(f), i1 = Math.min(last, i0 + 1), m = f - i0;
           const A0 = F.at[i0], A1 = F.at[i1];
           V.pool(ctx, OM.lerp(A0.x + A0.w / 2, A1.x + A1.w / 2, m), OM.lerp(A0.top, A1.top, m) + F.capPx / 2, 320, 120, ink.crest, 0.55 * surge);
         }

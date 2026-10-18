@@ -28,9 +28,7 @@ OM.scene({
   below /= 6.0; near /= 9.0;
   float wall = step(0.12, l) * (1.0 - smoothstep(0.62, 0.75, l));
   float ao = wall * below * 0.45 + (1.0 - wall) * clamp(near * 1.4, 0.0, 1.0) * 0.6;
-  vec2 v = uv - 0.5;
-  float vig = smoothstep(0.35, 0.95, length(v * vec2(1.4, 1.8))) * 0.35;
-  return vec4(c * (1.0 - uAmount * uP0.x * ao) * (1.0 - uAmount * vig), 1.0);
+  return vec4(c * (1.0 - uAmount * uP0.x * ao), 1.0);
 }`,
     });
     const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
