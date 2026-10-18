@@ -7,6 +7,12 @@
 // the music ends, only as a soft, heavily blurred, low-contrast drift in each
 // speck's brightness: up close just specks, at a glance the man. It holds through
 // the silence, then dissolves back into the even field, which stays to the end.
+//
+// Edit camera: x-end carries o-01's core across the cut and charges on a quiet hi-hat roll, so it takes
+// the outro's strengths (section o: punch 2.24%, jolt 8.4 px, roll 0.0056 rad) rather than the louder
+// bridge's, keeping the pulse even through the cut. The snare at 295.102 is the scene's own crack and
+// camera punch, its biggest moment, so the camera's backbeat jolt there is skipped.
+OM.edit.plan('x-end', { punch: 0.0224, back: 8.4, roll: 0.0056, skip: [295.102] });
 (() => {
   // The owner's portrait: 220 x 346 dots, nibble-packed 4-bit shades (0 = no dot), used as given.
   const COLS = 220, ROWS = 346;
@@ -58,7 +64,13 @@
   };
   const CX = 960, CY = 540;
   const FACE = { x: OX + 112 * PIX_X, y: OY + 95 * PIX_Y }; // where the face sits: its tiles land first
-  const SNARE = 295.079, KICK = 295.381, FORMED = 299.5; // the field has settled by FORMED
+  // The crack and the blow-out on the snare and the kick as measured on the song (295.102, 295.386).
+  const onDrum = (t, kind) => {
+    let best = t, d = 0.05;
+    for (const [x] of OM.edit.hits(kind, t - 0.05, t + 0.05)) if (Math.abs(x - t) < d) (d = Math.abs(x - t)), (best = x);
+    return best;
+  };
+  const SNARE = onDrum(295.079, 'snare'), KICK = onDrum(295.381, 'kick'), FORMED = 299.5; // the field has settled by FORMED
 
   // Phosphor: lit specks bloom green while they fly (uP0.y bloom), and once the field rests a
   // barely visible flicker runs through it (uP0.x shimmer). Off, it is the raw frame.

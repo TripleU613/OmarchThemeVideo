@@ -5,6 +5,15 @@
 // the hi-hat roll shimmers the rings. On the last downbeat everything goes
 // crest, and on the snare roll the whole tunnel, words and all, is squeezed
 // step by step into one point: the spark the final chorus drops from.
+//
+// Edit camera: the scene's own camera lunges on every downbeat (3.5%, 6% on the last) and its lens
+// punches on every strong kick (focal), so the camera's downbeat punches (235.876, 238.008, 240.142,
+// 242.274) and its off-beat kick punches (the rest of the list) would stack on those and are skipped.
+// Its beat-3 punches and backbeat jolts stay, and the 233.748 punch lands the cut on the drum ahead
+// of the scene's cut-locked lunge. The build into chorus 3 (241.207 -> 243.344, c3-01's) runs over the
+// squeeze. The lines keep their own layout (a function of T alone): under both cameras every line that
+// reads stays at least 58 px inside the frame, clear of the border band, so the plan needs no cap.
+OM.edit.plan('x-b2', { skip: [235.876, 238.008, 240.142, 242.274, 235.614, 239.34, 240.014, 240.416, 241.086, 242.67] });
 (() => {
   const FONT = "700 100px 'JetBrains Mono'";
   window.__hf = window.__hf || {};
@@ -56,17 +65,18 @@
       };
       const L = OM.HOME;
       const ink = OM.fieldInks('tokyo-night');
-      const { C, MW, MH, motifs, Zc, focal, rings, frame, DOWN, camAt } = OM.xb;
+      const { C, MW, MH, motifs, Zc, focal, rings, frame, DOWN, camAt, onDrum } = OM.xb;
       const END = start + duration;
-      const SNARES = [233.895, 235.357, 236.402, 237.610, 238.097, 239.746, 240.094, 240.234, 240.628, 240.768, 242.091];
+      const SNARES = [233.895, 235.357, 236.402, 237.610, 238.097, 239.746, 240.094, 240.234, 240.628, 240.768, 242.091].map((t) => onDrum(t, 'snare'));
       // The squeeze: nothing until the last downbeat, then a step on each snare of the roll.
       // Tunnel collapse: steps in on the 242.486 snare, then from the 242.881 snare
       // the whole tunnel implodes, accelerating, onto the point by the 243.020
       // snare (the strongest hit before the drop), where it bursts out once.
-      const HIT = 243.020;
-      const SQ = [[DOWN[4], 0], [242.486, 0.3], [242.881, 0.55]];
+      // Each on the snare as measured on the song (the first is struck at 242.524).
+      const [S1, S2, HIT] = [242.486, 242.881, 243.020].map((t) => onDrum(t, 'snare'));
+      const SQ = [[DOWN[4], 0], [S1, 0.3], [S2, 0.55]];
       const squeeze = (T) => {
-        if (T >= 242.881) return OM.lerp(0.55, 1, OM.ease.inCubic(OM.prog(T, 242.881, HIT)));
+        if (T >= S2) return OM.lerp(0.55, 1, OM.ease.inCubic(OM.prog(T, S2, HIT)));
         for (let i = SQ.length - 1; i >= 0; i--) if (T >= SQ[i][0]) {
           const n = SQ[i + 1];
           return n ? OM.lerp(SQ[i][1], n[1], OM.ease.outExpo(OM.prog(T, SQ[i][0], SQ[i][0] + Math.min(0.12, n[0] - SQ[i][0])))) : 1;

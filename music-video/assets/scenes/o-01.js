@@ -7,6 +7,10 @@
 // three snares kicking the spin, until all of it is a dense glowing core still
 // turning, specks falling into it: the shared state x-end carries on from.
 OM.ownWords.add('o-01');
+// Edit camera: the key word's own camera kick (on its onset) is the scene's biggest move; the drumless
+// 291.344 downbeat 155 ms before it would punch first and blunt it, so that beat is skipped. The rest
+// fit as they are (the 290.812 jolt lands with the third word on its snare).
+OM.edit.plan('o-01', { skip: [291.344] });
 (() => {
   const TYPE = "800 100px 'JetBrains Mono'";
   window.__hf = window.__hf || {};
@@ -117,8 +121,18 @@ vec4 effect(vec2 uv) {
       const last = on.length - 1;
       const STOP = 292.107; // the hard stop: the line has read, the vortex grabs
       const COLL = 293.5; // the last snare snaps the vortex into the core: from here to the cut, the core alone
-      const SNARES = [293.2, 293.38, 293.5];
-      const DUR = (w) => (w === last ? 0.16 : 0.1);
+      // The three snares, on the drum as measured on the song.
+      const SNARES = [293.2, 293.38, 293.5].map((t) => {
+        let best = t, d = 0.05;
+        for (const [x] of OM.edit.hits('snare', t - 0.05, t + 0.05)) if (Math.abs(x - t) < d) (d = Math.abs(x - t)), (best = x);
+        return best;
+      });
+      // Each word's flight: fired out of the wordmark DUR before its onset, its cells accelerate and slam
+      // into the line ON the onset (the first frame with the word whole is the onset's); the key word
+      // storms in from the edges over a longer flight and lands on its onset the same way.
+      const DUR = (w) => (w === last ? 0.1 : 0.05);
+      const FIRE = (w) => on[w] - DUR(w);
+      const LAND = (w) => on[w];
       const P = 9; // lattice type pitch
 
       // ---- the line in lattice type, laid out once the face is in ----
@@ -260,7 +274,7 @@ vec4 effect(vec2 uv) {
         const glows = [];
         on.forEach((t0, i) => {
           const big = i === last;
-          const a = T - (t0 + DUR(i)), f = T - t0;
+          const a = T - LAND(i), f = T - t0;
           if (f >= 0 && f < 0.4 && !big) glows.push({ x: CX, y: CY, strength: 0.55 * Math.exp(-f / 0.07) * fade, reach: 420 });
           if (a < 0 || a > 1.6) return;
           glows.push({ x: lay.centre[i].x, y: lay.centre[i].y, strength: (big ? 1.35 : 0.95) * Math.exp(-a / (big ? 0.26 : 0.16)) * fade, reach: big ? 820 : 320 });
@@ -270,13 +284,13 @@ vec4 effect(vec2 uv) {
         OM.hero(ctx, T, dpr, { inks: ink, L, word: false, gain: 0.8, bg: false, glows });
         OM.paintWord(ctx, L, dpr, ink, { glows });
         // The line: each word's cells fired out of the wordmark (the key word storms in from every edge).
-        const flash = T - (on[last] + DUR(last));
+        const flash = T - LAND(last);
         const vis = [];
         for (const k of lay.cells) {
-          const t0 = on[k.w];
+          const t0 = FIRE(k.w);
           if (T < t0) continue;
           const a = T - t0, dur = DUR(k.w), big = k.w === last;
-          const e = OM.ease.outExpo(OM.clamp(a / dur));
+          const e = OM.clamp(a / dur) ** 2;
           const h1 = OM.hash(k.k, 1, 211), h2 = OM.hash(k.k, 2, 211);
           let fx0, fy0;
           if (big) {

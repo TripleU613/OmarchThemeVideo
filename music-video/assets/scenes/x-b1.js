@@ -7,6 +7,12 @@
 //
 // Shared section code lives on OM.xb (file scope, so x-b2 can use it): the
 // vanishing point, the motif bitmaps, the tunnel's camera and its rings.
+//
+// Edit camera: x-b1's own camera only builds smoothly (tilt and rush), so the camera's beats fit as
+// they are and land with the in-picture hits (the crest rings on the two downbeats, the motifs on
+// the kicks). The one exception is the drumless 233.216 beat right before the closing snare: the
+// scene's own punch on that snare (POP) is its biggest moment, so that beat is skipped.
+OM.edit.plan('x-b1', { skip: [233.216] });
 (() => {
   const L = OM.HOME;
   const ink = OM.fieldInks('tokyo-night');
@@ -77,8 +83,16 @@
   // ---------- the tunnel: camera depth Z(T), closed form ----------
   const T0 = 233.802; // x-b2's first downbeat: the tunnel starts moving here
   const V0 = 1.2, K = Math.log(2) / 2.136; // speed doubles every bar
-  const DOWN = [233.802, 235.915, 238.051, OM.beatOnset(240.187), OM.beatOnset(242.323)]; // the last two on their drum onsets
-  const KICKS = [234.289, 235.636, 236.124, 236.286, 237.354, 237.703, 239.351, 239.862, 240.025, 240.419, 240.930, 241.093, 241.464, 241.604, 241.998, 242.416, 242.695, 242.811];
+  // x-b2's downbeats on their drum onsets, except the first: the lunge that lands the 233.80 cut
+  // stays on the cut itself (the seam frames are drawn from it).
+  const DOWN = [233.802, ...[235.915, 238.051, 240.187, 242.323].map(OM.beatOnset)];
+  // Hits on the drum as measured on the song (OM.T.drums): the nearest of `kind` within 50 ms of t, else t.
+  const onDrum = (t, kind) => {
+    let best = t, d = 0.05;
+    for (const [x] of OM.edit.hits(kind, t - 0.05, t + 0.05)) if (Math.abs(x - t) < d) (d = Math.abs(x - t)), (best = x);
+    return best;
+  };
+  const KICKS = [234.289, 235.636, 236.124, 236.286, 237.354, 237.703, 239.351, 239.862, 240.025, 240.419, 240.930, 241.093, 241.464, 241.604, 241.998, 242.416, 242.695, 242.811].map((t) => onDrum(t, 'kick'));
   const Zc = (T) => {
     const tau = Math.max(0, T - T0);
     let z = (V0 / K) * (Math.exp(K * tau) - 1);
@@ -142,7 +156,7 @@
     for (const d of DOWN) rush += (d === DOWN[4] ? 0.06 : 0.035) * punch(T - d);
     return { zoom: 1 + 1.9 * Math.abs(rot) + rush * out, rot, x: 0, y: 0 }; // 1.9|rot| covers the corners
   };
-  OM.xb = { C, MW, MH, motifs, Zc, focal, rings, frame, KICKS, DOWN, camAt };
+  OM.xb = { C, MW, MH, motifs, Zc, focal, rings, frame, KICKS, DOWN, camAt, onDrum };
 
   // ---------- x-b1 ----------
   OM.scene({
@@ -166,11 +180,21 @@
         }`,
       });
       const END = start + duration;
-      const BARS = [229.529, 231.665]; // downbeats: the vortex doubles its speed
-      const SNARES = [227.904, 229.227, 231.224, 231.712, 233.361];
-      const FORM = [228.252, 228.438, 228.786, 229.320, 229.901]; // the five strong kicks: a motif forms on each
-      const EAT = NAMES.map((_, i) => 231.665 + SPB * (1 + 0.5 * i)); // swallowed on the half-beats of the last bar
-      const POP = 233.361, OPEN = 233.7;
+      // Every hit on the drum as measured: the downbeats at their onsets, the kicks and snares as hit.
+      const BARS = [229.529, 231.665].map(OM.beatOnset); // downbeats: the vortex doubles its speed
+      const SNARES = [227.904, 229.227, 231.224, 231.712, 233.361].map((t) => onDrum(t, 'snare'));
+      const FORM = [228.252, 228.438, 228.786, 229.320, 229.901].map((t) => onDrum(t, 'kick')); // the five strong kicks: a motif forms on each
+      // Swallowed on the beats and half-beats of the last bar (beats 2, 2.5, 3, 3.5 and 4, at their drum onsets).
+      const B2 = OM.beatOnset(232.2), B3 = OM.beatOnset(232.734), B4 = OM.beatOnset(233.268);
+      const EAT = [B2, (B2 + B3) / 2, B3, (B3 + B4) / 2, B4];
+      const POP = SNARES[4], OPEN = 233.7;
+      // The closing snare's camera punch: a quick push in on POP, exactly 0 again 0.25 s later (well before the cut).
+      const popPunch = (T) => {
+        const d = T - POP;
+        if (d < -0.016 || d >= 0.25) return 0;
+        if (d < 0) return 0.5 - 0.5 * Math.cos((Math.PI * (d + 0.016)) / 0.016);
+        return (1 - d / 0.25) ** 3 * (1 + (3 * d) / 0.25);
+      };
       // The field's swirl angle: speed doubling on each downbeat, integrated exactly.
       const swirl = (T) => {
         let a = 0, v = 0.5, t0 = start;
@@ -361,7 +385,8 @@
           const hit = OM.pulse(lensHits.filter((x) => x <= T), T, 0.12);
           const grow = OM.prog(T, start, POP);
           const amount = OM.post.envelope(T, start, END, { ramp: 0.4, hold: 0.07 }) * (0.45 + 0.55 * grow);
-          fx.apply(T, { amount, cam: camAt(T), p0: [C.x, 1080 - C.y, 55 + 150 * grow * grow + 70 * hit, 0.5 + 1.2 * hit] });
+          const cam = OM.edit.apply(camAt(T), { zoom: 0.04 * popPunch(T), x: 0, y: 0, rot: 0 });
+          fx.apply(T, { amount, cam, p0: [C.x, 1080 - C.y, 55 + 150 * grow * grow + 70 * hit, 0.5 + 1.2 * hit] });
         },
         release: () => { fx.release(); c.release(); },
       };

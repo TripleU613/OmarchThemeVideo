@@ -12,6 +12,14 @@
 // lattice (field, wordmark, the sung line as hero text in half cells, the two
 // buttons) and its drain order, so the cuts between those scenes match by
 // construction.
+//
+// Edit camera: x-o1's own camera is a slow dolly, so the camera's beats fit and land with the
+// scene's hits (the cells' flight on 281.738, the OS line on the 282.810 downbeat, the maker line on
+// 284.936). The desktop fills the frame and the packed mark sits 58 px from the left edge, so the zoom
+// is capped at 3% (on top of the dolly's 2%) to keep the mark whole on the 282.810 punch. Inside the
+// hard stops the scene's own camera stutters on every stop, so the camera's two beats there (287.606,
+// on a stop, and 288.140) are skipped.
+OM.edit.plan('x-o1', { max: 0.03, skip: [287.606, 288.14] });
 (() => {
   const HEAD = "800 100px 'JetBrains Mono'", LABEL = "600 100px 'JetBrains Mono'";
   window.__hf = window.__hf || {};
@@ -247,19 +255,25 @@ vec4 effect(vec2 uv) {
   const F_TERM = "500 32px 'JetBrains Mono'", F_BOLD = "800 32px 'JetBrains Mono'", F_MADE = "800 34px 'JetBrains Mono'";
   const F_BAR = "600 22px 'JetBrains Mono'", F_CODE = "400 21px 'JetBrains Mono'";
   window.__hf.buildReady['x-o1-type'] = Promise.all([F_TERM, F_BOLD, F_MADE, F_BAR, F_CODE].map((f) => document.fonts.load(f)));
-  /** fastfetch's output: the credits as system info, a line per hit. */
+  /** The drum hit (kick or snare, as measured on the song) nearest t within 50 ms, else t. */
+  const hit = (t) => {
+    let best = t, d = 0.05;
+    for (const kind of ['kick', 'snare']) for (const [x] of OM.edit.hits(kind, t - 0.05, t + 0.05)) if (Math.abs(x - t) < d) (d = Math.abs(x - t)), (best = x);
+    return best;
+  };
+  /** fastfetch's output: the credits as system info, a line per hit (each on its drum as measured). */
   const INFO = [
-    { t: 282.006, kind: 'head', row: 0 },
-    { t: 282.285, kind: 'sep', row: 1 },
-    { t: 282.819, k: 'OS', v: 'Omarchy', row: 3 },
+    { t: hit(282.006), kind: 'head', row: 0 },
+    { t: hit(282.285), kind: 'sep', row: 1 },
+    { t: hit(282.819), k: 'OS', v: 'Omarchy', row: 3 },
     { t: OM.beatOnset(283.376), k: 'WM', v: 'Hyprland', row: 4 },
     { t: OM.beatOnset(283.91), k: 'Song', v: 'We Can Fix Everything (The Ultimate Machine)', row: 6 },
-    { t: 284.537, k: 'Music', v: 'Kevin Koontz / REARRANGED', row: 7 },
+    { t: hit(284.537), k: 'Music', v: 'Kevin Koontz / REARRANGED', row: 7 },
     { t: OM.beatOnset(284.979), k: 'Made by', v: 'TripleU613', made: true, row: 8 },
-    { t: 285.698, k: 'Built with', v: 'HyperFrames, Three.js, GSAP', row: 10 },
-    { t: 285.954, k: 'Theme', v: 'Tokyo Night', row: 11 },
-    { t: 286.418, k: 'Font', v: 'JetBrains Mono', row: 12 },
-    { t: 286.952, k: 'Inspired by', v: 'omarchy.org, by DHH', row: 13 },
+    { t: hit(285.698), k: 'Built with', v: 'HyperFrames, Three.js, GSAP', row: 10 },
+    { t: hit(285.954), k: 'Theme', v: 'Tokyo Night', row: 11 },
+    { t: hit(286.418), k: 'Font', v: 'JetBrains Mono', row: 12 },
+    { t: hit(286.952), k: 'Inspired by', v: 'omarchy.org, by DHH', row: 13 },
     { t: OM.beatOnset(287.115), kind: 'swatch', row: 15 },
   ];
   const KEYINK = [TN.blue, TN.magenta, TN.cyan, TN.green, TN.yellow, TN.red];
@@ -303,11 +317,11 @@ vec4 effect(vec2 uv) {
       const th = OM.theme('tokyo-night');
       const end = start + duration;
       const IN0 = start + 0.07, IN1 = 281.55; // the field dissolves into the desktop
-      const TYPE0 = 281.031, ENTER = 281.751, FLY0 = 281.751; // fastfetch typed on the hats, entered on the kick
+      const TYPE0 = hit(281.031), ENTER = 281.751, FLY0 = 281.751; // fastfetch typed on the hats from the kick, entered on the kick
       const STOPS = [287.486, 287.602, 287.742, 287.858, 287.974, 288.113, 288.253, 288.369, 288.554];
       const PROMPT2 = 287.3, DIM0 = 288.3, DIM1 = 288.6; // the output dims before the wordmark re-forms over it
       const BACK0 = 288.554, OUT0 = 288.62, OUT1 = 289.26, DONE = 289.3;
-      const KICKS = [281.031, 281.751, 282.006, 282.285, 282.819, 285.698, 285.954, 286.418, 286.952, 287.022, 288.369, 289.483];
+      const KICKS = [281.031, 281.751, 282.006, 282.285, 282.819, 285.698, 285.954, 286.418, 286.952, 287.022, 288.369, 289.483].map(hit);
       const CMD = 'fastfetch';
 
       // The wordmark's cells, paired with the mark's sub-cells left to right, so the name packs into the logo.
@@ -574,9 +588,14 @@ vec4 effect(vec2 uv) {
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
           // The whole-frame dolly: out to 1.02 as the desktop arrives, settling back to rest before the exit.
           const dolly = OM.smooth(OM.prog(T, 281.6, 282.9)) * (1 - OM.ease.inOutSine(OM.prog(T, 282.9, 287.6)));
+          // The hard stops stutter the whole frame with the cursor: on each stop the camera jumps a few px
+          // (alternating sides) and a hair in, settling within the cursor's own 70 ms jolt; 0 elsewhere.
+          const stop = OM.lastHit(STOPS, T), sk = OM.hitCount(STOPS, T);
+          const sj = stop !== null && T - stop < 0.07 ? (1 - (T - stop) / 0.07) ** 2 : 0;
+          const stutter = { zoom: 0.006 * sj, x: (sk % 2 ? 7 : -7) * sj, y: (OM.hash(sk, 6, 4) - 0.5) * 8 * sj, rot: 0 };
           const post = () => fx.apply(T, {
             amount: OM.post.envelope(T, start, end, { ramp: 0.6 }) * (0.35 + 0.65 * OM.smooth(OM.prog(T, 280.9, 289.3))) * (1 - OM.smooth(OM.prog(T, 288.6, 289.3))),
-            cam: { zoom: 1 + 0.02 * dolly, x: -4 * dolly, y: 2 * dolly },
+            cam: OM.edit.apply({ zoom: 1 + 0.02 * dolly, x: -4 * dolly, y: 2 * dolly }, stutter),
             p0: [OM.prog(T, 281.4, 289.2), 0, 0, 0],
           });
           if (T < IN0 || T >= DONE || T >= end - 0.07) {
