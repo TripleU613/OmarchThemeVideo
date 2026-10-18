@@ -116,7 +116,7 @@ vec4 effect(vec2 uv) {
       const OPEN = 28.65;
       const KICK = 30.79;
       const HUNT = [31.3, 31.556, 31.811, 32.09, 32.345, 32.647, 32.879];
-      const LOCK = OM.downbeatsIn(32.5, 33.5)[0]; // 32.949
+      const LOCK = OM.beatOnset(OM.downbeatsIn(32.5, 33.5)[0]); // 32.913, the drum hit on the 32.949 downbeat
       const CREDIT = OM.beatsIn(34.4, 34.8)[0]; // 34.575
       const END = 36.711;
       const BLOOM = OM.downbeatsIn(35, 35.2)[0]; // 35.109

@@ -32,7 +32,7 @@ vec4 effect(vec2 uv) {
       const on = OM.sung('v1-06').map((w) => w.t0);
       const N = on.length;
       const HM = OM.HOME, G = { x0: HM.x0, y0: HM.y0, cw: HM.cw / 2, ch: HM.ch / 2 };
-      const KICKS = [59.791, 60.325, 60.86, 61.928], FLARE = 63.042;
+      const KICKS = [59.791, 60.325, 60.86, 61.928], FLARE = OM.beatOnset(63.042);
       const DRAW0 = 63.12, DRAW1 = 63.3, FILL1 = END - H - 0.01;
       const FACE = 770; // the anvil's top face
       const hrow = OM.cellAt(HM, 960, 540).row;

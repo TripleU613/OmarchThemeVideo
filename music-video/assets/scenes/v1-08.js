@@ -44,7 +44,7 @@ vec4 effect(vec2 uv) {
       const HM = OM.HOME, hc = OM.cellAt(HM, 960, 540);
       const PX = HM.x0 + (hc.col + 0.5) * HM.cw, PY = HM.y0 + (hc.row + 0.5) * HM.ch; // the spark's centre
       const S = 8, Gp = { x0: PX - S / 2, y0: PY - S / 2, cw: S, ch: S }; // print cell (0,0) sits on the spark
-      const DONE = 71.634, SNARES = [68.104, 68.778, 69.404, 70.24, 71.053, 71.471, 71.94]; // pad blink, through the gap and the pause too
+      const DONE = OM.beatOnset(71.634), SNARES = [68.104, 68.778, 69.404, 70.24, 71.053, 71.471, 71.94]; // pad blink, through the gap and the pause too
       const LIE0 = 72.2, LIE1 = END - H - 0.01, PRESS = 0.22, CAPMAX = 62;
       const TOPS = Math.ceil(N / 2), RINGS = Math.max(TOPS, N - TOPS);
       // Top words run outer to inner, bottom words inner to outer, so the stack reads in order.
