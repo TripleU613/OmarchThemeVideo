@@ -6,6 +6,11 @@
 // windows. After the line has read together the city goes dark window by
 // window, the facades dissolve, and only the lattice it was built on is left:
 // the grid of the next cut.
+
+// Edit camera: the key word's downbeat (171.82) is the scene's big moment, the
+// power surge through the whole city, so the camera's beat there is skipped and
+// the scene lands its own bigger punch on that drum onset instead.
+OM.edit.plan('c2-04', { skip: [171.816] });
 OM.ownWords.add('c2-04');
 (() => {
   const W = 800;
@@ -80,10 +85,10 @@ OM.ownWords.add('c2-04');
       // The key word: the longest held one (the city-wide wave lands with it).
       let K = 0;
       words.forEach((w, k) => { if (w.t1 - w.t0 > words[K].t1 - words[K].t0) K = k; });
-      const DB1 = OM.beatOnset(OM.downbeatsIn(171.6, 172)[0] || 171.851), DB2 = OM.downbeatsIn(173.8, 174.2)[0] || 173.987;
-      const SNARES = [170.365, 170.852, 171.433, 171.897, 172.176, 172.71, 172.965, 173.383];
-      const OUT = DB2, GONE = 174.42;
-      const HM = OM.HOME, V = 5200;
+      const DB1 = OM.beatOnset(OM.downbeatsIn(171.6, 172)[0] || 171.851), DB2 = OM.beatOnset(OM.downbeatsIn(173.8, 174.2)[0] || 173.987);
+      const SNARES = [170.360, 170.822, 171.408, 171.860, 172.184, 172.746, 172.934, 173.412]; // measured snare onsets
+      const OUT = DB2, GONE = 174.42, WALL = 174.380; // WALL: the measured kick the wall lands on
+      const HM = OM.HOME, V = 12000; // the switch-on wave, fast enough that a word reads within a frame or two
 
       const get = OM.c2.lazy(W, () => {
         const L = OM.c2.layout(words, { weight: W, cap: 150, maxW: 1560, cy: 580, rows: 3, lead: 1.32, minCap: 100 });
@@ -148,8 +153,8 @@ OM.ownWords.add('c2-04');
           pool(ctx, 960, OM.lerp(540, 980, sink), 620 + 500 * sink, OM.lerp(620, 300, sink), ink.lit, OM.lerp(0.5, 0.2, sink) * (1 - out));
 
           const facade = sm(T, start, start + 0.35);
-          // Wall rise: after the line, every tower climbs to the top of the frame and the alleys fill, landing on k174.36: the city becomes one wall of windows.
-          const rise = OM.ease.inOutCubic(OM.prog(T, OUT, 174.359));
+          // Wall rise: after the line, every tower climbs to the top of the frame and the alleys fill, landing on k174.38: the city becomes one wall of windows.
+          const rise = OM.ease.inOutCubic(OM.prog(T, OUT, WALL));
           const nSn = OM.hitCount(SNARES, T);
           const sn = SNARES.reduce((a, s) => Math.max(a, decay(T, s, 0.1)), 0);
           const dbA = T - DB1;
@@ -254,11 +259,12 @@ OM.ownWords.add('c2-04');
             ctx.fill();
             ctx.restore();
           }
-          // Warning lights blinking on the tower tops.
+          // Warning lights blinking on the tower tops, on the beat: half of them on each alternate drum onset.
+          const bt = OM.c2.beat(T);
           let prev = null;
           for (const [col, r] of top) {
             if (r !== prev && OM.hash(col, 0, 41) < 0.5) {
-              const on2 = (T * 1.2 + OM.hash(col, 1, 41)) % 1 < 0.35;
+              const on2 = (bt.i + (OM.hash(col, 1, 41) < 0.5 ? 0 : 1)) % 2 === 0 && T - bt.t < 0.2;
               if (on2 && !out && T > start + 0.5) {
                 ctx.fillStyle = ink.crest;
                 ctx.fillRect(HM.x0 + col * HM.cw + 3, HM.y0 + (r - 1) * HM.ch + 4, 7, 7);
@@ -267,8 +273,8 @@ OM.ownWords.add('c2-04');
             prev = r;
           }
           }
-          // Helicopter pass: a slow track across the city with an altitude bob.
-          OM.c2.apply(fx, T, start, END, { amount: 1, x: 40 - 80 * OM.prog(T, start, END), y: 10 * Math.sin(T * 1.6), rot: 0.008 * Math.sin(T * 0.5) });
+          // Helicopter pass: a slow track across the city with an altitude bob, punching in on the key word's downbeat surge.
+          OM.c2.apply(fx, T, start, END, { amount: 1, x: 40 - 80 * OM.prog(T, start, END), y: 10 * Math.sin(T * 1.6), rot: 0.008 * Math.sin(T * 0.5), punch: 0.045 * OM.c2.punch(T, DB1) });
         },
         release: () => {
           wins = null;

@@ -6,6 +6,12 @@
 // downbeat pulses the entire board. Then the dive resumes on the roll: the
 // words stream past and go dark, the core rushes up to fill the frame, and on
 // the last hit its lights go out into the night the bridge opens on.
+
+// Edit camera: the key word's downbeat (188.81), where its charge pulses the
+// whole board, is the scene's big moment: the camera's beat there is skipped and
+// the scene lands its own bigger punch on that drum onset. At the dive's downbeat
+// (191.11) the camera's punch leaves the words about 20 px clear of the band.
+OM.edit.plan('c2-08', { skip: [188.812] });
 OM.ownWords.add('c2-08');
 (() => {
   const W = 800;
@@ -116,8 +122,8 @@ OM.ownWords.add('c2-08');
       const on = words.map((w) => w.t0);
       let K = 0;
       words.forEach((w, k) => { if (w.t1 - w.t0 > words[K].t1 - words[K].t0) K = k; });
-      const KICKS = [187.757, 188.012, 188.43, 188.546];
-      const DB1 = OM.downbeatsIn(188.7, 189)[0] || 188.848, DB2 = OM.downbeatsIn(191, 191.3)[0] || 191.147;
+      const KICKS = [187.748, 188.026, 188.428, 188.552]; // measured kick onsets
+      const DB1 = OM.beatOnset(OM.downbeatsIn(188.7, 189)[0] || 188.848), DB2 = OM.beatOnset(OM.downbeatsIn(191, 191.3)[0] || 191.147); // the downbeats' drum onsets
       const OFF = 192.95; // the core goes dark at the top of the roll
       const { HM, ZX, ZY, CORE, S0, traces } = OM.c2.board;
       const CS = 8;
@@ -200,7 +206,7 @@ OM.ownWords.add('c2-08');
             }
           }
           ctx.stroke();
-          const hits = [...on, ...KICKS, DB1, 189.6, 190.4, DB2];
+          const hits = [...on, ...KICKS, DB1, 189.624, 190.530, DB2]; // 189.62: the perc; 190.53: beat 4's onset
           ctx.fillStyle = OM.c2.rgba(ink.crest, 1 - dark);
           for (const h of hits) {
             const a = T - h;
@@ -233,7 +239,7 @@ OM.ownWords.add('c2-08');
           // The word circuits: fed from the core on the onset, flooding their letterforms.
           for (const w of circuits) {
             if (!w || T < on[w.k] - 0.1) continue;
-            const flood = w.k === K ? 0.32 : 0.2;
+            const flood = w.k === K ? 0.14 : 0.1; // fast enough that each word reads within a few frames of its onset
             const age = T - on[w.k];
             // The feed: a trace from the core to the word's entry, current arriving on the onset.
             const fd = OM.prog(T, on[w.k] - 0.1, on[w.k]);
@@ -246,7 +252,7 @@ OM.ownWords.add('c2-08');
             if (lim > l1) ctx.lineTo(X(b[0]), Y(b[1] + (c2[1] - b[1]) * Math.min(1, (lim - l1) / (l2 || 1))));
             ctx.stroke();
             if (age < 0) continue;
-            const front = (age / flood) * w.dmax;
+            const front = OM.ease.outCubic(OM.clamp(age / flood)) * w.dmax;
             const isLit = (n) => w.dist[n] >= 0 ? w.dist[n] <= front : age > flood;
             const hold = w.k === K ? 0.5 + 0.5 * Math.sin((T - on[w.k]) * 9) * (T < words[K].t1 ? 1 : 0) : 0;
             const hot = age < flood + 0.08 || decay(T, DB1, 0.12) > 0.4;
@@ -307,7 +313,8 @@ OM.ownWords.add('c2-08');
           });
           }
           // Fast dive through the layers, banking as it goes; easing level into the dark.
-          OM.c2.apply(fx, T, start, END, { amount: 0.85, rot: 0.03 * Math.sin((T - start) * 1.1) * (0.4 + 0.6 * sm(T, DB2, DB2 + 0.5)), zoom: 1 + 0.03 * sm(T, DB2, OFF), ramp: 0.55 });
+          // The key word's charge punches in on its downbeat with the board's pulse.
+          OM.c2.apply(fx, T, start, END, { amount: 0.85, rot: 0.03 * Math.sin((T - start) * 1.1) * (0.4 + 0.6 * sm(T, DB2, DB2 + 0.5)), zoom: 1 + 0.03 * sm(T, DB2, OFF), ramp: 0.55, punch: 0.045 * OM.c2.punch(T, DB1) });
         },
         release: () => {
           fx.release();

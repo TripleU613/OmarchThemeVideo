@@ -6,6 +6,11 @@
 // the downbeat. Once the line has read together, three fast strokes on the
 // roll take the rest of the grime off, the words and leading fade, and the
 // clear window is just the field.
+
+// Edit camera: the key word's slap (174.77) gets the scene's own punch, its
+// biggest hit; beat 3 at 175.01 (hats only) would land a third hit 243 ms into
+// that stroke, right after the cut's, so it is skipped.
+OM.edit.plan('c2-05', { skip: [175.01] });
 OM.ownWords.add('c2-05');
 (() => {
   const W = 800;
@@ -39,8 +44,8 @@ OM.ownWords.add('c2-05');
       const on = words.map((w) => w.t0);
       const HM = OM.HOME, CS = 9; // letter cells: 8px on a 9px pitch
       const GRIME = [th['bg-deep'], th.surface, th['surface-2'], th.selection];
-      const WIPES = [177.02, 177.14, 177.26]; // the roll's clear-up strokes
-      const FADE = 177.06, CLEAR = 177.5;
+      const WIPES = [177.128, 177.194, 177.394]; // the roll's clear-up strokes, on its measured hits (beat 3's hat, the perc, the next hat)
+      const FADE = WIPES[0] + 0.04, CLEAR = 177.5;
 
       const get = OM.c2.lazy(W, () => {
         const L = OM.c2.layout(words, { weight: W, cap: 150, maxW: 1720, cy: 540, rows: 3, lead: 1.6, minCap: 100 });
@@ -58,13 +63,13 @@ OM.ownWords.add('c2-05');
                 const key = cl.i + di + ',' + (cl.j + dj);
                 if (!set.has(key)) { set.add(key); halo.push([cl.x + di * CS, cl.y + dj * CS]); }
               }
-          const dur = OM.clamp(wd.t1 - wd.t0, 0.2, 0.55);
+          const dur = OM.clamp(wd.t1 - wd.t0, 0.12, 0.2); // a fast stroke: the word reads within a couple of frames of its onset
           strokes.push({ k, y0: p.base - L.cap - 34, y1: p.base + 0.32 * L.cap + 18, xa: p.x - 34, xb: p.x + p.w + 40, t0: on[k], dur });
           letters.push({ k, cells, halo, x: p.x });
         });
         return { strokes, letters };
       });
-      const bladeX = (s, T) => s.xa + (s.xb - s.xa) * OM.ease.outCubic(OM.prog(T, s.t0, s.t0 + s.dur));
+      const bladeX = (s, T) => s.xa + (s.xb - s.xa) * OM.ease.outExpo(OM.prog(T, s.t0, s.t0 + s.dur));
       const wipeX = (i, T) => -100 + 2200 * OM.ease.inOutCubic(OM.prog(T, WIPES[i], WIPES[i] + 0.22));
       const wipeBand = (i) => [i * 360 - 20, (i + 1) * 360 + 20];
 
@@ -203,7 +208,8 @@ OM.ownWords.add('c2-05');
             if (T >= s.t0 && T < s.t0 + s.dur + 0.4) p0 = [bladeX(s, T) / 1920, 1 - s.y1 / 1080, 1 - s.y0 / 1080, 1 - OM.prog(T, s.t0 + s.dur, s.t0 + s.dur + 0.4)];
           }
           cur = OM.lerp(cur, 0, OM.smooth(OM.prog(T, WIPES[0], WIPES[0] + 0.35)));
-          OM.c2.apply(fx, T, start, END, { amount: 1, x: cur, p0 });
+          // The key word's slap (the longest-held word, held in crest) punches in.
+          OM.c2.apply(fx, T, start, END, { amount: 1, x: cur, p0, punch: 0.04 * OM.c2.punch(T, on[0]) });
         },
         release: () => {
           fx.release();

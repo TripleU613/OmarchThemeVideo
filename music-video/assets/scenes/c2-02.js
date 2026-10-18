@@ -6,6 +6,12 @@
 // flashes with it. The fleet pulses on the kicks, then the belt runs and
 // carries it off; on the downbeat the empty belt flares and settles into the
 // single crest line of the next cut.
+
+// Edit camera: the fleet's kick flashes are elements, not camera moves. The key
+// word's machine slams down with the scene's own punch (163.757); the camera's
+// snare jolt 80 ms later (163.837) would stack a second hit on it while the punch
+// is still at half strength, so that beat is skipped.
+OM.edit.plan('c2-02', { skip: [163.837] });
 OM.ownWords.add('c2-02');
 (() => {
   const W = 800;
@@ -41,7 +47,7 @@ OM.ownWords.add('c2-02');
       const words = OM.sung('c2-02');
       const on = words.map((w) => w.t0);
       const K = words.length - 1;
-      const KICKS = [164.374, 164.676, 164.792, 164.862];
+      const KICKS = [164.392, 164.662, 164.784, 164.834]; // measured kick onsets
       const RUN = 164.98, DB2 = OM.beatOnset(OM.downbeatsIn(165.3, 165.7)[0] || 165.489);
       const HM = OM.HOME, cR = OM.cellAt(HM, 960, 540).row;
       const CS = 9, PADX = 30, PADY = 30, GAP = 36, NECK = 22, MAXW = 1840;
@@ -200,12 +206,12 @@ OM.ownWords.add('c2-02');
           this.draw(t, T);
           const ctx = c.ensure();
           if (OM.c2.live(T, start, END)) {
-            // Roll call (k164.68, k164.79, k164.86): each machine's status lamp, in its bezel corner clear of the word, lights in turn down the fleet, a third of the fleet per kick, and rides off with it.
+            // Roll call (k164.66, k164.78, k164.83, measured): each machine's status lamp, in its bezel corner clear of the word, lights in turn down the fleet, a third of the fleet per kick, and rides off with it.
             {
               const list = get().ms.filter(Boolean), n = list.length;
               const run = OM.ease.inCubic(OM.prog(T, RUN, DB2)) * 2300;
               list.forEach((mc, i) => {
-                const h = [164.676, 164.792, 164.862][Math.min(2, Math.floor((i * 3) / n))];
+                const h = KICKS[1 + Math.min(2, Math.floor((i * 3) / n))];
                 const a = T - h;
                 if (a < 0) return;
                 const x = mc.sx + mc.sw - 20 + run, y = mc.sy + mc.sh - 18;
@@ -235,8 +241,8 @@ OM.ownWords.add('c2-02');
             pool(ctx, mc.sx + mc.sw / 2 + OM.ease.inCubic(OM.prog(T, RUN, DB2)) * 2300, mc.by, 120, 50, ink.crest, 0.4 * fl);
           });
           }
-          // Steady industrial tracking along the line, a push as the belt runs.
-          OM.c2.apply(fx, T, start, END, { amount: 0.9, x: -34 + 68 * OM.prog(T, start, END), zoom: 1 + 0.06 * sm(T, 164.9, 165.5), ramp: 0.45 });
+          // Steady industrial tracking along the line, a push as the belt runs that lands on the downbeat, and a punch as the key word's machine slams down.
+          OM.c2.apply(fx, T, start, END, { amount: 0.9, x: -34 + 68 * OM.prog(T, start, END), zoom: 1 + 0.06 * sm(T, 164.9, DB2), ramp: 0.45, punch: 0.042 * OM.c2.punch(T, on[K]) });
         },
         release: () => {
           fx.release();

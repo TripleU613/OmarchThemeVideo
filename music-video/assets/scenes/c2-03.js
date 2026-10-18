@@ -5,6 +5,11 @@
 // floods across the hull in light and cools into its band inks while glass and
 // foam spray off. The kicks ripple the name; on the run into the downbeat the
 // camera pushes in on it, the hull falls away and the name melts into the glow.
+
+// Edit camera: the snare jolt at 167.04 would rattle the frame for the 164 ms
+// right before the bottle smashes on the name, blunting the scene's own smash
+// (punch and shake, its biggest hit), so that beat is skipped.
+OM.edit.plan('c2-03', { skip: [167.036] });
 OM.ownWords.add('c2-03');
 (() => {
   const W = 800;
@@ -35,8 +40,8 @@ OM.ownWords.add('c2-03');
       const words = OM.sung('c2-03');
       const on = words.map((w) => w.t0);
       const K = words.length - 1; // the name
-      const KICKS = [168.182, 168.368, 168.623, 168.856, 169.436];
-      const DB2 = OM.downbeatsIn(169.5, 170)[0] || 169.738;
+      const KICKS = [168.156, 168.382, 168.636, 168.830, 169.430]; // measured kick onsets
+      const DB2 = OM.beatOnset(OM.downbeatsIn(169.5, 170)[0] || 169.738); // the downbeat's drum onset
       const HM = OM.HOME, cR = OM.cellAt(HM, 960, 540).row;
       const yT = HM.y0 + cR * HM.ch; // the gunwale: the cut's line
       const BOW = 1700;
@@ -128,7 +133,7 @@ OM.ownWords.add('c2-03');
               if (!list.length) return;
               let x0 = Infinity, x1 = -Infinity;
               for (const cl of list) { x0 = Math.min(x0, cl.x); x1 = Math.max(x1, cl.x + CS); }
-              const dur = Math.min(0.26, Math.max(0.12, words[k].t1 - on[k]));
+              const dur = Math.min(0.1, Math.max(0.08, words[k].t1 - on[k])); // a quick stroke: the word reads within two frames
               const edge = x0 + (x1 - x0 + 30) * OM.ease.outCubic(OM.prog(T, on[k], on[k] + dur));
               for (const cl of list) {
                 if (cl.x > edge) continue;
@@ -142,7 +147,7 @@ OM.ownWords.add('c2-03');
           // The name, flooding out of the impact and cooling into its bands; the kicks ripple through it.
           const a = T - on[K];
           if (a >= 0) {
-            const reach = 1300 * OM.ease.outExpo(OM.clamp(a / 0.55));
+            const reach = 1300 * OM.ease.outExpo(OM.clamp(a / 0.35));
             const cool = OM.clamp((a - 0.2) / 0.8);
             for (const [col, row] of NAME) {
               const x = NL.x0 + (col + 0.5) * NL.cw, y = NL.y0 + (row + 0.5) * NL.ch;
@@ -203,7 +208,7 @@ OM.ownWords.add('c2-03');
           this.draw(t, T);
           const ctx = c.ensure();
           if (OM.c2.live(T, start, END)) {
-            // Deck lamp chase (k168.37, k168.62, s168.79, k168.86, k169.44): on each hit a run of light races the gunwale from bow to stern, above the words.
+            // Deck lamp chase (k168.38, k168.64, s168.76, k168.83, k169.43, measured): on each hit a run of light races the gunwale from bow to stern, above the words.
             {
               const cam = OM.ease.inOutCubic(OM.prog(T, 168.62, DB2)), S2 = 1 + 0.55 * cam, ny2 = NL.y0 + 9.5 * NL.ch;
               const fade = 1 - sm(T, 169.2, DB2);
@@ -211,7 +216,7 @@ OM.ownWords.add('c2-03');
               ctx.translate(960, OM.lerp(ny2, 540, cam));
               ctx.scale(S2, S2);
               ctx.translate(-OM.lerp(960, NL.x0 + 500, cam), -ny2);
-              for (const h of [168.368, 168.623, 168.786, 168.856, 169.436]) {
+              for (const h of [KICKS[1], KICKS[2], 168.764, KICKS[3], KICKS[4]]) {
                 const a = T - h;
                 if (a < 0 || a > 0.7 || fade <= 0) continue;
                 const head = BOW - a * 3000;
@@ -234,10 +239,11 @@ OM.ownWords.add('c2-03');
             }
           }
           }
-          // Low-angle tilt up the hull to the name, a jolt on the smash.
+          // Low-angle tilt up the hull to the name, a punch and a jolt on the smash.
           const j = decay(T, on[K], 0.08);
           OM.c2.apply(fx, T, start, END, {
             amount: 1, y: 36 * (1 - OM.smooth(OM.prog(T, start, on[K]))) + 10 * j * Math.cos(T * 77), x: 14 * j * Math.sin(T * 90), rot: 0.004 * j,
+            punch: 0.045 * OM.c2.punch(T, on[K]),
           });
         },
         release: () => {

@@ -5,6 +5,11 @@
 // horizontal lines. With the line read, the letters' lines drop and pile onto
 // one row; on the last downbeat a final herd runs that row end to end and
 // leaves it a single crest line, and the plain goes dark behind it.
+
+// Edit camera: the defaults fit. The key word's own punch (177.93) sits 270 ms
+// after the cut's beat and 260 ms before the downbeat, so nothing stacks, and at
+// the camera's peak (4.7% on the 180.32 kick) the words keep about 110 px off the band.
+OM.edit.plan('c2-06', {});
 OM.ownWords.add('c2-06');
 (() => {
   const W = 800;
@@ -45,8 +50,8 @@ OM.ownWords.add('c2-06');
       const words = OM.sung('c2-06');
       const on = words.map((w) => w.t0);
       const HM = OM.HOME, cR = OM.cellAt(HM, 960, 540).row, lineY = HM.y0 + cR * HM.ch;
-      const CS = 9, V = 2600; // letter cells: 8px on a 9px pitch
-      const DROP = 180.95, HERD = OM.downbeatsIn(182.3, 182.7)[0] || 182.486, HV = 2900;
+      const CS = 9, V = 4200; // letter cells: 8px on a 9px pitch; V: the herds' gallop, quick enough that each word is laid within a few frames
+      const DROP = 180.95, HERD = OM.beatOnset(OM.downbeatsIn(182.3, 182.7)[0] || 182.486), HV = 2900;
       const HERD0 = HERD - 2050 / HV; // the final herd's lead reaches the right edge on the downbeat
       const FRAME = OM.SPB / 4;
 
@@ -150,10 +155,10 @@ OM.ownWords.add('c2-06');
           this.draw(t, T);
           const ctx = c.ensure();
           if (OM.c2.live(T, start, END)) {
-            // Settling puffs (s180.70) and hat glitter: the snare knocks dust up off every word's baseline, and the hats glint single dashes in the letters until they drop.
+            // Settling puffs (s180.72, measured) and hat glitter: the snare knocks dust up off every word's baseline, and the hats glint single dashes in the letters until they drop.
             {
               const rows6 = get().filter(Boolean);
-              const a = T - 180.698;
+              const a = T - 180.716;
               if (a >= 0 && a < 0.6)
                 for (const r of rows6)
                   for (let n = 0; n < 16; n++) {
@@ -184,8 +189,8 @@ OM.ownWords.add('c2-06');
             }
           }
           }
-          // Fast lateral tracking alongside the herd, with the gallop's bob.
-          OM.c2.apply(fx, T, start, END, { amount: 0.85, x: 30 - 60 * OM.prog(T, start, END), y: 3 * Math.abs(Math.sin((Math.PI * T) / (OM.SPB / 2))) });
+          // Fast lateral tracking alongside the herd, with the gallop's bob, punching in as the key word's herd lands it.
+          OM.c2.apply(fx, T, start, END, { amount: 0.85, x: 30 - 60 * OM.prog(T, start, END), y: 3 * Math.abs(Math.sin((Math.PI * T) / (OM.SPB / 2))), punch: 0.05 * OM.c2.punch(T, on[0]) });
         },
         release: () => {
           fx.release();

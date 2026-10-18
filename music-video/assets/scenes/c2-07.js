@@ -6,6 +6,11 @@
 // across it, lighting every letter as it passes. Then the canyon and the words
 // go dark and the entire deck draws in to one cell at the centre on the
 // downbeat: the spark of the next cut.
+
+// Edit camera: the downbeat at 184.56 (hats only) lands 153 ms before the key
+// word closes the span with the scene's own punch, its biggest hit, so that
+// beat is skipped rather than flamming into it.
+OM.edit.plan('c2-07', { skip: [184.564] });
 OM.ownWords.add('c2-07');
 (() => {
   const W = 800;
@@ -63,7 +68,7 @@ OM.ownWords.add('c2-07');
             const mine = cells.filter((cl) => cl.l === l);
             if (!mine.length) continue;
             const cx = mine.reduce((s, cl) => s + cl.x, 0) / mine.length, cy = mine.reduce((s, cl) => s + cl.y, 0) / mine.length;
-            letters.push({ k, cells: mine, cx, cy, ta: on[k] + l * Math.min(0.035, 0.2 / n), dx: (OM.hash(k, l, 1) - 0.5) * 300, dy: 640 + 360 * OM.hash(k, l, 2), rot: (OM.hash(k, l, 3) - 0.5) * 5 });
+            letters.push({ k, cells: mine, cx, cy, ta: on[k] + l * Math.min(0.016, 0.08 / n), dx: (OM.hash(k, l, 1) - 0.5) * 300, dy: 640 + 360 * OM.hash(k, l, 2), rot: (OM.hash(k, l, 3) - 0.5) * 5 });
           }
         });
         gx0 = OM.clamp(gx0, 160, 900);
@@ -179,10 +184,10 @@ OM.ownWords.add('c2-07');
           this.draw(t, T);
           const ctx = c.ensure();
           if (OM.c2.live(T, start, END)) {
-            // Rail-end sparks (s186.43, k186.57) and last plank (s186.78): the drawing-in deck ends throw sparks on the hits, and on the final snare the spark briefly reaches one plank either side before settling.
+            // Rail-end sparks (s186.42, k186.56) and last plank (s186.81), all measured: the drawing-in deck ends throw sparks on the hits, and on the final snare the spark briefly reaches one plank either side before settling.
             {
               const R2 = 1100 * (1 - OM.ease.inExpo(OM.prog(T, PULL, DB2)));
-              for (const [h, hi] of [[186.433, 0], [186.572, 1]]) {
+              for (const [h, hi] of [[186.424, 0], [186.556, 1]]) {
                 const a = T - h;
                 if (a < 0 || a > 0.3) continue;
                 ctx.fillStyle = ink.crest;
@@ -192,8 +197,8 @@ OM.ownWords.add('c2-07');
                   if (OM.hash(n, hi, 113) > a / 0.3) ctx.fillRect(x, y, 4, 4);
                 }
               }
-              // Deck beat: on s186.43 and k186.57 the drawing-in deck swells to three rows of light across its whole span.
-              for (const h of [186.433, 186.572]) {
+              // Deck beat: on s186.42 and k186.56 the drawing-in deck swells to three rows of light across its whole span.
+              for (const h of [186.424, 186.556]) {
                 const a = T - h;
                 if (a < 0 || a > 0.22) continue;
                 const f = 1 - a / 0.22;
@@ -205,9 +210,9 @@ OM.ownWords.add('c2-07');
                 }
                 pool(ctx, 960, lineY, Math.max(200, R2), 60, ink.lit, 0.35 * f);
               }
-              // Deck echo: on s186.78 the vanished deck flashes back out across the frame from the spark and fades.
+              // Deck echo: on s186.81 the vanished deck flashes back out across the frame from the spark and fades.
               {
-                const b2 = OM.prog(T, 186.781, 187.05);
+                const b2 = OM.prog(T, 186.812, 187.05);
                 if (b2 > 0 && b2 < 1) {
                   const f = Math.sin(Math.PI * Math.min(1, b2 * 3)) * (1 - b2) + (b2 < 0.33 ? 0 : 0), w = 1100 * OM.ease.outCubic(Math.min(1, b2 * 2));
                   ctx.fillStyle = OM.c2.rgba(ink.hover, Math.max(f, (1 - b2) * 0.8));
@@ -218,7 +223,7 @@ OM.ownWords.add('c2-07');
                   }
                 }
               }
-              const b = OM.prog(T, 186.781, 187.12), reach = Math.sin(Math.PI * b);
+              const b = OM.prog(T, 186.812, 187.12), reach = Math.sin(Math.PI * b);
               if (b > 0 && b < 1) {
                 ctx.fillStyle = OM.c2.rgba(ink.hover, reach);
                 const sp2 = OM.cellAt(HM, 960, 540);
@@ -246,11 +251,11 @@ OM.ownWords.add('c2-07');
             }
           }
           }
-          // Wide on the canyon, then a push along the span riding with the train.
+          // Wide on the canyon, then a punch as the key word closes the span and a push along it riding with the train.
           const xh = OM.lerp(-200, 2120, OM.prog(T, TR0, TR1));
           const push = sm(T, TR0 - 0.2, TR0 + 0.5) * (1 - sm(T, TR1, PULL));
           const flare = sm(T, TR0, TR0 + 0.1) * (1 - sm(T, TR1, TR1 + 0.2));
-          OM.c2.apply(fx, T, start, END, { amount: 1, zoom: 1 + 0.07 * push, x: -(xh - 960) * 0.05 * push, p0: [xh / 1920, 1 - (lineY + HM.ch * 1.5) / 1080, flare, 0] });
+          OM.c2.apply(fx, T, start, END, { amount: 1, zoom: 1 + 0.07 * push, x: -(xh - 960) * 0.05 * push, p0: [xh / 1920, 1 - (lineY + HM.ch * 1.5) / 1080, flare, 0], punch: 0.05 * OM.c2.punch(T, on[K]) });
         },
         release: () => {
           fx.release();

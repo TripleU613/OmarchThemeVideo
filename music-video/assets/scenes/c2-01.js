@@ -8,6 +8,11 @@
 //
 // Also defines OM.c2, the helpers chorus 2's scenes share (layout and
 // rasterizing the sung words into cells, pools, easing shorthands).
+
+// Edit camera: the downbeat at 159.05 has no kick and lands 142 ms before the key
+// word, whose shards slam the pane shut with the scene's own (bigger) punch, so
+// that beat is skipped rather than flamming into it. The drop at 158.00 stays.
+OM.edit.plan('c2-01', { skip: [159.05] });
 OM.ownWords.add('c2-01');
 (() => {
   const FONT = (w, px) => `${w} ${px}px 'JetBrains Mono'`;
@@ -60,14 +65,36 @@ OM.ownWords.add('c2-01');
       const zmin = 1 + (2 * Math.abs(x)) / 1920 + (2 * Math.abs(y)) / 1080 + 1.8 * Math.abs(rot);
       return { zoom: Math.max(zoom, zmin), rot, x, y };
     },
-    /** Run a scene's post pass: its own move and effect amount eased to 0 at its window's ends, over the section camera. */
-    apply(fx, T, start, end, { amount = 0, zoom = 1, rot = 0, x = 0, y = 0, p0, p1, ramp = 0.4 } = {}) {
+    /**
+     * Run a scene's post pass: its own move and effect amount eased to 0 at its window's ends, over the section camera.
+     * `punch` is extra zoom for the scene's own hits (OM.c2.punch), applied unramped but exactly 0 in the cut holds.
+     */
+    apply(fx, T, start, end, { amount = 0, zoom = 1, rot = 0, x = 0, y = 0, p0, p1, ramp = 0.4, punch = 0 } = {}) {
       const e = OM.post.envelope(T, start, end, { ramp, hold: 0.07 });
-      const cam = OM.c2.camAt(T, { zoom: 1 + (zoom - 1) * e, rot: rot * e, x: x * e, y: y * e });
+      const hit = OM.c2.live(T, start, end) ? punch : 0;
+      const cam = OM.c2.camAt(T, { zoom: (1 + (zoom - 1) * e) * (1 + hit), rot: rot * e, x: x * e, y: y * e });
       return fx.apply(T, { amount: amount * e, cam, p0, p1 });
     },
     /** True away from the cut frames, where extras may draw. */
     live: (T, start, end) => T > start + 0.07 && T < end - 0.07,
+    /** The last measured beat at or before T (OM.T.beatsOn, on the drum): { i, t }, i = -1 before the first. */
+    beat(T) {
+      const B = (OM.T && OM.T.beatsOn) || [];
+      let lo = 0, hi = B.length;
+      while (lo < hi) {
+        const m = (lo + hi) >> 1;
+        if (B[m] <= T) lo = m + 1; else hi = m;
+      }
+      return { i: lo - 1, t: lo > 0 ? B[lo - 1] : -Infinity };
+    },
+    /** A camera punch on a scene's own hit at t0, the edit camera's shape: a 16 ms rise to 1 on t0, then a smooth settle to exactly 0 over `fall`. */
+    punch(T, t0, fall = 0.22) {
+      const d = T - t0;
+      if (d < -0.016 || d >= fall) return 0;
+      if (d < 0) return 0.5 - 0.5 * Math.cos((Math.PI * (d + 0.016)) / 0.016);
+      const u = d / fall;
+      return (1 - u) ** 3 * (1 + 3 * u);
+    },
     sm: (T, a, b) => OM.smooth(OM.prog(T, a, b)),
     decay: (T, t0, half) => (T < t0 ? 0 : Math.pow(0.5, (T - t0) / half)),
     /**
@@ -182,8 +209,9 @@ OM.ownWords.add('c2-01');
       const words = OM.sung('c2-01');
       const on = words.map((w) => w.t0);
       const K = words.length - 1; // the key word: the biggest shards, closing the pane
-      const SNARES = [159.591, 160.218, 160.798];
-      const DB2 = OM.downbeatsIn(161, 161.5)[0] || 161.239;
+      const SNARES = [159.596, 160.226, 160.786]; // measured snare onsets
+      const DB2 = OM.beatOnset(OM.downbeatsIn(161, 161.5)[0] || 161.239); // the downbeat's drum onset
+      const LATE = [160.226, 160.786, 160.886, 161.258]; // the late slivers' hits, measured
       const PX = 320, PY = 140, PW = 1280, PH = 800, CS = 9; // the film's letter cells: 8px on a 9px pitch
 
       // ---- the shards: a jittered 16x10 mesh over the pane, each quad cut on a random diagonal ----
@@ -327,11 +355,11 @@ OM.ownWords.add('c2-01');
           this.draw(t, T);
           const ctx = c.ensure();
           if (OM.c2.live(T, start, END)) {
-            // Late slivers (s160.22, s160.80, k160.91, s161.29): the last crumbs of glass fly home onto the pane's rim, outside the words, and the rim glows where each lands.
+            // Late slivers (s160.23, s160.79, k160.89, s161.26, measured): the last crumbs of glass fly home onto the pane's rim, outside the words, and the rim glows where each lands.
             // Rim ring: as the slivers land, the pane's whole rim rings in light, a band around the words, never over them.
             {
               let ring = 0;
-              for (const h of [160.218, 160.798, 160.91, 161.286]) if (T >= h && T < h + 0.3) ring = Math.max(ring, 1 - (T - h) / 0.3);
+              for (const h of LATE) if (T >= h && T < h + 0.3) ring = Math.max(ring, 1 - (T - h) / 0.3);
               if (ring > 0) {
                 ctx.strokeStyle = OM.c2.rgba(ink.lit, 0.4 * ring);
                 ctx.lineWidth = 40;
@@ -341,7 +369,7 @@ OM.ownWords.add('c2-01');
                 ctx.strokeRect(320 - 4, 140 - 4, 1280 + 8, 800 + 8);
               }
             }
-            [160.218, 160.798, 160.91, 161.286].forEach((h, hi) => {
+            LATE.forEach((h, hi) => {
               const u = OM.prog(T, h - 0.2, h), a = T - h;
               if (u <= 0 || a > 0.25) return;
               for (let n = 0; n < 6; n++) {
@@ -372,10 +400,10 @@ OM.ownWords.add('c2-01');
             }
           }
           }
-          // Slow-motion pull-out as the shards fly home, locking with a small punch on the key word.
+          // Slow-motion pull-out as the shards fly home, locking with a punch on the key word: the scene's biggest hit.
           const amount = 0.12 + 0.5 * (1 - sm(T, on[K] + 0.1, on[K] + 0.6));
-          const zoom = 1 + 0.07 * (1 - OM.smooth(OM.prog(T, start, on[K]))) + 0.012 * decay(T, on[K], 0.12);
-          OM.c2.apply(fx, T, start, END, { amount, zoom });
+          const zoom = 1 + 0.07 * (1 - OM.smooth(OM.prog(T, start, on[K])));
+          OM.c2.apply(fx, T, start, END, { amount, zoom, punch: 0.05 * OM.c2.punch(T, on[K], 0.26) });
         },
         release: () => {
           fx.release();
