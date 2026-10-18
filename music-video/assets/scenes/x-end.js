@@ -124,19 +124,27 @@ vec4 effect(vec2 uv) {
           px.fill((255 << 24) | (BGP[2] << 16) | (BGP[1] << 8) | BGP[0]);
           return { k, g, im, px };
         });
-        const dw = Math.max(1, Math.round(DOT_W * dpr)), dh = Math.max(1, Math.round(DOT_H * dpr));
+        const dw = Math.max(1, Math.round(DOT_W * dpr));
         const yAt = (gy) => Math.round((Y0 + gy * PIX_Y) * dpr);
-        const pack = ([r, g, b]) => (255 << 24) | (Math.round(b) << 16) | (Math.round(g) << 8) | Math.round(r);
+        const pack = (r, g, b) => (255 << 24) | (Math.round(b) << 16) | (Math.round(g) << 8) | Math.round(r);
         for (let gy = 0; gy < GY; gy++) {
-          const y0 = yAt(gy);
+          // Exact coverage: each device row a dot row touches is shaded by its share of it, so the
+          // 3.08 px pitch never beats against the pixel grid as dark lines.
+          const top = (Y0 + gy * PIX_Y) * dpr, bot = top + DOT_H * dpr, rows = [];
+          for (let y = Math.max(0, Math.floor(top)); y < Math.min(H, Math.ceil(bot)); y++) rows.push([y, Math.min(y + 1, bot) - Math.max(y, top)]);
           for (let gx = 0; gx < GX; gx++) {
             const grain = GRAIN * (OM.hash(gx, gy, 709) - 0.5);
             const face = tone(BASE + CONTRAST * D[gy * GX + gx] + grain), flat = tone(BASE + grain);
             const hot = face.map((v, k) => v + (CREST[k] - v) * 0.65);
-            const cols = [pack(face), pack(flat), pack(hot)];
-            const x0 = Math.round(gx * PIX_X * dpr);
-            for (let y = Math.max(0, y0); y < Math.min(H, y0 + dh); y++)
-              for (let x = x0; x < Math.min(W, x0 + dw); x++) for (let s = 0; s < 3; s++) sheets[s].px[y * W + x] = cols[s];
+            const x0 = Math.round(gx * PIX_X * dpr), x1 = Math.min(W, x0 + dw);
+            [face, flat, hot].forEach(([r, g, b], s) => {
+              const px = sheets[s].px, dr = r - BGP[0], dg = g - BGP[1], db = b - BGP[2];
+              // Added to what is there, so a device row two dot rows share gets both shares.
+              for (const [y, a] of rows) {
+                const i = y * W + x0, p = px[i];
+                px.fill(pack((p & 255) + dr * a, ((p >> 8) & 255) + dg * a, ((p >> 16) & 255) + db * a), i, y * W + x1);
+              }
+            });
           }
         }
         for (const s of sheets) s.g.putImageData(s.im, 0, 0);

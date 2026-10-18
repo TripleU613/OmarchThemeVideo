@@ -252,15 +252,15 @@ vec4 effect(vec2 uv) {
     { t: 282.006, kind: 'head', row: 0 },
     { t: 282.285, kind: 'sep', row: 1 },
     { t: 282.819, k: 'OS', v: 'Omarchy', row: 3 },
-    { t: 283.376, k: 'WM', v: 'Hyprland', row: 4 },
-    { t: 283.91, k: 'Song', v: 'We Can Fix Everything (The Ultimate Machine)', row: 6 },
+    { t: OM.beatOnset(283.376), k: 'WM', v: 'Hyprland', row: 4 },
+    { t: OM.beatOnset(283.91), k: 'Song', v: 'We Can Fix Everything (The Ultimate Machine)', row: 6 },
     { t: 284.537, k: 'Music', v: 'Kevin Koontz / REARRANGED', row: 7 },
-    { t: 284.979, k: 'Made by', v: 'TripleU613', made: true, row: 8 },
+    { t: OM.beatOnset(284.979), k: 'Made by', v: 'TripleU613', made: true, row: 8 },
     { t: 285.698, k: 'Built with', v: 'HyperFrames, Three.js, GSAP', row: 10 },
     { t: 285.954, k: 'Theme', v: 'Tokyo Night', row: 11 },
     { t: 286.418, k: 'Font', v: 'JetBrains Mono', row: 12 },
     { t: 286.952, k: 'Inspired by', v: 'omarchy.org, by DHH', row: 13 },
-    { t: 287.115, kind: 'swatch', row: 15 },
+    { t: OM.beatOnset(287.115), kind: 'swatch', row: 15 },
   ];
   const KEYINK = [TN.blue, TN.magenta, TN.cyan, TN.green, TN.yellow, TN.red];
   const CODE = [
@@ -572,11 +572,11 @@ vec4 effect(vec2 uv) {
           const dpr = c.dpr;
           ctx.globalAlpha = 1;
           ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-          // The whole-frame dolly: out to 1.04 as the desktop arrives, settling back to rest before the exit.
+          // The whole-frame dolly: out to 1.02 as the desktop arrives, settling back to rest before the exit.
           const dolly = OM.smooth(OM.prog(T, 281.6, 282.9)) * (1 - OM.ease.inOutSine(OM.prog(T, 282.9, 287.6)));
           const post = () => fx.apply(T, {
             amount: OM.post.envelope(T, start, end, { ramp: 0.6 }) * (0.35 + 0.65 * OM.smooth(OM.prog(T, 280.9, 289.3))) * (1 - OM.smooth(OM.prog(T, 288.6, 289.3))),
-            cam: { zoom: 1 + 0.04 * dolly, x: -18 * dolly, y: 6 * dolly },
+            cam: { zoom: 1 + 0.02 * dolly, x: -4 * dolly, y: 2 * dolly },
             p0: [OM.prog(T, 281.4, 289.2), 0, 0, 0],
           });
           if (T < IN0 || T >= DONE || T >= end - 0.07) {

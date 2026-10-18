@@ -253,6 +253,17 @@ OM.scene({
           ctx.fillRect(Math.round(wx + vx * age), Math.round(craneY + 4 - 120 * age + 600 * age * age), 2, 2);
         }
         // The crane on top: mast, swinging jib, cable and hook (carrying the next storey down).
+        // A storey being lowered passes in front of it: the crane is clipped out of the storey's
+        // extent (its beams reach 3 px past the top and bottom).
+        const fi = lands.findIndex((x, i) => i > 0 && T >= x - 0.3 && T < x);
+        ctx.save();
+        if (fi > 0) {
+          const sf = settle(fi);
+          ctx.beginPath();
+          ctx.rect(-2000, -4000, 6000, 8000);
+          ctx.rect(X0, sf.y - 3, W, FH + 6);
+          ctx.clip('evenodd');
+        }
         {
           const mastH = 230, top = craneY - mastH;
           const swing = Math.sin((T - start) * 1.6) * 0.9;
@@ -276,6 +287,7 @@ OM.scene({
             ctx.fillRect(Math.round(X0 + 77 + jl - 6), top - 14, 8, 8);
           }
         }
+        ctx.restore();
         ctx.restore();
       },
       release: () => c.release(),
