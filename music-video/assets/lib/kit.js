@@ -66,6 +66,85 @@
     return out;
   };
 
+  // ---------- the beat jiggle ----------
+  // One small bump per beat while the drums play, for scenes that opt in by
+  // feeding it into their own camera or one element. The analysis grid and the
+  // drum events both sit on 23 ms analysis frames, and the grid runs 46 ms late
+  // against the drums, so each bump peaks on the grid smoothed into an even
+  // pulse (a local linear fit over 7 beats) and moved 46 ms early: the closest
+  // fit to the measured kicks and snares. Its size follows the beat's drum hit,
+  // and it is 0 wherever the drums are out. No bump comes within two frames of
+  // a cut, so cut frames stay exact.
+  const JIG = { RISE: 0.024, FALL: 0.17, GUARD: 0.034, LATE: 0.046 };
+  let bumps = null;
+  /** The bumps, built on first use: frame-need.js and the scene sections load after this file. */
+  function jigBumps() {
+    const N = window.OM_FRAME_NEED;
+    if (!T || !KICK) return [];
+    const B = T.beats, ev = [...N.kick, ...N.snare];
+    const onset = B.map((b, i) => {
+      let n = 0, sx = 0, sy = 0, sxx = 0, sxy = 0;
+      for (let j = Math.max(0, i - 3); j <= Math.min(B.length - 1, i + 3); j++, n++) {
+        sx += j; sy += B[j]; sxx += j * j; sxy += j * B[j];
+      }
+      const slope = (n * sxy - sx * sy) / (n * sxx - sx * sx);
+      return sy / n + slope * (i - sx / n) - JIG.LATE;
+    });
+    // Beat strength: the low-band onset strength at the hit, or the loudest kick or snare event on it.
+    const s = onset.map((t) => {
+      let m = 0;
+      for (let f = Math.round((t - 0.03) * A.fps); f <= Math.round((t + 0.08) * A.fps); f++) m = Math.max(m, KICK[OM.clamp(f, 0, A.frames - 1)] / 255);
+      for (const e of ev) if (Math.abs(e[0] - t) <= 0.035) m = Math.max(m, OM.clamp(e[1] / 0.45));
+      return m;
+    });
+    const median = (xs) => xs.slice().sort((a, b) => a - b)[xs.length >> 1];
+    const cuts = [...document.querySelectorAll('section.scene[data-start]')].map((el) => parseFloat(el.dataset.start)).filter((c) => c > 0);
+    const downs = new Set(T.downbeats.map((d) => Math.round(d * 1000)));
+    const out = [];
+    for (let i = 0; i < B.length; i++) {
+      const t = onset[i], down = downs.has(Math.round(B[i] * 1000));
+      // Drums in play: the median beat strength around this beat.
+      const g = median(s.slice(Math.max(0, i - 3), i + 4));
+      const w = OM.smooth(OM.clamp((g - 0.2) / 0.12)) * (0.55 + 0.45 * OM.clamp((s[i] - 0.2) / 0.4)) * (down ? 1 : 0.85);
+      if (w < 0.05 || t + JIG.FALL > T.duration) continue;
+      if (cuts.some((c) => c > t - JIG.RISE - JIG.GUARD && c < t + JIG.FALL + JIG.GUARD)) continue;
+      out.push({ t, w, k: i, down });
+    }
+    return out;
+  }
+  /** The bumps, or none while frame-need.js is absent (NO_FRAMES drafts leave it out). */
+  const allBumps = () => bumps || (window.OM_FRAME_NEED ? (bumps = jigBumps()) : []);
+  /** The bump around global time `time`, or null. */
+  const bumpAt = (time) => {
+    const bs = allBumps();
+    let lo = 0, hi = bs.length - 1, r = -1;
+    while (lo <= hi) {
+      const m = (lo + hi) >> 1;
+      if (bs[m].t - JIG.RISE <= time) { r = m; lo = m + 1; } else hi = m - 1;
+    }
+    return r >= 0 && time < bs[r].t + JIG.FALL ? bs[r] : null;
+  };
+  /** A bump's shape at d seconds from its onset: a raised-cosine rise to 1 on the onset, then a smooth settle to exactly 0. */
+  const bumpShape = (d) => {
+    if (d < -JIG.RISE || d >= JIG.FALL) return 0;
+    if (d < 0) return 0.5 - 0.5 * Math.cos((Math.PI * (d + JIG.RISE)) / JIG.RISE);
+    const u = d / JIG.FALL;
+    return (1 - u) ** 4 * (1 + 4 * u);
+  };
+  /** The beat jiggle at global time `time`, 0..1: 1 on a strong downbeat's drum onset, settled within about 0.12 s. */
+  OM.jiggle = (time) => {
+    const b = bumpAt(time);
+    return b ? b.w * bumpShape(time - b.t) : 0;
+  };
+  /** The same jiggle with its beat: { v, k (beat index, for alternating sides), down (on a downbeat) }. */
+  OM.jiggle.beat = (time) => {
+    const b = bumpAt(time);
+    return b ? { v: b.w * bumpShape(time - b.t), k: b.k, down: b.down } : { v: 0, k: -1, down: false };
+  };
+  /** Every bump { t, w, k, down }, for checks. */
+  OM.jiggle.bumps = () => allBumps().slice();
+  OM.jiggle.SHAPE = JIG;
+
   // ---------- placeholder slate for scenes not built yet ----------
   OM.slate = ({ id, device, theme, line }) =>
     OM.scene({
