@@ -72,7 +72,7 @@ its idea:
 - **v2-02** · Camera: sway riding the vocal level · Shader: green-tone luminance split pulsing with each note · Extras: note particles rising from struck windows
 - **v2-03** · Camera: tumbling roll with the falling windows, then reversing · Shader: rewind tracking lines and scrub blur, green-tinted · Extras: debris that rewinds with the windows
 - **v2-04** · Camera: lateral parallax between the two exposures, converging · Shader: double-exposure screen blend converging to one image · Extras: phosphor dot glow at power-off
-- **v2-05** · Camera: low glide along the keyboard with a rack focus · Shader: macro depth of field across the keys · Extras: key backlight bloom, dust over the board
+- **v2-05** · Camera: low glide along the keyboard with a rack focus · Shader: macro depth of field across the keys · Extras: key backlight bloom, dust over the board · Jiggle: camera zoom +0.5% on each beat (OM.jiggle)
 - **v2-06** · Camera: chase cam behind the plane, rolling on the banks · Shader: radial wind blur and speed lines · Extras: cloud wisps passing, wingtip sparkles
 - **v2-07** · Camera: running with a gait bob, settling dead still when they stop · Shader: motion blur while running, crisp when still · Extras: kicked-up dust, path-building sparks
 - **v2-08** · Camera: road vibration and a slow roll into curves · Shader: sunrise lens flare with horizon heat shimmer · Extras: passing light streaks, lane markers flashing by
@@ -101,10 +101,10 @@ its idea:
 - **b-02** · Camera: slow pull-back revealing the wall, with a float · Shader: per-screen flicker bloom · Extras: power-on sparkles
 - **b-03** · Camera: low tracking behind the roller, a bump on each kick · Shader: asphalt heat haze · Extras: gravel bits, steam off the roller
 - **b-04** · Camera: microscope drift with focus wobble · Shader: microscope lens, circular vignette and slight fisheye · Extras: drifting micro-particles
-- **b-05** · Camera: following the liquid light from the desk to the door · Shader: liquid caustics, refracted ripples of light · Extras: droplets, light splashes
+- **b-05** · Camera: following the liquid light from the desk to the door · Shader: liquid caustics, refracted ripples of light · Extras: droplets, light splashes · Jiggle: the pool swells on the beats its kicks and words leave free
 - **b-06** · Camera: slow lateral relay pan · Shader: candle-flicker exposure with soft halation · Extras: embers rising, smoke wisps
 - **b-07** · Camera: time-lapse push-in, stepping with each life stage · Shader: one screen look per era (a curved old CRT, then a clean flat panel) · Extras: dust in window light
-- **b-08** · Camera: tracking the cascade on a rising spiral · Shader: an impact ripple from each domino that falls · Extras: dust puffs per domino
+- **b-08** · Camera: tracking the cascade on a rising spiral · Shader: an impact ripple from each domino that falls · Extras: dust puffs per domino · Jiggle: camera zoom +0.5% on the beats between its own hits
 
 ## Build
 

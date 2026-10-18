@@ -76,20 +76,37 @@
   // and it is 0 wherever the drums are out. No bump comes within two frames of
   // a cut, so cut frames stay exact.
   const JIG = { RISE: 0.024, FALL: 0.17, GUARD: 0.034, LATE: 0.046 };
-  let bumps = null;
+  let onsets = null, bumps = null;
+  /** Each grid beat's drum onset: the grid smoothed into an even pulse and moved 46 ms early. */
+  const beatOnsets = () => onsets || (onsets = (T ? T.beats : []).map((b, i, B) => {
+    let n = 0, sx = 0, sy = 0, sxx = 0, sxy = 0;
+    for (let j = Math.max(0, i - 3); j <= Math.min(B.length - 1, i + 3); j++, n++) {
+      sx += j; sy += B[j]; sxx += j * j; sxy += j * B[j];
+    }
+    const slope = (n * sxy - sx * sy) / (n * sxx - sx * sx);
+    return sy / n + slope * (i - sx / n) - JIG.LATE;
+  }));
+  /**
+   * Where the drums really hit for a time taken from the beat grid (OM.T.beats,
+   * OM.T.downbeats, OM.beatsIn, or a number copied from them): that beat's
+   * onset, as the jiggle uses it. Any other time comes back unchanged.
+   */
+  OM.beatOnset = (t) => {
+    if (!T) return t;
+    const B = T.beats;
+    let lo = 0, hi = B.length - 1;
+    while (lo < hi) {
+      const m = (lo + hi) >> 1;
+      if (B[m] < t) lo = m + 1; else hi = m;
+    }
+    const i = lo > 0 && Math.abs(B[lo - 1] - t) < Math.abs(B[lo] - t) ? lo - 1 : lo;
+    return Math.abs(B[i] - t) < 0.002 ? beatOnsets()[i] : t;
+  };
   /** The bumps, built on first use: frame-need.js and the scene sections load after this file. */
   function jigBumps() {
     const N = window.OM_FRAME_NEED;
     if (!T || !KICK) return [];
-    const B = T.beats, ev = [...N.kick, ...N.snare];
-    const onset = B.map((b, i) => {
-      let n = 0, sx = 0, sy = 0, sxx = 0, sxy = 0;
-      for (let j = Math.max(0, i - 3); j <= Math.min(B.length - 1, i + 3); j++, n++) {
-        sx += j; sy += B[j]; sxx += j * j; sxy += j * B[j];
-      }
-      const slope = (n * sxy - sx * sy) / (n * sxx - sx * sx);
-      return sy / n + slope * (i - sx / n) - JIG.LATE;
-    });
+    const B = T.beats, ev = [...N.kick, ...N.snare], onset = beatOnsets();
     // Beat strength: the low-band onset strength at the hit, or the loudest kick or snare event on it.
     const s = onset.map((t) => {
       let m = 0;
@@ -131,15 +148,21 @@
     const u = d / JIG.FALL;
     return (1 - u) ** 4 * (1 + 4 * u);
   };
-  /** The beat jiggle at global time `time`, 0..1: 1 on a strong downbeat's drum onset, settled within about 0.12 s. */
-  OM.jiggle = (time) => {
+  /** True when a bump falls within 0.15 s of one of the scene's own hits, so it is left out whole. */
+  const taken = (b, own) => !!own && own.some((h) => Math.abs(h - b.t) < 0.15);
+  /**
+   * The beat jiggle at global time `time`, 0..1: 1 on a strong downbeat's drum
+   * onset, settled within about 0.12 s. `own` (optional) lists the scene's own
+   * hit times; a bump on one of them is dropped whole so the two never stack.
+   */
+  OM.jiggle = (time, own) => {
     const b = bumpAt(time);
-    return b ? b.w * bumpShape(time - b.t) : 0;
+    return b && !taken(b, own) ? b.w * bumpShape(time - b.t) : 0;
   };
   /** The same jiggle with its beat: { v, k (beat index, for alternating sides), down (on a downbeat) }. */
-  OM.jiggle.beat = (time) => {
+  OM.jiggle.beat = (time, own) => {
     const b = bumpAt(time);
-    return b ? { v: b.w * bumpShape(time - b.t), k: b.k, down: b.down } : { v: 0, k: -1, down: false };
+    return b && !taken(b, own) ? { v: b.w * bumpShape(time - b.t), k: b.k, down: b.down } : { v: 0, k: -1, down: false };
   };
   /** Every bump { t, w, k, down }, for checks. */
   OM.jiggle.bumps = () => allBumps().slice();

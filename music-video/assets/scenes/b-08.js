@@ -216,9 +216,11 @@ vec4 effect(vec2 uv) {
             const w = k >= 0 ? set.words[k] : null;
             const p0 = w ? [(w.x + 10) / 1920, 1 - (w.y - set.cap / 2) / 1080, T - on[k], 1] : [0.5, 0.5, 9, 0];
             const p1 = T >= FLOOD ? [0.5, 0.5, (T - FLOOD) * 0.7, 1.4] : [0.5, 0.5, 9, 0];
+            // The beats between its own hits nudge the camera in by half a percent.
+            const jig = 0.005 * OM.jiggle(T, [...on, ...SNARES, FLOOD, FULL]);
             return {
               amount: e,
-              cam: { zoom: 1 + e * (0.06 + 0.08 * s), rot: e * 0.045 * s, y: e * -22 * s },
+              cam: { zoom: 1 + e * (0.06 + 0.08 * s + jig), rot: e * 0.045 * s, y: e * -22 * s },
               p0, p1,
             };
           })());

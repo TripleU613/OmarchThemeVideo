@@ -267,9 +267,11 @@ OM.scene({
           }
         }
         const ce = V.camEnv(T, start, END);
+        // The board thumps on the beat: a half-percent push on each drum hit, gone in the collapse.
+        const jig = 0.005 * OM.jiggle(T) * (1 - suck);
         fx.apply(T, {
           amount: V.env(T, start, END) * (1 - suck),
-          cam: { zoom: 1 + ce * (0.012 + 0.025 * p), x: ce * -10 * Math.sin(p * 3.1) },
+          cam: { zoom: 1 + ce * (0.012 + 0.025 * p + jig), x: ce * -10 * Math.sin(p * 3.1) },
           p0: [OM.lerp(0.5, 0.18, p), 0, 0, 0],
         });
       },

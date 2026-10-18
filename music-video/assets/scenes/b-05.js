@@ -239,7 +239,9 @@ OM.scene({
               ctx.fillStyle = f > 0.85 ? ink.crest : f > 0.6 ? ink.hover : ink.lit;
               OM.cell(ctx, H, q, r, dpr);
             }
-          B.pool(ctx, IMPACT.x, IMPACT.y, (160 + 90 * pourA) * (1 - 0.8 * shrink), ink.lit, keep * (0.3 * pourA + 0.12 * kick) * (1 - 0.4 * shrink));
+          // The pool also swells on the beats its own kicks and words leave free, until the light drains back.
+          const beat = Math.max(kick, (1 - drainC) * OM.jiggle(T, [...KICKS, ...on]));
+          B.pool(ctx, IMPACT.x, IMPACT.y, (160 + 90 * pourA) * (1 - 0.8 * shrink), ink.lit, keep * (0.3 * pourA + 0.12 * beat) * (1 - 0.4 * shrink));
           // The pool on the floor.
           // The pool condenses into one drop, waiting to rise.
           const pr = (10 * pourA + 4 * kick) * (1 - shrink);
