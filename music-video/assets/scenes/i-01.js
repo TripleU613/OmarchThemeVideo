@@ -8,7 +8,12 @@
 // the fans spin down and their light streams out along the slot as beads, and
 // the cursor types the slot out to both frame edges, accelerating with the
 // roll: the slot, stretched, is the horizon i-02 opens on.
-//
+
+// Edit camera: still while the machine sleeps (the LED's breath is the only pulse in that
+// bar), then it wakes with it on the 5.01 downbeat; the two downbeats that turn the scene
+// (the wake and the 7.18 hit) punch harder than the section's default.
+OM.edit.plan('i-01', { skip: [2.848, 3.388, 3.928, 4.468], down: 2 });
+
 // OM.intro: painters the whole intro shares (scene files load in order).
 OM.intro = (() => {
   const L = OM.HOME;
@@ -47,9 +52,15 @@ OM.intro = (() => {
   }
   const letterOf = new Int8Array(word.w).fill(-1);
   LETTERS.forEach(([a, b], i) => { for (let c = a; c <= b; c++) letterOf[c] = i; });
-  const TYPED = 11.424; // the downbeat the last letter is up on
-  // One letter per eighth, the last on the downbeat; the cursor runs back along the horizon first.
-  const LT = LETTERS.map((_, i) => TYPED - (LETTERS.length - 1 - i) * (OM.SPB / 2));
+  const TYPED = OM.beatOnset(11.424); // the downbeat the last letter is up on (its drum onset, 11.368)
+  // One letter per eighth of the measured beats (each onset and the midpoint to the next), the last on the
+  // downbeat; the cursor runs back along the horizon first. (Stepping back by the fixed tempo instead put the
+  // first three letters 15 ms behind their beats.)
+  const BO = (OM.T && OM.T.beatsOn) || [];
+  const E8 = [];
+  for (let i = 0; i + 1 < BO.length; i++) E8.push(BO[i], (BO[i] + BO[i + 1]) / 2);
+  const k8 = E8.findIndex((x) => Math.abs(x - TYPED) < 0.005);
+  const LT = LETTERS.map((_, i) => (k8 >= LETTERS.length ? E8[k8 - (LETTERS.length - 1 - i)] : TYPED - (LETTERS.length - 1 - i) * (OM.SPB / 2)));
   /** Rows a letter still sits below its home at T: the whole height, rising out of the line with an overshoot, then 0. */
   const lift = (i, T) => {
     const q = OM.ease.outBack(OM.prog(T, LT[i] - 0.14, LT[i] + 0.1), 2.2);
@@ -93,20 +104,26 @@ OM.intro = (() => {
   };
 
   // ---- the dawn (i-02, and the frame i-03 opens on) ----
-  const DAWN0 = 9.265; // the downbeat the sun ignites on
-  const KICK = 12.934; // the letters ignite
+  const DAWN0 = OM.beatOnset(9.265); // the downbeat the sun ignites on (its drum onset, 9.222)
+  // The letters ignite on the hit's attack: 12.986, the onset of that beat. (OM.T.drums puts a kick at 12.962, but
+  // the song's attack is at 12.984-12.986 in every band; that search stopped 40 ms after the old 12.934 and missed it.)
+  const KICK = OM.beatOnset(13.026);
   const DB2 = OM.beatOnset(13.584); // and blaze fully, on that downbeat's drum hit
   const FREEZE = 19.96; // the dawn holds from here, so i-02's last frames and i-03's first are one picture
   const BEATS = OM.downbeatsIn(DAWN0 + 0.5, FREEZE).map((b) => OM.beatOnset(b));
-  const SNARES = [9.636, 14.048, 16.045];
-  const HATS = [13.93, 17.81];
+  const BLINK = OM.beatsIn(7.5, DAWN0).map((b) => OM.beatOnset(b)); // the waiting cursor's beats, at their drum onsets
+  const SNARES = [9.61, 14.068, 16.03]; // measured (OM.T.drums)
+  const HATS = [13.932, 17.81]; // the hi-hat roll, from its first measured hat
+  // The hats the standing cursor blinks on through the roll (a sixteenth either side of each beat), measured on
+  // the song at 2 ms; the fixed tempo drifted up to 42 ms behind them by the roll's end.
+  const BLINKS = [14.204, 14.47, 14.74, 15.01, 15.282, 15.552, 15.824, 16.092, 16.366, 16.634, 16.902, 17.172, 17.44, 17.712];
   const SC = word.w / 2; // the sun's column: the centre of the frame
   const sunRow = (T) => OM.lerp(HR + 2, 8, OM.ease.outCubic(OM.prog(Math.min(T, FREEZE), DAWN0, KICK + 0.6)));
   /** The cursor at T: a single cell gliding along the horizon to after the last letter, then a bar rising on the downbeat, blinking on the hats. */
   const cursor = (T) => {
     if (T < DAWN0) {
       // Waiting at the centre, blinking on the beats.
-      const b = OM.lastHit(OM.beatsIn(7.5, DAWN0), T);
+      const b = OM.lastHit(BLINK, T);
       return { col: MIDC, top: HR, on: T < 8.0 || b === null || T - b < OM.SPB * 0.55 };
     }
     if (T < TYPED) {
@@ -118,7 +135,8 @@ OM.intro = (() => {
       return { col: Math.round(OM.lerp(from, LETTERS[k][1] + 3, OM.ease.outCubic(OM.prog(T, LT[k] - 0.1, LT[k])))), top: HR, on: true };
     }
     const top = Math.round(OM.lerp(HR, CUR.r0, OM.clamp(OM.ease.outBack(OM.prog(T, TYPED, TYPED + 0.2)), 0, 1.1)));
-    const on = T < HATS[0] || T >= HATS[1] || Math.floor((T - HATS[0]) / (OM.SPB / 2)) % 2 === 0;
+    // Through the roll it blinks on the hats: lit round each beat, dark round its off-beat.
+    const on = T < HATS[0] || T >= HATS[1] || OM.hitCount(BLINKS, T) % 2 === 0;
     return { col: CUR.col, top: Math.max(0, top), on };
   };
 
@@ -297,11 +315,13 @@ vec4 effect(vec2 uv) {
 }` });
     const { L, LD, HY, ink, INKS, HR, MIDC, C0, C1, level, buf, at, flush, wake } = OM.intro;
     const END = 7.94;
-    const DB = [2.902, 5.062, 7.221];
+    const DB = [2.902, 5.062, 7.221].map((b) => OM.beatOnset(b)); // the downbeats at their drum onsets: 2.848, 5.013, 7.178
     const WAKE = DB[1], SOLID = DB[2];
     const BREATH = DB[1] - DB[0];
-    const HALF = OM.SPB / 2;
-    const BEATS = OM.beatsIn(0.5, SOLID);
+    // The hats the awake LED flickers on, one per eighth (measured on the song at 2 ms; the fixed tempo drifted
+    // up to 27 ms behind them): bright on the beats, dim on the off-beats.
+    const FLICK = [5.286, 5.554, 5.822, 6.092, 6.364, 6.634, 6.904];
+    const BEATS = OM.beatsIn(0.5, 7.221).map((b) => OM.beatOnset(b)); // the cursor blinks on the drum onsets
 
     // ---- the console, on a lattice 1.5x the home one, its vent slot on the horizon's line ----
     const LM = OM.lattice({ wordWidth: 1770, wordX: 75, wordY: HY - 19.5 * L.ch * 1.5 });
@@ -369,7 +389,7 @@ vec4 effect(vec2 uv) {
         let B;
         if (t < DB[0]) B = OM.smooth(OM.prog(t, 2.62, DB[0]));
         else if (t < WAKE) B = 0.25 + 0.75 * (0.5 + 0.5 * Math.cos((2 * Math.PI * (t - DB[0])) / BREATH));
-        else if (t < SOLID) B = Math.floor((t - WAKE) / HALF) % 2 ? 0.55 : 1;
+        else if (t < SOLID) B = OM.hitCount(FLICK, t) % 2 ? 0.55 : 1;
         else B = 1.15;
         const F = t < WAKE ? 0 : t < SOLID ? 0.3 + 0.9 * OM.ease.inCubic(OM.prog(t, WAKE, SOLID)) : 1.2 * Math.exp(-(t - SOLID) / 0.25);
         const phi = 2 * Math.PI * revs(t);

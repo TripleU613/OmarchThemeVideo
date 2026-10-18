@@ -3,6 +3,14 @@
 // 15x15 mark at 4x4 cells per logo pixel, landing on the intro's big hit with
 // a one-frame crest. Light runs the spiral on the accelerating hi-hat roll;
 // then the mark turns in four hard 90-degree steps on the beats and comes home.
+
+// Edit camera: the scene's own camera already hits most of the drums, so the edit camera
+// stands aside on those beats: the implosion's thumps (21.08, 21.35, 21.62), the lock on the
+// big hit (22.19: the spiral camera snapping off is the intro's biggest moment, and the
+// camera's 22.15 punch and 22.22 kick would blur it), and every counter-roll kick (23.23,
+// 24.85 and the four quarter turns). It keeps the beats in between, and the cut's downbeat.
+OM.edit.plan('i-03', { skip: [21.08, 21.35, 21.617, 22.19, 23.234, 24.853, 26.461, 27.001, 27.535, 28.075] });
+
 OM.scene({
   id: 'i-03',
   build(el, { start }) {
@@ -19,7 +27,7 @@ OM.scene({
     // Hits measured from the drums at 3 ms (the beat grid runs 50-85 ms late here): [time, strength].
     const FILL_A = [[20.946, 1.9], [21.08, 1.25], [21.35, 1.23], [21.617, 1.66], [22.16, 1.66]]; // the implosion punches through these
     const FILL_B = [[23.234, 1.35], [23.506, 1.1], [23.771, 1.4], [24.18, 1.07]];
-    const FILL_C = [[24.853, 1.04], [25.135, 0.94], [25.384, 1.1], [25.651, 1.22], [25.791, 0.93], [25.927, 1.19], [26.197, 1.04], [26.328, 1.11]];
+    const FILL_C = [[24.853, 1.04], [25.116, 0.94], [25.384, 1.1], [25.651, 1.22], [25.791, 0.93], [25.927, 1.19], [26.197, 1.04], [26.328, 1.11]];
     const PULSES = [...FILL_B, ...FILL_C];
     const LAND = 22.16 + 0.03; // the mark lands on the last hit of fill A (its step takes one frame)
     const FRAME = 1 / 30;

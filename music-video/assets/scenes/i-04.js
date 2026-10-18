@@ -9,6 +9,13 @@
 // racks into focus on the ad-lib. The title is set in lattice cells like the
 // wordmark, the subtitle and credit in mono, the way the homepage hero is built.
 // On the 35.11 downbeat the glow blooms into white: the out-handoff.
+
+// Edit camera: the section's defaults, except on the lock (32.91). There the scene's own hit
+// (focus snap, crest flash, streaks and the title's push, at the top of the dolly swell) is
+// the designed moment, and a camera punch on top would carry the title's ends to within a few
+// px of the border band.
+OM.edit.plan('i-04', { skip: [32.914] });
+
 (() => {
   const FONT = "800 132px 'JetBrains Mono'";
   window.__hf = window.__hf || {};
@@ -114,16 +121,17 @@ vec4 effect(vec2 uv) {
 
       // ---- timing (audiomap: kick 30.79, accelerating roll + risers into the 33.0 surge, ad-lib 34.58) ----
       const OPEN = 28.65;
-      const KICK = 30.79;
-      const HUNT = [31.3, 31.556, 31.811, 32.09, 32.345, 32.647, 32.879];
+      // Drum hits as measured on the song (OM.T.drums): the kick, then the roll's hits, one focus step on each.
+      const KICK = 30.77;
+      const HUNT = [31.302, 31.572, 31.838, 32.108, 32.374, 32.644, 32.778];
       const LOCK = OM.beatOnset(OM.downbeatsIn(32.5, 33.5)[0]); // 32.913, the drum hit on the 32.949 downbeat
-      const CREDIT = OM.beatsIn(34.4, 34.8)[0]; // 34.575
+      const CREDIT = OM.beatsIn(34.4, 34.8)[0]; // 34.575: on the ad-lib's voice (about 34.59), not a drum hit
       const END = 36.711;
-      const BLOOM = OM.downbeatsIn(35, 35.2)[0]; // 35.109
+      const BLOOM = OM.beatOnset(OM.downbeatsIn(35, 35.2)[0]); // 35.062, the drum hit on the 35.109 downbeat
       const WHITE = END - 0.08; // the last frames are exactly the white handoff
       const white = OM.theme('white').bg;
       // The assembly: the mark's cells fly into the title's, one word locking in on each hit.
-      const HITS = [29.164, 29.304, 29.977];
+      const HITS = [29.164, 29.292, 29.954]; // the beat, the snare and the kick (measured)
       const LAUNCH = [28.8, 28.86, 29.4];
       const ASSEMBLED = HITS[2] + 0.4;
       // Focus: 1 = the title sharp. Assembled sharp; it slips on the 30.79 kick, hunts on the roll, locks on the downbeat.

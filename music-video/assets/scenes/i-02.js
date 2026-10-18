@@ -4,7 +4,7 @@
 // after the last letter as a text cursor, rising as a bar on the 9.27
 // downbeat. The wordmark (75% of the frame) is a crisp silhouette with a dark
 // keyline and a rim on the sun side; the dawn builds behind it through the
-// perc roll; on the 12.93 kick and the 13.58 downbeat the letters ignite and
+// perc roll; on the 12.99 hit and the 13.52 downbeat the letters ignite and
 // the sky steps back, so the name blazes alone, breathing on the snares and
 // shimmering on the hats, until the riser swells everything.
 // The dawn holds from 19.96, the frame i-03 opens on (OM.intro.dawn).
@@ -13,6 +13,12 @@
 // smeared back along the line to the sun so shafts stream between the
 // letters. Extras: the brightest stars glint out one by one as the sky
 // fills, and one long flare runs along the horizon on the kick.
+
+// Edit camera: the section's defaults fit. The crane is slow and nothing of the scene's own
+// camera moves on the drums except one punch on the 12.99 hit (below), where the camera's
+// jolt on that beat (the strongest of the intro so far) shakes it: the ignition is the big hit.
+OM.edit.plan('i-02', {});
+
 OM.scene({
   id: 'i-02',
   build(el, { start, duration }) {
@@ -40,6 +46,16 @@ vec4 effect(vec2 uv) {
     const { LD: L, HY, ink, HR, R0, C0, C1, sunRow, DAWN0, KICK, dawn, FREEZE } = OM.intro;
     const END = start + duration;
     const horizonY = HY;
+    // The ignition hit: one 3% zoom punch of the scene's own camera, the edit kit's punch shape (a 16 ms rise, then a
+    // smooth settle to exactly 0 in 0.2 s) peaking on the hit's attack, KICK. Written out here rather than through
+    // OM.edit.scene, whose kick list puts this hit 24 ms early (see OM.intro.KICK).
+    const punch = (T) => {
+      const d = T - KICK;
+      if (d < -0.016 || d >= 0.2) return 0;
+      if (d < 0) return 0.5 - 0.5 * Math.cos((Math.PI * (d + 0.016)) / 0.016);
+      const u = d / 0.2;
+      return (1 - u) ** 3 * (1 + 3 * u);
+    };
     // The brightest stars, the same cells the dawn paints, each with its own moment to go out.
     const GLINTS = [];
     for (let row = R0; row < HR - 3; row++)
@@ -89,7 +105,7 @@ vec4 effect(vec2 uv) {
           // Rays ease back while the lit name holds the frame, and surge again on the riser.
           amount: OM.post.envelope(T, start, END, { ramp: 0.6, hold: 0.12 }) * OM.smooth(OM.prog(T, DAWN0, DAWN0 + 2.5))
             * (1 - 0.55 * OM.smooth(OM.prog(T, 13.6, 14.0)) * (1 - OM.smooth(OM.prog(T, 17.9, 19.3)))),
-          cam: { zoom: 1 + 0.075 * lift, y: -55 * lift },
+          cam: { zoom: (1 + 0.075 * lift) * (1 + 0.03 * punch(T)), y: -55 * lift },
           p0: [0.5, 1 - sunY / 1080, 0.55, 1.2 + 1.6 * (T >= KICK ? Math.exp(-(T - KICK) / 0.6) : 0)],
         });
       },
