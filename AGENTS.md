@@ -24,7 +24,9 @@ the pipeline works; this file is what you must not break.
    screenshot. The ideas live in `storyboard/IDEAS.md`.
 2. **The words are the material.** A scene draws its own line's words with
    `OM.sung(id)` and calls `OM.ownWords.add(id)`. The words are what the idea acts
-   on, never a caption; every word lands on its sung onset.
+   on, never a caption; every word lands on its sung onset. Words stay whole and
+   in frame: never under the 40 px border band, never covered or struck through
+   by the scene's own props, and never with a stray shape in the gap between two.
 3. **Words come from the lyrics file.** Scenes never hard-code the words: they
    draw their line through `OM.sung(id)`, so a fix in `lyrics.txt` (then
    `npm run lyrics:build`) reaches every scene. Refer to lines by id in code.
@@ -42,9 +44,16 @@ the pipeline works; this file is what you must not break.
    The White theme belongs only to the rented-world verse (v1-01 to v1-03).
    Everything is drawn as lattice light and clean silhouettes: never photoreal,
    no copyrighted characters, no replays of omarchy.org's own animations, and
-   the wordmark is rationed to the naming lines and the bookends.
+   the wordmark is rationed to the naming lines and the bookends. No grain,
+   scanlines, vignette, lens flare or ghosts, chromatic aberration, bloom haze or
+   drop shadows (the full banned list is in `storyboard/WORKER.md`).
 7. **Hit the music.** `npm run facts <id>` lists each scene's beats; the key word
-   gets the biggest moment.
+   gets the biggest moment. The beat grid (`OM.T.beats`, `OM.T.downbeats`,
+   `OM.beatsIn`, `OM.downbeatsIn`, and any number copied from them) runs about
+   46 ms late against the drums, so a visible hit on a grid time goes through
+   `OM.beatOnset(t)`, which returns that beat's drum onset. Kick and snare times
+   in `assets/lib/frame-need.js` and word onsets are already on the drum. All
+   analysis times sit on 23 ms frames, so about ±12 ms is as close as the data goes.
 8. **Budget:** 12 ms per frame or less at 1080p in the dev player.
 9. **Camera and effects belong to the scene.** Each scene runs its own camera
    move and shader through `OM.post` (its row in `storyboard/FX.md`). Effect
@@ -55,6 +64,13 @@ the pipeline works; this file is what you must not break.
    (`assets/lib/frame-need.js`), and subtler where only some edges are empty.
    Beneath them, a faint pixelated rim fog is always on: it breathes on the beat and
    takes the picture's edge colour. All of it is continuous across every cut.
+10. **The beat jiggle is opt-in.** `OM.jiggle(T, ownHits)` (`assets/lib/kit.js`) is
+   0..1: one small bump per beat while the drums play, peaking on the drum onset,
+   back to exactly 0 within 0.17 s, and 0 within 34 ms of every cut. A scene adds
+   it to its own camera or one element (about 0.5% zoom), scaled by its own camera
+   envelope, and passes its own hit times so no bump stacks on them. Use it only
+   where nothing in the scene already moves on the drums: today v2-05, b-05 and
+   b-08 (noted in their `storyboard/FX.md` rows).
 
 ## Working rules
 

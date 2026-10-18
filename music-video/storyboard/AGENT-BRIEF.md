@@ -12,7 +12,8 @@ through agreed **handoff frames**.
 - Project: `/home/tripleu/Omarchy Video/music-video`
 - **Your file: `assets/scenes/<id>.js`. It is the only file you may create or edit.**
 - API to read: `assets/lib/om.js` (math, easing, lattice, inks, canvas),
-  `assets/lib/kit.js` (line and word timing, beats, audio, hero field, wordmark painter),
+  `assets/lib/kit.js` (line and word timing, beats and `OM.beatOnset`, the beat
+  jiggle `OM.jiggle`, audio, hero field, wordmark painter),
   `assets/lib/handoff.js` (handoff frames and the lyric helper).
 - Idioms worth copying: `assets/scenes/i-04.js` (layered canvas, float blur, type
   rasterized into cells), `assets/scenes/v1-08.js`, `assets/scenes/c1-03.js`.
@@ -90,7 +91,11 @@ The names are night, spark, glow, field, word, screen, grid, line and spot; read
   the screensaver, the hero's click stamp, roaming sprite or music spectrum, or the
   site's theme wipe. No wordmark unless your brief says so. No full-frame overlay shader.
 - **Hit the music.** Your brief lists the downbeats, kicks and rolls in your window,
-  and the key word gets the biggest moment.
+  and the key word gets the biggest moment. Put a hit on a beat-grid time through
+  `OM.beatOnset(t)` (the grid runs about 46 ms late; this returns the drum onset).
+  Kick and snare event times are already on the drum.
+- **Keep the words whole.** Never under the 40 px border band, never covered or
+  struck through by your props, no stray shape in the gap between two words.
 
 ## Checking your work
 
@@ -118,8 +123,10 @@ rounds. Don't run assemble and don't edit any other file; the orchestrator does 
   word timings (timing only) and the music inside it.
 - **Timing accuracy:** the beat grid (beats and downbeats) runs about 46 ms late
   against the real drums, measured across the whole song. Kick and snare events
-  and word onsets are accurate. For a hard visual hit, use the nearest kick or
-  snare event rather than the downbeat until the grid is corrected.
+  and word onsets are accurate (all analysis times sit on 23 ms frames). For a
+  hard visual hit, use the kick or snare event, or wrap the grid time in
+  `OM.beatOnset(t)`, which returns that beat's drum onset. Never key a hit to a
+  raw grid time.
 - Ideas: your section in `storyboard/IDEAS.md`. Scenes marked **keep** get refined:
   keep their device, give their words the words-as-motion treatment, and meet the cuts.
 - The approved bar is chorus 1: read a couple of `assets/scenes/c1-0*.js` to see
