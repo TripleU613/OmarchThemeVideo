@@ -64,7 +64,7 @@
       // the whole tunnel implodes, accelerating, onto the point by the 243.020
       // snare (the strongest hit before the drop), where it bursts out once.
       const HIT = 243.020;
-      const SQ = [[242.323, 0], [242.486, 0.3], [242.881, 0.55]];
+      const SQ = [[DOWN[4], 0], [242.486, 0.3], [242.881, 0.55]];
       const squeeze = (T) => {
         if (T >= 242.881) return OM.lerp(0.55, 1, OM.ease.inCubic(OM.prog(T, 242.881, HIT)));
         for (let i = SQ.length - 1; i >= 0; i--) if (T >= SQ[i][0]) {

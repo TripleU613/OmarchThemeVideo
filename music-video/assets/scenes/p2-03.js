@@ -37,7 +37,7 @@ OM.scene({
     const h = OM.cellAt(L, 960, 540);
     const AVE = h.row; // the avenue runs along the centre row
     const PX = L.x0 + (h.col + 0.5) * L.cw, PY = L.y0 + (h.row + 0.5) * L.ch; // the spark's cell
-    const DB = 154.854, KICK2 = 154.97, CLIMB = 155.45, GONE = END - 0.09;
+    const DB = OM.beatOnset(154.854), KICK2 = 154.97, CLIMB = 155.45, GONE = END - 0.09;
     const cellX = (col) => L.x0 + col * L.cw, cellY = (row) => L.y0 + row * L.ch;
 
     let lay = null;

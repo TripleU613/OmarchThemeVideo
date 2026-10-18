@@ -77,7 +77,7 @@
   // ---------- the tunnel: camera depth Z(T), closed form ----------
   const T0 = 233.802; // x-b2's first downbeat: the tunnel starts moving here
   const V0 = 1.2, K = Math.log(2) / 2.136; // speed doubles every bar
-  const DOWN = [233.802, 235.915, 238.051, 240.187, 242.323];
+  const DOWN = [233.802, 235.915, 238.051, OM.beatOnset(240.187), OM.beatOnset(242.323)]; // the last two on their drum onsets
   const KICKS = [234.289, 235.636, 236.124, 236.286, 237.354, 237.703, 239.351, 239.862, 240.025, 240.419, 240.930, 241.093, 241.464, 241.604, 241.998, 242.416, 242.695, 242.811];
   const Zc = (T) => {
     const tau = Math.max(0, T - T0);
