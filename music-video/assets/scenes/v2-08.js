@@ -25,8 +25,7 @@ OM.scene({
       vec2 d = (uv - vec2(0.5, hy)) * vec2(uRes.x / uRes.y, 1.0);
       float halo = exp(-length(d) * 7.0) * 0.35;
       float streak = exp(-abs(d.y) * 160.0) * exp(-abs(d.x) * 1.6) * 0.5;
-      float ring = smoothstep(0.02, 0.0, abs(length(d - vec2(0.0, -0.18)) - 0.07)) * 0.08;
-      return vec4(c + vec3(0.73, 0.87, 0.59) * (halo + streak + ring) * s, 1.0);
+      return vec4(c + vec3(0.73, 0.87, 0.59) * (halo + streak) * s, 1.0);
     }`;
     const c = OM.canvas(cv, { alpha: false });
     const fx = OM.post(el, c, { effect: FX });

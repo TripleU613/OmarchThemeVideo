@@ -185,7 +185,7 @@ OM.scene({
     const END = start + duration;
     const SLOT = V.grid(N);
     const SCREEN = { x: 320, y: 140, w: 1280, h: 800 };
-    const DB = V.hitsIn(OM.T && OM.T.downbeats, start, END, [116.518, 118.654]);
+    const DB = V.hitsIn(OM.T && OM.T.downbeats, start, END, [116.518, 118.654]).map(OM.beatOnset);
     const PULL = 0.11; // the magnetic pull into the tile, accelerating to the click
     const CL0 = END - 0.42, CL1 = END - 0.08; // the words clear, gradually, by the cut
     const rng = OM.rng(2101);

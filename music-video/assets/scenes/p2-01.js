@@ -101,7 +101,7 @@ OM.ownWords.add('p2-01');
       const END = start + duration;
       const h = OM.cellAt(L, 960, 540);
       const YC = L.y0 + (h.row + 0.5) * L.ch; // the rail: the handoff line's centre
-      const DB = 150.605, EXIT = 151.2;
+      const DB = OM.beatOnset(150.605), EXIT = 151.2;
 
       let lay = null;
       const layout = () => {
