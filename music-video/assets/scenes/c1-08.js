@@ -10,6 +10,11 @@
 // on and the spotlight cuts out, and the camera pushes into the screen until the
 // frame is the screen handoff.
 OM.ownWords.add('c1-08');
+// Edit camera: the defaults fit. The scene's own camera never hits a drum (crane, creep, push), so
+// the camera's beats land its moments: the yank (111.136), the outline waking (112.200) and the
+// power-on flash (114.334), the push setting off on the kick after it; the key word, off the beat,
+// carries its own punch.
+OM.edit.plan('c1-08', {});
 (() => {
   const TYPE = "800 100px 'JetBrains Mono'";
   window.__hf = window.__hf || {};
@@ -79,8 +84,12 @@ OM.ownWords.add('c1-08');
       const th = OM.theme('tokyo-night');
       const [w0, w1, w2] = OM.words('c1-08');
       const DB1 = OM.beatOnset(OM.downbeatsIn(112, 112.5)[0] || 112.245); // on its kick, not the late grid
-      const DB2 = OM.downbeatsIn(114.2, 114.6)[0] || 114.381;
-      const KICK = 110.99, ROLL0 = 112.71, ROLL1 = 114.33, SN_PRE = 113.43, SN_A = 113.78, SN_B = 113.94;
+      const DB2 = OM.beatOnset(OM.downbeatsIn(114.2, 114.6)[0] || 114.381); // on the drum: 114.334
+      // A hit on the drum as measured on the song (OM.T.drums), the nearest within 50 ms.
+      const onDrum = (t, kind) => OM.edit.hits(kind, t - 0.05, t + 0.05).reduce((m, h) => (m === null || Math.abs(h[0] - t) < Math.abs(m - t) ? h[0] : m), null) ?? t;
+      const KICK = onDrum(110.99, 'kick'), ROLL0 = 112.71, ROLL1 = 114.33;
+      const [SN_PRE, SN_A, SN_B] = [113.43, 113.78, 113.94].map((t) => onDrum(t, 'snare')); // 113.398, 113.800, 113.938
+      const PUSH0 = onDrum(114.38, 'kick'); // the push into the screen sets off on the downbeat's kick (114.382)
       const OUT = start + duration - 0.07; // the push eases to a stop on the screen handoff, held for the last two frames
       const LIFT0 = start + 0.075; // the first frames are the spot handoff exactly
       const RELIEF = OM.mix(th['surface-2'], th['border-strong'], 0.6);
@@ -308,9 +317,9 @@ OM.ownWords.add('c1-08');
 
       /** Camera zoom about the frame centre: a creep while the machine stands, then the push into the screen. */
       const camera = (T) => {
-        const creep = 1 + CREEP * OM.ease.inOutSine(OM.prog(T, w1, DB2));
-        if (T <= DB2) return creep;
-        return (1 + CREEP) * Math.pow(PUSH / (1 + CREEP), OM.ease.inOutCubic(OM.prog(T, DB2, OUT)));
+        const creep = 1 + CREEP * OM.ease.inOutSine(OM.prog(T, w1, PUSH0));
+        if (T <= PUSH0) return creep;
+        return (1 + CREEP) * Math.pow(PUSH / (1 + CREEP), OM.ease.inOutCubic(OM.prog(T, PUSH0, OUT)));
       };
 
       // ---- camera: craning down from c1-07's high hold onto the stage as the lift rises; the push is camera() above ----
@@ -319,7 +328,9 @@ OM.ownWords.add('c1-08');
         const down = 1 - OM.smooth(OM.prog(T, start, w0 + 0.4));
         const y = CR.Y * down;
         const amount = OM.post.envelope(T, start, DB2 + 0.5, { ramp: 0.35, hold: 0.075 }) * (T < DB2 ? 1 : 0);
-        return { amount, cam: { zoom: OM.c1.cover(0, 0, y), rot: 0, x: 0, y }, p0: [camera(T), 0, 0, 0] };
+        // The key word's punch: the camera hits as it ignites the base band (the starfall lands on it).
+        const a = T - w2, kp = a < 0 || a >= 0.8 ? 0 : (1 - Math.exp(-a / 0.015)) * Math.exp(-a / 0.14) * (1 - OM.smooth(OM.prog(a, 0.5, 0.8)));
+        return { amount, cam: { zoom: OM.c1.cover(0, 0, y) * (1 + 0.055 * kp), rot: 0, x: 0, y }, p0: [camera(T), 0, 0, 0] };
       };
       // ---- extras: stage smoke drifting low across the floor, a puff of dust where the cloth's hem drags off ----
       const smoke = (ctx, T, X, Y, s, vis) => {

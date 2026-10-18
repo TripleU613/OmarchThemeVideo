@@ -10,6 +10,10 @@
 // kick the lattice cuts through the render as a shockwave and the render's
 // cells pop out from the edges in; on the snare the letters snap into lattice
 // cells that hollow out into the grid itself, landing on the grid handoff.
+// Edit camera: the defaults fit. Nothing in the scene's own camera hits a drum (it pans with the
+// voice); the key word adds its own punch to the camera's jolt on its beat (98.866), and the
+// 99.974 kick's shockwave rides the camera's backbeat jolt there.
+OM.edit.plan('c1-05', {});
 (() => {
   const ID = 'c1-05';
   OM.ownWords.add(ID);
@@ -54,7 +58,10 @@
       const sung = OM.sung(ID);
       const on = sung.map((w) => w.t0);
       // Hits: the kick under word 1, the downbeat in the held word, the kick where the energy turns high, the snare.
-      const KICK1 = 98.36, KICK2 = 100.01, SNARE = 100.7;
+      // Each on the drum as measured on the song (OM.T.drums): 98.350, 99.974, 100.734.
+      const onDrum = (t, kind) => OM.edit.hits(kind, t - 0.05, t + 0.05).reduce((m, h) => (m === null || Math.abs(h[0] - t) < Math.abs(m - t) ? h[0] : m), null) ?? t;
+      const KICK1 = onDrum(98.36, 'kick'), KICK2 = onDrum(100.01, 'kick'), SNARE = onDrum(100.7, 'snare');
+      const SHOCK = onDrum(100.22, 'kick');
       const DOWN = OM.beatOnset(OM.downbeatsIn(on[2], KICK2)[0] || 99.451); // the drum onset, not the late grid
       const D = [0.26, 0.2, 0.34]; // seconds each window takes to render, cell by cell
 
@@ -433,7 +440,9 @@
           x -= lean(2) * OM.smooth(OM.prog(T, KICK2, KICK2 + 0.5));
         }
         x *= e;
-        const zoom = (1 + 0.012 * e) * OM.c1.cover(0, x, 0);
+        // The key word's punch: a quick push in on its onset, the scene's biggest camera move.
+        const a = T - on[2], kp = a < 0 ? 0 : (1 - Math.exp(-a / 0.015)) * Math.exp(-a / 0.14);
+        const zoom = (1 + 0.012 * e + 0.055 * e * kp) * OM.c1.cover(0, x, 0);
         const amount = e * (1 - OM.smooth(OM.prog(T, on[0], on[2] + D[2] + 0.25)));
         return { amount, cam: { zoom, rot: 0, x, y: 0 } };
       };
@@ -582,8 +591,8 @@
             ctx.fillStyle = ink.bg;
             runs(lay.die, T, (x, y, w, h) => ctx.fillRect(x, y, w, h));
           }
-          // Pause sprinkle, lattice aftershock: the 100.22 kick shakes the ruled lattice once more, under the letters.
-          const shock = T >= 100.22 && T < 100.5 ? Math.pow(0.5, (T - 100.22) / 0.06) : 0;
+          // Pause sprinkle, lattice aftershock: the 100.206 kick shakes the ruled lattice once more, under the letters.
+          const shock = T >= SHOCK && T < SHOCK + 0.28 ? Math.pow(0.5, (T - SHOCK) / 0.06) : 0;
           if (shock > 0.03) {
             ctx.globalAlpha = 0.8 * shock;
             ctx.fillStyle = ink.mid;

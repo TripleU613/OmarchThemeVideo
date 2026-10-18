@@ -9,6 +9,9 @@
 // On the snare where the chorus lifts, the small type is distributed: sort by
 // sort it pops back off the paper, leaving only the name, at home.
 OM.ownWords.add('c1-03');
+// Edit camera: the big press on the 90.856 kick is the scene's own punch (with its overshoot),
+// so the camera's downbeat there is skipped; every other beat keeps the defaults.
+OM.edit.plan('c1-03', { skip: [90.86] });
 (() => {
   const FONT = "800 100px 'JetBrains Mono'";
   window.__hf = window.__hf || {};
@@ -51,9 +54,13 @@ OM.ownWords.add('c1-03');
       const on = OM.words('c1-03');
       const END = start + duration;
       // The name's syllables: O on its onset, MAR on the half-beat before the
-      // downbeat (a small kick there), CHY on the 90.86 kick into the 90.906
-      // downbeat. The small type lifts off from the 92.07 snare, where energy goes high.
-      const MAR = 90.639, KICK = 90.86, LIFT = 92.07, LIFTED = 0.32;
+      // downbeat (a small kick there), CHY on the 90.856 kick on the downbeat.
+      // The small type lifts off from the 92.05 snare, where energy goes high.
+      // Every hit is on the drum as measured on the song (OM.T.drums, OM.T.beatsOn).
+      const onDrum = (t, kind) => OM.edit.hits(kind, t - 0.05, t + 0.05).reduce((m, h) => (m === null || Math.abs(h[0] - t) < Math.abs(m - t) ? h[0] : m), null) ?? t;
+      const BO = (OM.T && OM.T.beatsOn) || [], bi = BO.findIndex((b) => b > 90.7);
+      const MAR = bi > 0 && BO[bi] - BO[bi - 1] < 0.7 ? (BO[bi - 1] + BO[bi]) / 2 : 90.592;
+      const KICK = onDrum(90.86, 'kick'), LIFT = onDrum(92.07, 'snare'), LIFTED = 0.32;
       const SHADOW = 0.5, FALL = 0.24, BITE = 0.18, COOL = 0.8;
 
       /** A block pressed at `hit`: cells [col, row, letter] on lattice G, its HOME-cell box and centre. */
@@ -158,7 +165,8 @@ OM.ownWords.add('c1-03');
       // ---- camera: a punch in on every press, overshooting back; then a slow push carried through the cut ----
       const th = OM.theme('tokyo-night');
       const PUSH = OM.c1.push34, T0 = END - (2 * (PUSH.ZOOM - 1)) / PUSH.SPEED;
-      const PUNCH = [[on[0], 0.022], [on[1], 0.018], [on[2], 0.026], [MAR, 0.026], [KICK, 0.06]];
+      const PUNCH = [[on[0], 0.022], [on[1], 0.018], [on[2], 0.026], [MAR, 0.026], [KICK, 0.07]];
+      const KISSES = [91.88, 92.16, 93.0].map((t) => onDrum(t, 'kick')), SHIMMERS = [91.39, 92.07, 92.62, 93.09].map((t) => onDrum(t, 'snare'));
       const punch = (a) => (a < 0 ? 0 : (1 - Math.exp(-a / 0.018)) * Math.exp(-a / 0.16) * Math.cos((2 * Math.PI * a) / 0.42));
       const look = (T) => {
         let zoom = 1 + 0.022 * OM.smooth(OM.prog(T, on[0] - 0.15, on[0])) * (1 - OM.smooth(OM.prog(T, 91.6, 92.4)));
@@ -263,7 +271,7 @@ OM.ownWords.add('c1-03');
           // Pause sprinkles. Platen kiss: on each kick the platen comes down lightly on the name again and an
           // impact line runs out above and below it (kept tight while the small type still sits above).
           // Fresh-ink shimmer: on each snare a band of the name's cells re-wets to hover in dither order.
-          for (const k0 of [91.88, 92.16, 93.0]) {
+          for (const k0 of KISSES) {
             const age = T - k0;
             if (age < 0 || age >= 0.2) continue;
             const reach = Math.round(1 + (k0 < LIFT + 0.4 ? 1 : 4) * OM.ease.outExpo(age / 0.2));
@@ -271,7 +279,7 @@ OM.ownWords.add('c1-03');
             for (let col = NB.c0 - reach; col <= NB.c1 + reach; col++)
               for (const row of [NB.r0 - reach, NB.r1 + reach]) if (OM.threshold(col, row) > 0.25 + age / 0.2) OM.cell(ctx, L, col, row, dpr);
           }
-          for (const s0 of [91.39, 92.07, 92.62, 93.09]) {
+          for (const s0 of SHIMMERS) {
             const a = (T - s0) / 0.22;
             if (a < 0 || a >= 1) continue;
             ctx.fillStyle = ink.hover;

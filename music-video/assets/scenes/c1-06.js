@@ -10,12 +10,17 @@
 // drain into the run line, the letters fold up into it, and it runs out across
 // the frame as the crest line.
 OM.ownWords.add('c1-06');
+// Edit camera: the check on the downbeat after the last word (103.672) is the payoff, so the scene
+// punches it itself with the sweep and the camera's downbeat there is skipped; the rest are defaults.
+OM.edit.plan('c1-06', { skip: [103.67] });
 (() => {
   const FONT = "800 100px 'JetBrains Mono'";
   window.__hf = window.__hf || {};
   window.__hf.buildReady = window.__hf.buildReady || {};
   window.__hf.buildReady['c1-06-type'] = document.fonts.load(FONT);
-  const KICKS = [101.54, 102.59, 105.88]; // strong kicks (audiomap)
+  /** A hit on the drum as measured on the song (OM.T.drums): the nearest within 50 ms, else t. */
+  const onDrum = (t, kind) => OM.edit.hits(kind, t - 0.05, t + 0.05).reduce((m, h) => (m === null || Math.abs(h[0] - t) < Math.abs(m - t) ? h[0] : m), null) ?? t;
+  const KICKS = [101.54, 102.59, 105.88].map((t) => onDrum(t, 'kick')); // the strong kicks, on the drum
 
   OM.scene({
     id: 'c1-06',
@@ -121,7 +126,7 @@ OM.ownWords.add('c1-06');
 
       // Wild: a shuffle, re-swapped on the sixteenths before the first word. The first seed whose
       // shuffle is gibberish, moves bars on every level and reshuffles most of the line on the last wins.
-      const SIX = OM.SPB / 4, beat0 = OM.beatsIn(start - 0.05, start + 0.05)[0] ?? start;
+      const SIX = OM.SPB / 4, beat0 = OM.beatOnset(OM.beatsIn(start - 0.05, start + 0.05)[0] ?? start);
       let wild, sorted;
       for (let seed = 0xc106; seed < 0xc106 + 400; seed++) {
         const rnd = OM.rng(seed);
@@ -152,11 +157,13 @@ OM.ownWords.add('c1-06');
       const calmOf = (level) => 0.03 + 0.97 * Math.pow(1 - level / K, 1.3);
 
       // The check on the downbeat after the last word; out: drain on the beat, fold on the downbeat, run out on the kick.
-      const CHECK = OM.downbeatsIn(last + 0.15, last + 2)[0] ?? last + 0.4, SWEEP = 0.7;
-      const FOLD = OM.downbeatsIn(CHECK + 1, END - 0.3)[0] ?? END - 0.55;
-      const DRAIN = OM.beatsIn(FOLD - OM.SPB - 0.05, FOLD - 0.05)[0] ?? FOLD - OM.SPB;
+      // Grid times go through OM.beatOnset, so each lands on the drum.
+      const CHECK = OM.beatOnset(OM.downbeatsIn(last + 0.15, last + 2)[0] ?? last + 0.4), SWEEP = 0.7;
+      const FOLDG = OM.downbeatsIn(CHECK + 1, END - 0.3)[0], FOLD = FOLDG !== undefined ? OM.beatOnset(FOLDG) : END - 0.55;
+      const DRAIN = OM.beatOnset(OM.beatsIn((FOLDG ?? FOLD) - OM.SPB - 0.05, (FOLDG ?? FOLD) - 0.05)[0] ?? FOLD - OM.SPB);
       const SPREAD = KICKS.find((k) => k >= FOLD && k < FOLD + 0.2) ?? FOLD + 0.04;
       const OUT = Math.min(SPREAD + 0.3, END - HOLD);
+      const TICKS = [104.35, 104.89, 104.95, 105.42, 105.51].map((t) => onDrum(t, 'snare')), THUMP = onDrum(105.14, 'kick');
       const RISE = start + HOLD, GROW = Math.max(0.28, on[0] + 0.03 - RISE); // the chart grows in, eased, arriving with word 0
       // The check: a front from off-left to off-right, fast off the downbeat; passed(x) is when it crosses x.
       const front = (T) => OM.lerp(-80, 2000, OM.ease.outCubic(OM.prog(T, CHECK, CHECK + SWEEP)));
@@ -175,7 +182,9 @@ OM.ownWords.add('c1-06');
         let z = 0;
         for (const t0 of LEVELS) if (T > t0) z += STEP * back(OM.clamp((T - t0) / 0.26));
         z *= 1 - OM.smooth(OM.prog(T, CHECK + SWEEP, DRAIN));
-        const zoom = 1 + z * OM.post.envelope(T, start, OUT, { ramp: 0.3, hold: HOLD });
+        // The check's punch: the line reads, and the camera hits the downbeat with the sweep.
+        const ca = T - CHECK, cp = ca < 0 ? 0 : (1 - Math.exp(-ca / 0.015)) * Math.exp(-ca / 0.14);
+        const zoom = 1 + (z + 0.065 * cp) * OM.post.envelope(T, start, OUT, { ramp: 0.3, hold: HOLD });
         const peak = OM.smooth(OM.prog(T, CHECK - 0.06, CHECK + 0.1)) * (1 - OM.smooth(OM.prog(T, CHECK + SWEEP, CHECK + SWEEP + 0.35)));
         const amount = OM.post.envelope(T, start, OUT, { ramp: 0.4, hold: HOLD }) * (0.45 + 0.55 * peak);
         return { amount, cam: { zoom }, p0: [front(T) / 1920, peak, 0, 0] };
@@ -222,13 +231,12 @@ OM.ownWords.add('c1-06');
           const uRise = OM.ease.inOutCubic(OM.prog(T, RISE, RISE + GROW));
 
           // Pause sprinkles. Checker tick: each snare runs a crest cursor along the sorted bar tops, left to right,
-          // re-checking the order. Run-line thump: the 105.14 kick squashes every bar a cell into the run line.
-          const TICKS = [104.35, 104.89, 104.95, 105.42, 105.51];
+          // re-checking the order. Run-line thump: the 105.154 kick squashes every bar a cell into the run line.
           const tick = (col) => TICKS.some((s0) => {
             const a = (T - s0) / 0.3;
             return a >= 0 && a < 1 && Math.abs(col - OM.lerp(COL0 - 4, COL1 + 4, a)) < PITCH * 4.5;
           });
-          const thump = T >= 105.14 && T < 105.3 ? Math.pow(0.5, (T - 105.14) / 0.05) : 0;
+          const thump = T >= THUMP && T < THUMP + 0.16 ? Math.pow(0.5, (T - THUMP) / 0.05) : 0;
           // Bars: height is the letter's place in the line, jumping with the spectrum while unsorted.
           for (let v = 0; v < N; v++) {
             const rise = OM.ease.inOutCubic(OM.prog(T, RISE + delay[v], RISE + delay[v] + GROW - 0.03));

@@ -9,6 +9,11 @@
 // flare. On the last kick the camera pushes past the friend into the screen
 // while the words dither off and the room goes dark, leaving the empty screen.
 OM.ownWords.add('c1-04');
+// Edit camera: the first two words land with the scene's own camera punch on the beats at 93.518 and
+// 94.074, and the last kick (97.284) starts its own push into the screen, so those beats are skipped.
+// The snare roll's build and drop (95.130) land the pull-back; the key word adds its own punch to the
+// camera's jolt on its beat (96.734).
+OM.edit.plan('c1-04', { skip: [93.52, 94.07, 97.27] });
 (() => {
   const FONT = "800 200px 'JetBrains Mono'";
   window.__hf = window.__hf || {};
@@ -134,10 +139,12 @@ OM.ownWords.add('c1-04');
 
       // ---- timing (snare fill 93.81, kick 94.06, roll into the 95.18 downbeat, hats into w2, kick 97.27) ----
       const PULL0 = OM.line('c1-04').words[cut][1];
-      const DROP = OM.downbeatsIn(95, 95.4)[0] || 95.179;
+      // A hit on the drum as measured on the song (OM.T.drums), the nearest within 50 ms.
+      const onDrum = (t, kind) => OM.edit.hits(kind, t - 0.05, t + 0.05).reduce((m, h) => (m === null || Math.abs(h[0] - t) < Math.abs(m - t) ? h[0] : m), null) ?? t;
+      const DROP = OM.beatOnset(OM.downbeatsIn(95, 95.4)[0] || 95.179); // on the drum: the roll lands at 95.130
       const TURN0 = DROP + 0.22, TURN1 = W2 - 0.03;
       const DIS0 = DROP + 0.12, DIS1 = TURN1 - 0.05;
-      const KICK2 = 97.27;
+      const KICK2 = onDrum(97.27, 'kick');
       const DB2 = OM.beatOnset(OM.downbeatsIn(97.2, 97.5)[0] || 97.315); // on the drum, with KICK2
       const FADE0 = END - 0.4, FADE1 = END - 0.05;
       const SEAM = 0.05;
@@ -162,7 +169,7 @@ OM.ownWords.add('c1-04');
       const camAt = (T) => {
         const Db = dolly(T);
         const q = OM.clamp(Math.log(Db / D0) / lnW);
-        const punch = 1 + 0.03 * kick(ON.slice(0, cut + 1), T) + 0.012 * kick(ON.slice(cut + 1), T);
+        const punch = 1 + 0.03 * kick(ON.slice(0, cut + 1), T) + 0.012 * kick(ON.slice(cut + 1, KEY), T) + 0.045 * kick([ON[KEY]], T);
         const home = T >= KICK2 ? 1 - OM.ease.outCubic(OM.prog(T, KICK2, END - SEAM)) : 1;
         return {
           D: Db / punch,
@@ -188,9 +195,10 @@ OM.ownWords.add('c1-04');
         if (T >= DB2) g += 0.3 * Math.exp(-(T - DB2) / 0.22);
         // Pause sprinkle, rim-light roll: in the gap the two lit words throb on the snare roll and the kick,
         // so the faces' rim light, the keys and the table pool answer each hit.
-        if (T > ON[cut] && T < W2 - 0.05) g += 0.14 * OM.pulse([94.3, 94.69, 94.97, 95.22], T, 0.06) + 0.3 * OM.pulse([94.88], T, 0.09);
+        if (T > ON[cut] && T < W2 - 0.05) g += 0.14 * OM.pulse(ROLL, T, 0.06) + 0.3 * OM.pulse(ROLL_KICK, T, 0.09);
         return g * (1 + 0.15 * OM.audio(T).kick) * (1 - OM.smooth(OM.prog(T, FADE0, FADE1)));
       };
+      const ROLL = [94.3, 94.69, 94.97, 95.22].map((t) => onDrum(t, 'snare')), ROLL_KICK = [onDrum(94.88, 'kick')];
       const leanAt = (T) => OM.ease.outCubic(OM.prog(T, ON[KEY], ON[KEY] + 0.32));
 
       // ---- the words: JetBrains Mono ExtraBold rasterized onto half-cells ----
@@ -488,11 +496,13 @@ OM.ownWords.add('c1-04');
       // ---- camera: c1-03's push carried through the cut and let go into the pull-back; then a gentle
       // over-the-shoulder dolly, drifting sideways past the friend, home by the last frames ----
       const PUSH = OM.c1.push34, TAU = 0.45;
+      const ed = OM.edit.scene(start, END);
       const look = (T) => {
         const s = Math.max(0, T - start);
         const carry = (PUSH.ZOOM - 1 + PUSH.SPEED * TAU * (1 - Math.exp(-s / TAU))) * (1 - OM.smooth(OM.prog(T, PULL0, DROP)));
         const par = OM.smooth(OM.prog(T, PULL0 + 0.2, DROP + 0.3)) * (1 - OM.smooth(OM.prog(T, KICK2, END - SEAM)));
-        const x = -30 * par * Math.sin(0.8 * (T - PULL0) + 0.4), rot = ((0.7 * Math.PI) / 180) * par * Math.sin(0.6 * (T - PULL0) - 0.9);
+        const tc = ed.clock(T) - PULL0; // the sideways drift surges through each beat
+        const x = -30 * par * Math.sin(0.8 * tc + 0.4), rot = ((0.7 * Math.PI) / 180) * par * Math.sin(0.6 * tc - 0.9);
         const zoom = (1 + carry) * OM.c1.cover(rot, x, 0);
         // The sharp zone: the screen, as it is projected now.
         const k = camAt(T), kc = F / k.D;

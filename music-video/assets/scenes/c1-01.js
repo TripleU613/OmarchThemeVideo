@@ -9,6 +9,11 @@
 // pulse on the snares, then the glaze burns away outward from them into the
 // back light it stood in, the seams follow, and what is left is the glow.
 OM.ownWords.add('c1-01');
+// Edit camera: the key word's own supernova kick is the scene's hit, so the camera's downbeat there
+// (82.302) is skipped; the 84.442 downbeat is a bare hat and the strong 84.540 kick (the surge, which
+// burns the glaze away) carries the punch instead, raised to a full beat's (offbeat 1). offbeat is
+// window-wide, so the strong 81.512 kick (just after w1 lands) punches at full strength too.
+OM.edit.plan('c1-01', { skip: [82.3, 84.4], offbeat: 1 });
 
 // Chorus 1's shared camera-and-effects helpers (scene files load in timeline order, so c1-02..c1-08 use them).
 OM.c1 = {
@@ -153,9 +158,12 @@ OM.c1 = {
       const on = words.map((w) => w.t0);
       const K = words.length - 1; // the key word: the fracture across the whole bowl
       const LAND = on[K]; // on the 82.338 downbeat
-      const SNARES = [83.48, 83.73, 83.89, 84.06];
+      // A hit on the drum as measured on the song (OM.T.drums), the nearest within 50 ms.
+      const onDrum = (t, kind) => OM.edit.hits(kind, t - 0.05, t + 0.05).reduce((m, h) => (m === null || Math.abs(h[0] - t) < Math.abs(m - t) ? h[0] : m), null) ?? t;
+      const SNARES = [83.48, 83.73, 83.89, 84.06].map((t) => onDrum(t, 'snare'));
       const FILL = 83.36; // the hi-hat fill rising into the next line
-      const SURGE = OM.downbeatsIn(84.3, 84.7)[0] || 84.497; // with the 84.52 kick
+      const SURGE = onDrum(84.52, 'kick'); // on the strong kick after the 84.442 downbeat
+      const ed = OM.edit.scene(start, END);
 
       // ---- the grid: a third-size home lattice, so the spark cell is exactly a 3x3 block ----
       const HM = OM.HOME, S = 3;
@@ -477,11 +485,11 @@ OM.c1 = {
       const GLINTS = [LAND, ...SNARES, SURGE];
       const look = (T) => {
         const e = OM.post.envelope(T, start, END, { ramp: 0.6, hold: 0.07 });
-        const p = OM.prog(T, start, END);
+        const p = OM.prog(ed.clock(T), start, END); // the orbit surges through each beat
         const rot = ((2 * Math.PI) / 180) * Math.sin(Math.PI * p) * e;
         const x = -16 * Math.sin(2 * Math.PI * p) * e, y = 0;
         // 1.00 to 1.05 of push, never less than the roll needs to keep the corners covered.
-        const zoom = Math.max(1 + 0.05 * e * OM.smooth(OM.prog(T, start, 84.4)), OM.c1.cover(rot, x, y)) + 0.022 * novaKick(T);
+        const zoom = Math.max(1 + 0.05 * e * OM.smooth(OM.prog(T, start, 84.4)), OM.c1.cover(rot, x, y)) + 0.06 * novaKick(T);
         // The sweep runs off each hit: the key word's landing, every snare pulse, the surge.
         const h = OM.lastHit(GLINTS, T), run = h === null ? -1 : OM.prog(T, h, h + (h === LAND ? 0.7 : 0.4));
         const amount = e * OM.smooth(OM.prog(T, LAND + 0.05, LAND + 0.35)) * (1 - sm(T, 84.6, 84.9));
@@ -519,7 +527,8 @@ OM.c1 = {
 
       // ---- explosion, supernova: on the key word the spark goes nova. A round ring of crest light blooms out
       // of the impact point across the frame, lattice debris flies out behind it and cools, the camera kicks
-      // gently. The ring is past the words in under 0.1 s and the debris is sparse, so the line reads at once. ----
+      // hard (the edit camera's downbeat is skipped for it). The ring is past the words in under 0.1 s and
+      // the debris is sparse, so the line reads at once. ----
       const novaKick = (T) => {
         const a = T - LAND;
         return a < 0 ? 0 : (1 - Math.exp(-a / 0.02)) * Math.exp(-a / 0.16);
@@ -555,7 +564,7 @@ OM.c1 = {
       };
       // ---- pause sprinkle: the mended bowl rings. Each snare sends a chime of light round the front of the
       // rim from the lip's centre; the 84.17 kick rings the whole mouth, back edge too. Above the words. ----
-      const CHIMES = [[83.48, 0], [83.73, 0], [83.89, 0], [84.06, 0], [84.17, 1]];
+      const CHIMES = [...SNARES.map((t) => [t, 0]), [onDrum(84.17, 'kick'), 1]];
       const rimChime = (ctx, T) => {
         const fade = 1 - sm(T, 84.45, 84.6);
         if (fade <= 0) return;

@@ -11,6 +11,12 @@
 // each, until the monitor dims and its light drains, cell by cell in dither
 // order, into the pool of the stage spotlight the next scene opens on.
 OM.ownWords.add('c1-07');
+// Edit camera: each word's defibrillator thump is the scene's own punch, roll and jolt, so the camera's
+// backbeat on the third word (107.400) is skipped, and so is its punch on the second kick of the restored
+// rhythm (109.016), which the scene's heartbeat swell carries. The downbeat kick before the key word
+// (107.936) stays as the small atrial beat, lighter than the key word's thump (down 0.9, not 1.5);
+// down is window-wide, so the 110.070 downbeat under the falling light punches at 0.9 too.
+OM.edit.plan('c1-07', { down: 0.9, skip: [107.4, 109.02] });
 (() => {
   const TYPE = "500 100px 'JetBrains Mono'";
   const NUM = "800 84px 'JetBrains Mono'";
@@ -153,15 +159,18 @@ OM.ownWords.add('c1-07');
       const sung = OM.sung('c1-07');
       const on = sung.map((w) => w.t0);
 
-      // ---- hits (audio map) ----
+      // ---- hits, on the drum as measured on the song (OM.T.drums): the nearest within 50 ms ----
+      const onDrum = (t, kind) => OM.edit.hits(kind, t - 0.05, t + 0.05).reduce((m, h) => (m === null || Math.abs(h[0] - t) < Math.abs(m - t) ? h[0] : m), null) ?? t;
       const HOLD = 0.07; // the first and last two frames are the handoffs exactly
       const POWER = start + HOLD; // first frame after the 106.42 kick: the screen opens
       const P_WAVE = 107.95; // kick + downbeat: the atrial bump before the key beat
-      const KICKS = [108.55, 109.02, 109.62]; // the rhythm the key word restores
+      const KICKS = [108.55, 109.02, 109.62].map((t) => onDrum(t, 'kick')); // the rhythm the key word restores: 108.514, 109.016, 109.580
+      const BLINKS = [109.37, 109.55].map((t) => onDrum(t, 'snare'));
+      const THROBS = [onDrum(109.76, 'kick'), onDrum(110.06, 'kick'), onDrum(110.16, 'snare')];
       const TAIL_END = 109.8; // the sweep leaves the screen
       const DRAIN = 109.8, FALL = 0.34; // light falls to the floor, landing from the 110.11 downbeat
       const LAND = end - HOLD - 0.1;
-      const D = [0.16, 0.16, 0.24, 0.3]; // seconds to write each word
+      const D = [0.08, 0.08, 0.1, 0.12]; // seconds to write each word: quick, so each word reads right on its onset
       const JOLT = [5, 6, 8, 16]; // px of thump per word
       const AMP = [9, 11, 13, 42], DIP = [3, 3, 4, 10]; // spike height and dip, in cells
       const WEAK = [ink.mid, ink.mid, ink.lit], DROP = [0.34, 0.26, 0.18];
@@ -376,9 +385,9 @@ OM.ownWords.add('c1-07');
           // The stage light arriving under the drain.
           const mc = OM.smooth(OM.prog(T, DRAIN, LAND)), mp = OM.smooth(OM.prog(T, DRAIN + FALL * 0.9, LAND));
           if (mc > 0) spot(ctx, ink, mc, mp);
-          // Pause sprinkles. Monitor blink: the snares at 109.37 and 109.55 blink the HR lamp and flare the grid.
-          // Drain throb: the 109.76 and 110.06 kicks and the 110.16 snare pulse the falling trace.
-          const blink = OM.pulse([109.37, 109.55], T, 0.06) * (T < 109.75 ? 1 : 0);
+          // Pause sprinkles. Monitor blink: the snares at 109.334 and 109.534 blink the HR lamp and flare the grid.
+          // Drain throb: the 109.738 and 110.022 kicks and the 110.192 snare pulse the falling trace.
+          const blink = OM.pulse(BLINKS, T, 0.06) * (T < 109.75 ? 1 : 0);
           // Defibrillator thump: the frame jolts on each word, softly on each kick after.
           const [jx, jy, flash] = joltAt(T);
           ctx.save();
@@ -420,7 +429,7 @@ OM.ownWords.add('c1-07');
           if (headOn) pool(ctx, L.x0 + (hq + 0.5) * L.cw, L.y0 + (hr + 0.5) * L.ch, 44, 44, ink.lit, T < on[3] ? 0.3 : 0.5);
 
           // The trace: written by the sweep, cooling from crest; broken until the key word mends it.
-          const beat = OM.pulse([...KICKS, 109.76, 110.06, 110.16], T, 0.11);
+          const beat = OM.pulse([...KICKS, ...THROBS], T, 0.11);
           const drawn = [];
           for (const cl of M.cells) {
             if (cl.at > T) continue;

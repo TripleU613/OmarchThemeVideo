@@ -11,6 +11,9 @@ OM.ownWords.add('c1-02'); // this scene draws its own words, so the caption bar 
 // slam shut and it powers on: the panel's lattice wakes, the homepage field
 // sweeps up it from the backlight in dither order, and the camera swings round
 // into the screen until the field is the frame.
+// Edit camera: the key word's slam is the scene's own crash zoom and shake, so the camera's
+// backbeat jolt 95 ms after it (87.118, a bare hat) is skipped; the rest runs at the defaults.
+OM.edit.plan('c1-02', { skip: [87.12] });
 (() => {
   const TYPE = "'JetBrains Mono'";
   window.__hf = window.__hf || {};
@@ -115,8 +118,12 @@ OM.ownWords.add('c1-02'); // this scene draws its own words, so the caption bar 
       const sung = OM.sung('c1-02');
       const on = sung.map((w) => w.t0);
       const N = on.length, KEY = N - 1, SLAM = on[KEY];
-      const KICKS = [85.52, 85.91, 86.59];
-      const LIT_ON = 87.4, LIT_FULL = 87.8, GO = 88.19; // snares: the field sweeps up, it is full, the push
+      // A hit on the drum as measured on the song (OM.T.drums), the nearest within 50 ms.
+      const onDrum = (t, kind) => OM.edit.hits(kind, t - 0.05, t + 0.05).reduce((m, h) => (m === null || Math.abs(h[0] - t) < Math.abs(m - t) ? h[0] : m), null) ?? t;
+      const KICKS = [85.52, 85.91, 86.59].map((t) => onDrum(t, 'kick'));
+      const [LIT_ON, LIT_FULL, GO] = [87.4, 87.8, 88.19].map((t) => onDrum(t, 'snare')); // snares: the field sweeps up, it is full, the push
+      const RIPPLE = onDrum(88.47, 'kick');
+      const ed = OM.edit.scene(start, END); // its clock: the slow float and sway surge through each beat
 
       // ---- inks ----
       // Clean dark bodies in the theme's surfaces (no green wash), their edges lit green.
@@ -200,8 +207,9 @@ OM.ownWords.add('c1-02'); // this scene draws its own words, so the caption bar 
         const A = KEYS[i], B = KEYS[i + 1], q = SEG[i](prog(T, A[0], B[0]));
         const drift = 1 - smooth(prog(T, SLAM - 0.2, SLAM + 0.25)); // the slow float stops once it is assembled: the rows read straight
         const s = Math.exp(lerp(Math.log(A[1]), Math.log(B[1]), q));
-        const pitch = lerp(A[2], B[2], q) + 0.8 * drift * Math.sin(0.55 * (T - start) + 1);
-        const yaw = lerp(A[3], B[3], q) + 1.4 * drift * Math.sin(0.7 * (T - start));
+        const tc = ed.clock(T) - start;
+        const pitch = lerp(A[2], B[2], q) + 0.8 * drift * Math.sin(0.55 * tc + 1);
+        const yaw = lerp(A[3], B[3], q) + 1.4 * drift * Math.sin(0.7 * tc);
         return camera(s, pitch * DEG, yaw * DEG, [0, 1, 2].map((j) => lerp(A[4][j], B[4][j], q)), dy);
       };
 
@@ -385,8 +393,8 @@ OM.ownWords.add('c1-02'); // this scene draws its own words, so the caption bar 
       /** One key row: keycaps (pressed down a little on the lock) and their legends. */
       const drawRow = (ctx, K, dpr, r, yo, T, m) => {
         const a = T - on[r.k];
-        // Pause sprinkle, keyboard ripple: the 88.47 kick runs a press down the rows, back to front.
-        const rk = T - 88.47 - 0.035 * r.k, rip = rk >= 0 && rk < 0.3 ? Math.exp(-rk / 0.07) : 0;
+        // Pause sprinkle, keyboard ripple: the 88.486 kick runs a press down the rows, back to front.
+        const rk = T - RIPPLE - 0.035 * r.k, rip = rk >= 0 && rk < 0.3 ? Math.exp(-rk / 0.07) : 0;
         const hb = (a >= 0 ? 1 - 0.4 * Math.exp(-a / 0.06) : 1) - 0.3 * rip;
         const flash = a >= 0 ? Math.exp(-a / 0.12) : 0;
         const legend = a < 0 ? ink.lit : a < 0.1 || r.k === KEY || rip > 0.3 ? ink.crest : OM.mix(ink.crest, ink.hover, smooth(prog(a, 0.1, 0.6)));
@@ -411,8 +419,9 @@ OM.ownWords.add('c1-02'); // this scene draws its own words, so the caption bar 
       const look = (T) => {
         const e = OM.post.envelope(T, start, END, { ramp: 0.45, hold: 0.07 });
         const sway = e * (1 - smooth(prog(T, SLAM - 0.5, SLAM - 0.05)));
-        const rot = -1.6 * DEG * sway * Math.sin(0.8 * (T - start) + 0.6);
-        const x = 36 * sway * Math.sin(0.55 * (T - start) - 0.4);
+        const tc = ed.clock(T) - start;
+        const rot = -1.6 * DEG * sway * Math.sin(0.8 * tc + 0.6);
+        const x = 36 * sway * Math.sin(0.55 * tc - 0.4);
         const a = T - SLAM;
         const crash = a < 0 ? 0 : 0.1 * ease.outCubic(clamp(a / 0.05)) * Math.exp(-Math.max(0, a - 0.05) / 0.3);
         const zoom = (1 + crash * e) * OM.c1.cover(rot, x, 0);
