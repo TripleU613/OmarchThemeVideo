@@ -6,6 +6,13 @@
 // over, reflowed onto the bigger glass, so the whole line reads on the last
 // screen. The cursor beats with the kick train. On the snare the screen powers
 // off into one bright point, which settles at the centre as the spark.
+
+// Edit camera: the defaults fit. The scene's own camera only steps in, smoothly, on the words
+// where life moves on (the first lands exactly on the 219.330 backbeat jolt, so the cut kicks),
+// and the key (last) word is followed by the 220.932 downbeat, the camera's biggest punch here
+// on top of the drum build; the words sit on the screen, far from the border band.
+OM.edit.plan('b-07', {});
+
 OM.ownWords.add('b-07');
 // The b-07 -> b-08 cut, shared by both scenes: the desk's plank broken into a
 // row of standing dominoes along its own lattice row, the first one lit by the
@@ -68,8 +75,12 @@ OM.scene({
       { from: Math.min(3, n - 1), w: 1040, bez: 14, tall: 440, stand: 80 },
       { from: Math.min(5, n - 1), w: 1240, bez: 12, tall: 490, stand: 64 },
     ];
-    const KICKS = [218.686, 218.802, 219.057, 219.336, 219.591, 219.87, 220.125, 220.381, 220.822, 220.938, 221.077];
-    const OFF = 221.17, DESK = 800, LANDD = 221.89;
+    // The kick train the cursor beats with, on the measured kick onsets.
+    const KICKS = [218.686, 218.802, 219.057, 219.336, 219.591, 219.87, 220.125, 220.381, 220.822, 220.938, 221.077].map((t) => B.onDrum(t, 'kick'));
+    // The power-off on the measured snare (221.204); the hand's taps and the dying point's pips on their measured hits.
+    const OFF = B.onDrum(221.17, 'snare'), DESK = 800, LANDD = 221.89;
+    const TAPS = [220.94, 221.08].map((t) => B.onDrum(t, 'kick'));
+    const PIPS = [B.onDrum(221.61, 'kick'), B.onDrum(221.7, 'snare'), B.onDrum(221.89, 'kick')];
     const LH = OM.HOME;
     /** The screen's last point of light: on the glass until it has collapsed, then arcing down onto the first domino. */
     const pointAt = (T, S) => {
@@ -328,7 +339,7 @@ OM.scene({
             {
               const ik = OM.fieldInks('tokyo-night');
               const S = lay()[stageAt(T)], si = stageAt(T);
-              const tap = OM.pulse([220.94, 221.08], T, 0.06) * (1 - OM.prog(T, OFF, OFF + 0.2));
+              const tap = OM.pulse(TAPS, T, 0.06) * (1 - OM.prog(T, OFF, OFF + 0.2));
               if (tap > 0.03) {
                 const x = 1740 - 146, y = DESK - 17 + 4 * tap;
                 ctx.globalAlpha = e * tap;
@@ -336,7 +347,7 @@ OM.scene({
                 ctx.fillRect(x - 4, y, 24, 5);
                 ctx.fillRect(x, DESK - 10, 26, 3);
               }
-              const pip = OM.pulse([221.61, 221.7, 221.89], T, 0.08) * (1 - OM.prog(T, B.DOMINO_CUT - 0.03, B.DOMINO_CUT));
+              const pip = OM.pulse(PIPS, T, 0.08) * (1 - OM.prog(T, B.DOMINO_CUT - 0.03, B.DOMINO_CUT));
               if (T > OFF + 0.35 && pip > 0.03) {
                 const { x, y } = pointAt(Math.min(T, LANDD), S);
                 // The dying point flares wide: a halo and long crest arms of light.

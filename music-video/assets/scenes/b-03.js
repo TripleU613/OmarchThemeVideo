@@ -6,6 +6,12 @@
 // rolled flat, thumping on the kicks, so the line is laid as road. When the
 // last word is down the rollers run on out of frame, still going, and the
 // pavers settle back into the lattice they were cut from: the board.
+
+// Edit camera: the scene's own camera bumps on its kicks, so the 204.574 backbeat jolt, 46 ms
+// after the 204.528 kick bump, is skipped rather than stacked. The key (last) word lands 28 ms
+// before the 203.502 backbeat, so the jolt and roll are raised to read on it.
+OM.edit.plan('b-03', { skip: [204.574], back: 10, roll: 0.006 });
+
 OM.ownWords.add('b-03');
 OM.scene({
   id: 'b-03',
@@ -32,7 +38,9 @@ OM.scene({
     const sung = OM.sung('b-03');
     const on = sung.map((w) => B.land(w.t0, start));
     const n = on.length;
-    const KICKS = [202.176, 203.221, 203.639, 204.568];
+    // The roller's thumps, on the measured kick onsets (202.188, 203.182, 203.622, 204.528).
+    const KICKS = [202.176, 203.221, 203.639, 204.568].map((t) => B.onDrum(t, 'kick'));
+    const STUDS = [205.22, 205.36].map((t) => B.onDrum(t, 'snare')); // the seam studs' snares
     const EXIT = 204.3, SETTLE = 204.95;
     const SR = B.SPARK.row;
     const DW = 54;
@@ -64,9 +72,9 @@ OM.scene({
           const q0 = Math.floor((x0 - H.x0) / H.cw), q1 = last ? Math.ceil((w.x + w.w - H.x0) / H.cw) + 3 : Math.ceil((x1 - H.x0) / H.cw);
           for (let q = q0; q < q1; q++)
             for (let r = ln.rTop; r <= ln.rBot; r++) {
-              // Laid in a fast front from the roller forward.
+              // Laid in a fast front from the roller forward: the word is down within about six frames.
               const f = (q - q0) / Math.max(1, q1 - q0);
-              pavers.push({ q, r, k, letter: lit.has(q + ',' + r), at: on[k] + 0.12 * f + 0.015 * OM.hash(q, r, 4) });
+              pavers.push({ q, r, k, letter: lit.has(q + ',' + r), at: on[k] + 0.07 * f + 0.01 * OM.hash(q, r, 4) });
             }
         });
       });
@@ -118,7 +126,8 @@ OM.scene({
         // The pavers: dropped in from above the road, then pressed flat under the drum.
         for (const p of pavers) {
           if (T < p.at) continue;
-          const drop = OM.ease.inCubic(OM.prog(T, p.at, p.at + 0.09));
+          // Each paver shows from its first frame and slams flat 50 ms later.
+          const drop = OM.ease.inCubic(OM.prog(T, p.at, p.at + 0.05));
           const x = rx[lanes.indexOf(spans[p.k].lane)];
           const px = H.x0 + (p.q + 0.5) * H.cw, pressed = px < x - 10;
           const sinceP = pressed ? OM.clamp((x - 10 - px) / 220) : 0;
@@ -127,7 +136,7 @@ OM.scene({
           else fill = pressed ? th['surface-2'] : th.surface;
           const k = OM.lerp(1.9, 1, drop) * (p.letter ? 1 : 0.86);
           const w = H.cw * k, h = H.ch * k;
-          ctx.globalAlpha = fade * OM.clamp(drop * 2.5);
+          ctx.globalAlpha = fade * OM.prog(T, p.at - 0.001, p.at + 0.02);
           ctx.fillStyle = fill;
           ctx.fillRect(px - w / 2, H.y0 + (p.r + 0.5) * H.ch - h / 2 - (1 - drop) * 18, w, h);
         }
@@ -171,7 +180,7 @@ OM.scene({
 
             // Seam Studs: as the road settles into the grid, its crossings stud crest on the snares.
             {
-              const p = OM.pulse([205.22, 205.36], T, 0.07);
+              const p = OM.pulse(STUDS, T, 0.07);
               if (p > 0.02) {
                 const L = OM.HOME, ik = OM.fieldInks('tokyo-night');
                 const { lanes } = lay();
@@ -182,7 +191,7 @@ OM.scene({
                   const r0 = Math.floor((ln.rTop - 3) / 2), r1 = Math.ceil((ln.rBot + 3) / 2);
                   for (let row = r0; row <= r1; row++)
                     for (let col = L.cMin; col <= L.cMin + L.cols; col++) {
-                      if (OM.hash(col, row, T >= 205.36 ? 2 : 1) > 0.2) continue;
+                      if (OM.hash(col, row, T >= STUDS[1] ? 2 : 1) > 0.2) continue;
                       ctx.fillRect(L.x0 + col * L.cw - 2, L.y0 + row * L.ch - 2, 4, 4);
                     }
                 }
@@ -220,7 +229,9 @@ OM.scene({
             cam: (() => {
               const L0 = lay().lanes[0];
               const kick = OM.pulse(KICKS, T, 0.08);
-              const x = OM.clamp(-(rollerX(T, L0, lay().spans) - 960) * 0.12, -110, 110);
+              // The pan stops short on the right so the first word stays whole and clear of the
+              // border band (it ran 110 px and pushed that word out of frame once the roller left).
+              const x = OM.clamp(-(rollerX(T, L0, lay().spans) - 960) * 0.12, -30, 110);
               return { zoom: 1 + e * (0.12 + 0.012 * kick), x: e * x, y: e * (18 - 7 * kick) };
             })(),
           });

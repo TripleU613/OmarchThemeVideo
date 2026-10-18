@@ -6,6 +6,14 @@
 // downbeat after the key word the cascade breaks out of the letters across the
 // whole lattice, accelerating as it spreads, every fallen cell landing in the
 // homepage field. By the kick it fills the frame; the letters settle into it.
+
+// Edit camera: it now carries the beat here (the old jiggle on the scene's own camera is gone).
+// The key word's payoff is the flood on the next downbeat (225.222), so the downbeat punch is
+// raised; that also lands the drop out of the long kick build (223.076) harder. The 227.368
+// downbeat is skipped: the letters have settled into the field and the camera rests into the
+// section boundary.
+OM.edit.plan('b-08', { down: 2.2, skip: [227.368] });
+
 OM.ownWords.add('b-08');
 OM.scene({
   id: 'b-08',
@@ -40,8 +48,10 @@ vec4 effect(vec2 uv) {
     const on = sung.map((w) => B.land(w.t0, start));
     const n = on.length;
     const K = n - 1; // the key word, held into the build
-    const FLOOD = 225.28, FULL = 226.62, SETTLE = 226.7;
-    const SNARES = [223.33, 223.864];
+    // The cascade breaks out on the downbeat's drum onset (225.222); the letters flash on the measured snares (223.304, 223.880).
+    const FLOOD = OM.beatOnset(225.28), FULL = 226.62, SETTLE = 226.7;
+    const SNARES = [223.33, 223.864].map((t) => B.onDrum(t, 'snare'));
+    const beat = OM.edit.scene(start, END);
     const C0 = L.cMin, R0 = L.rMin, CW = L.cols, RH = L.rows;
     const at = new Float32Array(CW * RH).fill(Infinity); // when each lattice cell's domino falls
     const kind = new Uint8Array(CW * RH); // 0 field, 1 trail, 2 letter, 3 key letter
@@ -85,7 +95,9 @@ vec4 effect(vec2 uv) {
         });
         // The word topples in a wave from its entry.
         const far = Math.max(1, ...cells.map((q) => Math.hypot(q[0] - ex, (q[1] - ey) * 1.4)));
-        const dur = w.k === K ? 0.42 : Math.min(0.3, 0.12 + 0.02 * w.text.length);
+        // A quick wave, so the word reads within about six frames of its onset; the key word's
+        // slower wave is down just as the cascade breaks out on the next downbeat.
+        const dur = w.k === K ? 0.26 : Math.min(0.16, 0.06 + 0.015 * w.text.length);
         let last = entry, lastT = o;
         for (const [qx, qy] of cells) {
           const j = I(qx, qy);
@@ -146,10 +158,11 @@ vec4 effect(vec2 uv) {
         if (T >= FLOOD) OM.hero(ctx, T, dpr, { inks: ink, L, word: false, gain: 0.8, bg: false, mask: (col, row) => (T >= flood[I(col, row)] + 0.05 ? 1 : 0) });
         const snare = OM.pulse(SNARES, T, 0.1);
         const settle = OM.prog(T, SETTLE, END - 0.16);
-        const STAND = 0.1, FALL = 0.06;
+        // Dominoes stand up 0.1 s before they fall; a letter's only 0.05 s, so the word is not shown before its onset.
+        const STAND = 0.1, LSTAND = 0.05, FALL = 0.06;
         for (let j = 0; j < at.length; j++) {
           const a = at[j];
-          if (T < a - STAND && !rowCell[j]) continue;
+          if (T < a - (kind[j] >= 2 ? LSTAND : STAND) && !rowCell[j]) continue;
           const col = (j % CW) + C0, row = Math.floor(j / CW) + R0;
           const kd = kind[j];
           if (!kd) {
@@ -209,18 +222,17 @@ vec4 effect(vec2 uv) {
           ctx.globalAlpha = 1;
           fx.apply(T, (() => {
             const { set } = lay();
-            const s = OM.smooth(OM.prog(T, 222.3, 226.6));
+            // The spiral runs on the beat clock, so it surges through each beat.
+            const s = OM.smooth(OM.prog(beat.clock(T), 222.3, 226.6));
             // The latest word's impact ripples out from its first domino; the flood ripples from the centre.
             let k = -1;
             on.forEach((o, i) => { if (T >= o) k = i; });
             const w = k >= 0 ? set.words[k] : null;
             const p0 = w ? [(w.x + 10) / 1920, 1 - (w.y - set.cap / 2) / 1080, T - on[k], 1] : [0.5, 0.5, 9, 0];
             const p1 = T >= FLOOD ? [0.5, 0.5, (T - FLOOD) * 0.7, 1.4] : [0.5, 0.5, 9, 0];
-            // The beats between its own hits nudge the camera in by half a percent.
-            const jig = 0.005 * OM.jiggle(T, [...on, ...SNARES, FLOOD, FULL]);
             return {
               amount: e,
-              cam: { zoom: 1 + e * (0.06 + 0.08 * s + jig), rot: e * 0.045 * s, y: e * -22 * s },
+              cam: { zoom: 1 + e * (0.06 + 0.08 * s), rot: e * 0.045 * s, y: e * -22 * s },
               p0, p1,
             };
           })());

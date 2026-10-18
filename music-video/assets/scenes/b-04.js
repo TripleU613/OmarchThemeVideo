@@ -6,6 +6,12 @@
 // rule runs on 16ths, the letters breaking up into blinkers, blocks and gliders.
 // The kicks flash the board. Then everything outside the screen's edge dies,
 // the life inside goes dark, and the board is a screen.
+
+// Edit camera: the scene's turn is the downbeat after the last word (208.198), where the
+// letters are let go and life runs on 16ths, so the downbeat punch is raised to make it the
+// biggest hit; nothing in the scene's own camera moves on the drums, so nothing stacks.
+OM.edit.plan('b-04', { down: 2.4 });
+
 OM.ownWords.add('b-04');
 OM.scene({
   id: 'b-04',
@@ -40,12 +46,16 @@ OM.scene({
     const th = OM.theme('tokyo-night');
     const sung = OM.sung('b-04');
     const on = sung.map((w) => B.land(w.t0, start));
-    const KICKS = [206.333, 207.122, 207.54];
-    const RELEASE = 208.237, DIE = 208.62;
+    // The board flashes on the measured kicks (206.296, 207.138, 207.552); the letters are let
+    // go on the downbeat's drum onset and the outside dies on the next beat's.
+    const KICKS = [206.333, 207.122, 207.54].map((t) => B.onDrum(t, 'kick'));
+    const RELEASE = OM.beatOnset(208.237), DIE = OM.beatOnset(208.655);
     const SCR = { x: 320, y: 140, w: 1280, h: 800 };
+    const beat = OM.edit.scene(start, END);
 
-    // The clock: 8ths while the line is held, 16ths once it is let go, plus every onset.
-    const beats = OM.beatsIn(start - 1, END + 1);
+    // The clock: 8ths while the line is held, 16ths once it is let go, plus every onset,
+    // stepping on the beats' drum onsets (the grid runs ~45 ms late).
+    const beats = OM.beatsIn(start - 1, END + 1).map(OM.beatOnset);
     const ticks = [start];
     beats.forEach((b, i) => {
       const nx = beats[i + 1] ?? b + OM.SPB;
@@ -204,11 +214,13 @@ OM.scene({
             B.motes(ctx, T, { seed: 405, n: 18, color: OM.fieldInks('tokyo-night').mid, alpha: 0.4 * e, vx: -5, vy: 8, size: 2 });
           }
           ctx.globalAlpha = 1;
+          // The drift and the focus wobble run on the beat clock, so they surge through each beat.
+          const C = beat.clock(T);
           fx.apply(T, {
             // The lens eases off while the line is held, so the strokes read crisp.
             amount: e * (1 - 0.9 * OM.smooth(OM.prog(T, on[0] - 0.1, on[0] + 0.1)) * (1 - OM.smooth(OM.prog(T, RELEASE, RELEASE + 0.3)))),
-            cam: { zoom: 1 + e * 0.075, x: e * 22 * Math.sin(T * 0.6), y: e * 14 * Math.cos(T * 0.8), rot: e * 0.008 * Math.sin(T * 0.5) },
-            p0: [0.5 + 0.5 * Math.sin(T * 2.7), 0, 0, 0],
+            cam: { zoom: 1 + e * 0.075, x: e * 22 * Math.sin(C * 0.6), y: e * 14 * Math.cos(C * 0.8), rot: e * 0.008 * Math.sin(C * 0.5) },
+            p0: [0.5 + 0.5 * Math.sin(C * 2.7), 0, 0, 0],
           });
         },
         release: () => { fx.release(); c.release(); },

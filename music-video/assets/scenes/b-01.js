@@ -8,6 +8,12 @@
 // lit cell at the centre: the spark the next scene boots from.
 //
 // Also defines OM.bridge, the section's shared type helpers (used by b-02..b-08).
+
+// Edit camera: the counter's own slam (now sharp on the first word, which lands on the
+// 193.340 downbeat) and the key word's own housing jolt (36 ms after the 194.930 beat) are
+// the scene's designed hits, so the camera beats under them are skipped rather than stacked.
+OM.edit.plan('b-01', { skip: [193.34, 194.93] });
+
 OM.ownWords.add('b-01');
 (() => {
   const B = (OM.bridge = OM.bridge || {});
@@ -43,6 +49,12 @@ OM.ownWords.add('b-01');
   B.land = (t0, start) => Math.max(t0, start + 0.05);
   /** Camera and effect envelope: exactly 0 on the cut frames at both ends, easing in and out with no speed at the cuts. */
   B.env = (T, start, end, ramp = 0.5) => OM.post.envelope(T, start, end, { ramp, hold: 0.12 });
+  /** A hand-placed hit time moved onto the nearest measured drum onset of that kind (OM.T.drums) within 50 ms. */
+  B.onDrum = (t, kind) => {
+    let best = t, d = 0.05;
+    for (const [h] of OM.edit.hits(kind, t - 0.05, t + 0.05)) if (Math.abs(h - t) < d) { d = Math.abs(h - t); best = h; }
+    return best;
+  };
   /** Drifting specks, analytic in T: n of them in a box, wrapping, twinkling. */
   B.motes = (ctx, T, { seed = 1, n = 40, color, alpha = 0.5, x = 0, y = 0, w = 1920, h = 1080, vx = 6, vy = -10, size = 3 }) => {
     ctx.fillStyle = color;
@@ -219,13 +231,19 @@ OM.ownWords.add('b-01');
       const ink = OM.fieldInks('tokyo-night');
       const sung = OM.sung('b-01');
       const on = sung.map((w) => B.land(w.t0, start));
-      const K = 5; // the key word, held across the 195.512 downbeat
-      const SNARE = 196.51, FOLD = 196.82;
+      const K = 5; // the key word, held across the 195.464 downbeat
+      // The pause's two snares, on their measured onsets (196.396, 196.530).
+      const SHIVER = [196.37, 196.51].map((t) => B.onDrum(t, 'snare'));
+      const SNARE = SHIVER[1], FOLD = 196.82;
+      const beat = OM.edit.scene(start, END);
       const YEARS = [1991, 1994, 1997, 1999, 2004, 2018, 2026];
+      // A roll runs up to speed and slams into its stop on the onset (an in-out roll settled
+      // early, so each word was readable two or three frames before it was sung).
+      const roll = (u) => u * u;
       // Year as a continuous value: each word's roll lands its stop on the onset.
       const year = (T) => {
         let v = YEARS[0];
-        for (let i = 1; i < on.length && i < YEARS.length; i++) v += (YEARS[i] - YEARS[i - 1]) * OM.ease.inOutCubic(OM.prog(T, on[i] - 0.26, on[i]));
+        for (let i = 1; i < on.length && i < YEARS.length; i++) v += (YEARS[i] - YEARS[i - 1]) * roll(OM.prog(T, on[i] - 0.26, on[i]));
         return v;
       };
       const wheels = (v) => {
@@ -279,8 +297,9 @@ OM.ownWords.add('b-01');
           ctx.fillRect(0, 0, 1920, 1080);
           const { set, drums } = lay();
 
-          // The whole counter: slams in on the first word, folds into the spark at the end.
-          const slam = 1 - OM.ease.inOutCubic(OM.prog(T, on[0], start + 0.45));
+          // The whole counter: slams in on the first word (fully there two frames after its
+          // onset, settling from 4% big), folds into the spark at the end.
+          const slam = 1 - OM.ease.outCubic(OM.prog(T, on[0], on[0] + 0.24));
           const shut = OM.ease.inOutCubic(OM.prog(T, 196.62, 196.88)); // the housings close like shutters behind the drums
           const flying = T >= 196.74;
           const k = 1 + 0.04 * slam;
@@ -288,7 +307,7 @@ OM.ownWords.add('b-01');
           ctx.translate(B.SPARK.x, B.SPARK.y);
           ctx.scale(k, k);
           ctx.translate(-B.SPARK.x, -B.SPARK.y);
-          ctx.globalAlpha = OM.smooth(OM.prog(T, on[0] - 0.02, start + 0.38));
+          ctx.globalAlpha = OM.smooth(OM.prog(T, on[0] - 0.017, on[0] + 0.034));
 
           // The key word's downbeat shakes the housing.
           const jolt = (tt, a) => (T < tt ? 0 : a * Math.exp(-(T - tt) / 0.07) * Math.sin((T - tt) * 70));
@@ -301,7 +320,7 @@ OM.ownWords.add('b-01');
           const YW = 150, YH = 210, YX = 960 - 2 * YW - 30, YY = 210;
           const pos = wheels(year(T));
           // Wheel Shiver: on the pause's snares the year's last two wheels tick half a notch and settle back.
-          const shiver = [196.37, 196.51].reduce((m, h) => m + (T >= h ? 0.22 * Math.exp(-(T - h) / 0.06) * Math.cos((T - h) * 45) : 0), 0);
+          const shiver = SHIVER.reduce((m, h) => m + (T >= h ? 0.22 * Math.exp(-(T - h) / 0.06) * Math.cos((T - h) * 45) : 0), 0);
           pos[2] += shiver * 0.6;
           pos[3] -= shiver;
           const ycap = 128;
@@ -332,7 +351,7 @@ OM.ownWords.add('b-01');
           for (const d of flying ? [] : drums) {
             const o = on[d.k];
             // Rolls through the digits into its letter, locking on the onset with a rebound.
-            let p = o <= on[0] + 1e-6 ? (T >= o ? d.n : 0) : d.n * OM.ease.inOutCubic(OM.prog(T, o - 0.24, o));
+            let p = o <= on[0] + 1e-6 ? (T >= o ? d.n : 0) : d.n * roll(OM.prog(T, o - 0.24, o));
             if (T >= o) p -= 0.16 * Math.exp(-(T - o) / 0.06) * Math.sin((T - o) * 60);
             p += spin;
             const key = d.k === K;
@@ -380,7 +399,8 @@ OM.ownWords.add('b-01');
           ctx.globalAlpha = 1;
           fx.apply(T, {
             amount: e * (1 - 0.6 * OM.pulse(on, T, 0.15)),
-            cam: { zoom: 1 + 0.14 * e, x: e * 110 * (1 - 2 * OM.smooth(OM.prog(T, start, END))) },
+            // The slide runs on the beat clock, so it surges through each beat.
+            cam: { zoom: 1 + 0.14 * e, x: e * 110 * (1 - 2 * OM.smooth(OM.prog(beat.clock(T), start, END))) },
             p0: [1 - 700 / 1080, 0, 0, 0],
           });
         },

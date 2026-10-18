@@ -9,6 +9,13 @@
 // the next line's candles, the channels drain back into the pool, the glass
 // empties and the machine folds shut, and the pool condenses into one drop
 // that rises on the kick to light the first wick.
+
+// Edit camera: the key word floods 73 ms after the 210.208 downbeat, so the downbeat punch is
+// raised to make the key word's beat the biggest. The scene's own camera never moves on the
+// drums; its pool swells on the beats (the jiggle) and kicks as one of its elements, in step
+// with the camera rather than stacked on it, so it stays.
+OM.edit.plan('b-05', { down: 2.4 });
+
 OM.ownWords.add('b-05');
 // The b-05 -> b-06 cut, shared by both scenes: the next line's row of unlit
 // candles (measured from b-06's own words) and the condensed drop of light,
@@ -92,8 +99,11 @@ OM.scene({
     const H = B.sub(2);
     const sung = OM.sung('b-05');
     const on = sung.map((w) => B.land(w.t0, start));
-    const K = 3; // the key word, on the 210.257 downbeat
-    const KICKS = [209.816, 211.278, 212.904];
+    const K = 3; // the key word, on the 210.208 downbeat
+    const KICKS = [209.816, 211.278, 212.904].map((t) => B.onDrum(t, 'kick')); // measured: 209.826, 211.288, 212.898
+    // The pool drops land on the 212.898 kick and the 213.428 beat; the channel surge floods on
+    // the 212.892 beat (the strongest hit here; no snare was measured at 212.97).
+    const DROPS = [B.onDrum(212.9, 'kick'), OM.beatOnset(213.461)], SURGE = OM.beatOnset(212.927);
     const MELT = 213.0, ASSEMBLED = 213.9; // the melt over the end of the riser, from the 212.97 snare
     const S1 = 0.32, CX = 960, CY = 238; // keep the lid inside the camera crop and the deck at the pour's height
     const POUR = start + 0.08, IMPACT = { x: 960, y: 452 };
@@ -140,7 +150,10 @@ OM.scene({
           ty: cd.top + OM.hash(cl[0], cl[1], 23) * Math.max(1, cd.bh - H.ch),
         });
       });
-      return { set, words, melt };
+      // The letter cells and a one-cell margin round them: the channel surge runs round the words, never over them.
+      const clear = new Set();
+      for (const w of words) for (const [q, r] of w.cells) for (let dq = -1; dq <= 1; dq++) for (let dr = -1; dr <= 1; dr++) clear.add((q + dq) * 4096 + r + dr);
+      return { set, words, melt, clear };
     });
     // The machine at camera scale s: screen rect and deck.
     const machine = (ctx, s, glow, alphaDeck, lid = 0, drain = 0, fold = 0) => {
@@ -266,10 +279,17 @@ OM.scene({
             ctx.fillStyle = i >= n - 2 && (f < 1 || drainC > 0) ? ink.crest : OM.mix(ink.mid, ink.crest, pulse);
             OM.cell(ctx, H, q, r, dpr);
           }
+        }
+        // The letters go over every channel, so the last word's channel, which runs along the
+        // gutter under the first row, passes behind that row's descenders instead of through them.
+        for (const w of words) {
+          const o = on[w.w.k];
           // The flood: the letters fill left to right from the onset, crest cooling to their ink.
           if (T < o) continue;
           const key = w.w.k === K;
-          const sweep = OM.prog(T, o, o + (key ? 0.2 : 0.14));
+          // A quick flood: the word is lit within about five frames (seven for the key word).
+          const SW = key ? 0.12 : 0.08;
+          const sweep = OM.prog(T, o, o + SW);
           const a = T - o;
           if (key) B.pool(ctx, w.w.x + w.w.w / 2, w.w.y - set.cap / 2, Math.max(260, w.w.w), ink.lit, keep * (0.3 * Math.exp(-a / 0.4) + 0.08 * (1 - OM.prog(T, MELT, 213.45))));
           for (const cl of w.cells) {
@@ -287,7 +307,7 @@ OM.scene({
             }
             const u = (q - w.q0) / Math.max(1, w.q1 - w.q0);
             if (u > sweep + 1e-6) continue;
-            const age = a - u * (key ? 0.2 : 0.14);
+            const age = a - u * SW;
             const th0 = OM.threshold(q, r);
             const cool = age / (key ? 0.6 : 0.35);
             ctx.fillStyle = th0 > cool ? ink.crest : key ? ink.crest : ink.hover;
@@ -308,7 +328,7 @@ OM.scene({
             {
               const ik = OM.fieldInks('tokyo-night');
               const H2 = B.sub(2);
-              for (const h of [212.9, 213.41]) {
+              for (const h of DROPS) {
                 const f = OM.prog(T, h - 0.16, h);
                 if (f > 0 && f < 1) {
                   ctx.globalAlpha = e;
@@ -330,15 +350,16 @@ OM.scene({
                     }
                 }
               }
-              // Channel Surge: the snare floods every channel crest at once, three cells wide, and it drains back.
-              const a = T - 212.97;
+              // Channel Surge: the beat floods every channel crest at once, three cells wide, and it drains back.
+              const a = T - SURGE;
               if (a >= 0 && a < 0.35) {
-                const { words } = lay();
+                const { words, clear } = lay();
                 ctx.globalAlpha = e * (1 - a / 0.35);
                 ctx.fillStyle = ik.crest;
+                const put = (q, r) => { if (!clear.has(q * 4096 + r)) OM.cell(ctx, H2, q, r, c.dpr); };
                 for (const w of words)
                   for (const [q, r] of w.pts)
-                    for (let d = -1; d <= 1; d++) { OM.cell(ctx, H2, q + d, r, c.dpr); OM.cell(ctx, H2, q, r + d, c.dpr); }
+                    for (let d = -1; d <= 1; d++) { put(q + d, r); put(q, r + d); }
                 ctx.globalAlpha = 1;
                 for (const w of words) { const [q, r] = w.pts[w.pts.length - 1]; B.pool(ctx, H2.x0 + q * H2.cw, H2.y0 + r * H2.ch, 120, ik.lit, 0.45 * e * (1 - a / 0.35)); }
               }

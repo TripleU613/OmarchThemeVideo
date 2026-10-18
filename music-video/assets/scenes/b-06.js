@@ -6,6 +6,12 @@
 // crest. The key word is passed slowly, a chain of flames along its whole hold.
 // The flames duck and flare on every hard stop of the music. Then the flames
 // rise off the wicks together and the room becomes one lamp's light: the spot.
+
+// Edit camera: the defaults fit. The scene's own camera never moves on the drums (the flames
+// duck and the exposure flares on the stops, as elements), and the key word's ember bloom
+// (214.685) falls between beats, just as the 214.500 downbeat punch settles, so nothing stacks.
+OM.edit.plan('b-06', {});
+
 OM.ownWords.add('b-06');
 OM.scene({
   id: 'b-06',
@@ -37,7 +43,9 @@ OM.scene({
     const sung = OM.sung('b-06');
     const on = sung.map((w) => B.land(w.t0, start));
     const K = 1;
-    const STOPS = [214.506, 215.017, 215.179, 215.295, 215.412, 215.551, 216.549, 216.805];
+    // The hard stops as measured, then the two kicks on their measured onsets (216.518, 216.808).
+    const STOPS = [214.506, 215.017, 215.179, 215.295, 215.412, 215.551, ...[216.549, 216.805].map((t) => B.onDrum(t, 'kick'))];
+    const beat = OM.edit.scene(start, END);
     const RISE = 217.12;
 
     const lay = B.lazy(() => {
@@ -46,8 +54,8 @@ OM.scene({
       set.words.forEach((w) => {
         const cells = B.cells(w, set, H);
         const n = w.text.length;
-        // The key word is passed along its hold; the others catch in a quick run.
-        const span = w.k === K ? Math.min(0.9, (sung[K].t1 - sung[K].t0) * 0.6) : Math.min(0.2, 0.05 * n);
+        // The key word is passed along its hold; the others catch in a quick run (the word is lit within about seven frames).
+        const span = w.k === K ? Math.min(0.9, (sung[K].t1 - sung[K].t0) * 0.6) : Math.min(0.12, 0.03 * n);
         for (let j = 0; j < n; j++)
           candles.push({
             k: w.k, j,
@@ -216,7 +224,8 @@ OM.scene({
           ctx.globalAlpha = 1;
           fx.apply(T, {
             amount: e,
-            cam: { zoom: 1 + e * 0.07, x: e * (60 - 120 * OM.smooth(OM.prog(T, start + 0.2, END - 0.4))) },
+            // The relay pan runs on the beat clock, so it surges through each beat.
+            cam: { zoom: 1 + e * 0.07, x: e * (60 - 120 * OM.smooth(OM.prog(beat.clock(T), start + 0.2, END - 0.4))) },
             p0: [OM.pulse(STOPS, T, 0.08), 0, 0, 0],
           });
         },

@@ -6,6 +6,12 @@
 // it strangers' screens light ever faster until the dark is full. The snares
 // flicker the whole wall. Then every lit screen drops into the centre row,
 // column by column, and the row closes into one crest line: the road's first strip.
+
+// Edit camera: the backbeat jolts carry this line's two turns, the last word booting 41 ms
+// after the 199.209 beat and the wall dropping on the 200.276 snare, so the
+// jolt and roll are raised from the section's 6 px / 0.004 rad to read on them.
+OM.edit.plan('b-02', { back: 10, roll: 0.006 });
+
 OM.ownWords.add('b-02');
 OM.scene({
   id: 'b-02',
@@ -35,9 +41,14 @@ OM.scene({
     const ink = OM.fieldInks('tokyo-night');
     const th = OM.theme('tokyo-night');
     const sung = OM.sung('b-02');
-    const on = sung.map((w) => B.land(w.t0, start));
-    const SNARES = [197.857, 198.275, 198.67, 198.902, 199.993];
+    // The first word is sung 14 ms after the cut: it lands on its onset, held off only past the
+    // seam frames (the bridge's usual 50 ms guard would boot it two frames late).
+    const on = sung.map((w) => Math.max(w.t0, start + 0.013));
+    // The wall flickers on the snares, at their measured onsets.
+    const SNARES = [197.857, 198.275, 198.67, 198.902, 199.993].map((t) => B.onDrum(t, 'snare'));
     const DROP = 200.25, CLOSE = 200.9;
+    const HITS = [199.99, 200.27, 200.53, 200.92].map((t) => B.onDrum(t, 'snare')); // the refresh rows, on the snares
+    const LAST_KICK = B.onDrum(201.09, 'kick');
     const SR = B.SPARK.row, SC = B.SPARK.col;
     const C0 = L.cMin, C1 = L.cMin + L.cols;
 
@@ -52,8 +63,9 @@ OM.scene({
         const x0 = Math.min(...cells.map((q) => q[0])), x1 = Math.max(...cells.map((q) => q[0]));
         for (const [col, row] of cells) {
           taken.add(col + ',' + row);
-          // Booted in a left-to-right sweep from the onset, a little scatter per cell.
-          const at = on[w.k] + 0.13 * ((col - x0) / Math.max(1, x1 - x0)) + 0.02 * OM.hash(col, row, 5);
+          // Booted in a quick left-to-right sweep from the onset, a little scatter per cell:
+          // the whole word is on within about four frames.
+          const at = on[w.k] + 0.065 * ((col - x0) / Math.max(1, x1 - x0)) + 0.012 * OM.hash(col, row, 5);
           screens.push({ col, row, at, word: true, k: w.k });
         }
       });
@@ -79,7 +91,7 @@ OM.scene({
         const ctx = c.ensure();
         const dpr = c.dpr;
         if (T >= END - 0.1) return OM.handoff('line', ctx, T, dpr);
-        if (T < start + 0.05) return B.bootCut(ctx, T, dpr);
+        if (T < Math.min(start + 0.05, on[0])) return B.bootCut(ctx, T, dpr);
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
         const { screens } = lay();
@@ -125,7 +137,6 @@ OM.scene({
 
             // Refresh Rows: on each snare a band of strangers' screens re-boots crest as the wall drops.
             {
-              const HITS = [199.99, 200.27, 200.53, 200.92];
               const { screens } = lay();
               const ik = OM.fieldInks('tokyo-night'), L = OM.HOME;
               HITS.forEach((h, hi) => {
@@ -142,7 +153,7 @@ OM.scene({
                 }
               });
               // Line Pips: the closed line throws cells off its edges on the last kick.
-              const a = T - 201.09;
+              const a = T - LAST_KICK;
               if (a >= 0 && a < 0.09) {
                 ctx.globalAlpha = e * (1 - a / 0.09);
                 ctx.fillStyle = ik.hover;
