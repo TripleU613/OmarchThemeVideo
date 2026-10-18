@@ -57,11 +57,11 @@ OM.scene({
       const spans = [], pavers = [];
       lanes.forEach((ln) => {
         ln.ks.forEach((k, i) => {
-          const w = set.words[k];
-          const x0 = i ? set.words[ln.ks[i - 1]].x + set.words[ln.ks[i - 1]].w : ln.xL;
-          const x1 = i === ln.ks.length - 1 ? ln.xR : w.x + w.w;
+          const w = set.words[k], last = i === ln.ks.length - 1;
+          const x0 = i ? spans[ln.ks[i - 1]].x1 : ln.xL;
+          const x1 = last ? ln.xR : w.x + w.w + DW + 6; // park in the gap, clear of the word's last letter
           spans[k] = { x0, x1, lane: ln };
-          const q0 = Math.floor((x0 - H.x0) / H.cw), q1 = Math.ceil((w.x + w.w - H.x0) / H.cw) + (i === ln.ks.length - 1 ? 3 : 0);
+          const q0 = Math.floor((x0 - H.x0) / H.cw), q1 = last ? Math.ceil((w.x + w.w - H.x0) / H.cw) + 3 : Math.ceil((x1 - H.x0) / H.cw);
           for (let q = q0; q < q1; q++)
             for (let r = ln.rTop; r <= ln.rBot; r++) {
               // Laid in a fast front from the roller forward.

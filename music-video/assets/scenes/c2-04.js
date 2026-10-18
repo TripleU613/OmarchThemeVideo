@@ -86,7 +86,7 @@ OM.ownWords.add('c2-04');
       const HM = OM.HOME, V = 5200;
 
       const get = OM.c2.lazy(W, () => {
-        const L = OM.c2.layout(words, { weight: W, cap: 150, maxW: 1800, cy: 580, rows: 3, lead: 1.32, minCap: 100 });
+        const L = OM.c2.layout(words, { weight: W, cap: 150, maxW: 1560, cy: 580, rows: 3, lead: 1.32, minCap: 100 });
         const lit = new Map(); // "col,row" -> { k, t } when the window lights
         const colsWithText = new Map(); // col -> top text row
         words.forEach((wd, k) => {

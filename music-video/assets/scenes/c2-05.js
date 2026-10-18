@@ -144,14 +144,14 @@ OM.ownWords.add('c2-05');
             for (let r = HM.rMin; r <= HM.rMin + HM.rows; r++) ctx.fillRect(0, snap(HM.y0 + r * HM.ch), 1920, 1);
           }
 
-          // The blades: rubber at the front of each stroke, the handle up and behind.
+          // The blades: rubber at the front of each stroke, the pole hanging down and behind from its lower end.
           const blade = (x, y0, y1, a) => {
             ctx.fillStyle = rgba(th['surface-2'], a);
             ctx.fillRect(x - 18, y0 - 8, 14, y1 - y0 + 16);
             ctx.fillStyle = rgba(ink.crest, a);
             ctx.fillRect(x - 4, y0 - 8, 5, y1 - y0 + 16);
             ctx.save();
-            ctx.translate(x - 11, (y0 + y1) / 2);
+            ctx.translate(x - 11, y1 + 8);
             ctx.rotate(-0.5);
             ctx.fillStyle = rgba(th['border-strong'], a);
             ctx.fillRect(-180, -6, 180, 12);

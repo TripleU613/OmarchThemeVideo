@@ -128,7 +128,10 @@ OM.ownWords.add('c2-08');
       };
 
       const get = OM.c2.lazy(W, () => {
-        const L = OM.c2.layout(words, { weight: W, cap: 150, maxW: 1720, cy: 540, rows: 3, lead: 1.5, minCap: 100 });
+        const opt = { weight: W, cap: 150, maxW: 1720, cy: 540, rows: 3, lead: 1.5, minCap: 100 };
+        let L = OM.c2.layout(words, opt);
+        // One row would run through the core: lift it clear, so the feeds climb from the core into the words.
+        if (L.rowsUsed === 1) L = OM.c2.layout(words, { ...opt, rows: 1, cy: 540 - 1.1 * L.cap - 40 });
         return words.map((wd, k) => {
           const p = L.place[k];
           if (!p) return null;

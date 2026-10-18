@@ -93,7 +93,7 @@ OM.ownWords.add('c2-03');
 
           // Camera: from the run into the downbeat, push in on the name and bring it to frame centre.
           const cam = OM.ease.inOutCubic(OM.prog(T, 168.62, DB2));
-          const S = 1 + 0.55 * cam, nx = 960, ny = NL.y0 + 9.5 * NL.ch;
+          const S = 1 + 0.55 * cam, nx = OM.lerp(960, NL.x0 + 500, cam), ny = NL.y0 + 9.5 * NL.ch;
           const away = sm(T, 169.2, DB2); // the hull and the paint fall away
           const glowA = 0.5 * sm(T, 169.25, DB2 + 0.12);
           pool(ctx, 960, 540, 620, 620, ink.lit, glowA);
@@ -210,7 +210,7 @@ OM.ownWords.add('c2-03');
               ctx.save();
               ctx.translate(960, OM.lerp(ny2, 540, cam));
               ctx.scale(S2, S2);
-              ctx.translate(-960, -ny2);
+              ctx.translate(-OM.lerp(960, NL.x0 + 500, cam), -ny2);
               for (const h of [168.368, 168.623, 168.786, 168.856, 169.436]) {
                 const a = T - h;
                 if (a < 0 || a > 0.7 || fade <= 0) continue;
