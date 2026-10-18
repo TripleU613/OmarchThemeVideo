@@ -371,7 +371,7 @@ OM.scene({
           ctx.globalAlpha = 1;
           fx.apply(T, {
             amount: e * (1 - 0.6 * OM.pulse(on, T, 0.2)),
-            cam: { zoom: 1 + e * 0.1, y: e * (48 - 96 * OM.smooth(OM.prog(T, start + 0.3, 211.6))) },
+            cam: { zoom: 1 + e * 0.1, y: e * 48 * (1 - OM.smooth(OM.prog(T, start + 0.3, 211.6))) },
           });
         },
         release: () => { fx.release(); c.release(); },

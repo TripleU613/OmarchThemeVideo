@@ -50,10 +50,7 @@ OM.scene({
     vec2 c = lc - 0.5;
     vec2 l2 = 0.5 + c * (1.0 - uP1.x * 0.16 * dot(c, c));
     vec4 s = src(R.xy + l2 * (R.zw - R.xy));
-    float rows = (R.w - R.y) * 1080.0 / 3.0;
-    float scan = 1.0 - uP1.x * 0.16 * (0.5 + 0.5 * sin(lc.y * rows * 6.2832));
-    float vig = 1.0 - uP1.x * 0.35 * pow(length(c) * 1.4, 3.0);
-    vec3 sc = s.rgb * scan * vig;
+    vec3 sc = s.rgb;
     sc += vec3(0.75, 0.79, 0.96) * uP1.y * 0.05 * clamp(1.0 - abs(lc.x + lc.y - 1.2) * 3.0, 0.0, 1.0);
     col = vec4(sc, 1.0);
   }
