@@ -1,19 +1,17 @@
 # What stays on your machine, and why.
+#
+# The song (music-video/assets/audio/song.wav) and its words (music-video/lyrics.txt,
+# built into music-video/assets/lib/lyrics.js) are tracked. npm run verify stops the
+# silent placeholder song and the placeholder words from being committed.
 
-# The song and its lyrics are someone else's copyrighted work: bring your own.
-# Audio goes in music-video/assets/audio/song.wav; lyrics are built locally with
-#   cd music-video && npm run lyrics:from <your-words.lrc> && npm run lyrics:build
+# Raw source material: the master the analysis reads, the lyric sheet, stems.
 source/
-music-video/assets/audio/*
-!music-video/assets/audio/.gitkeep
-music-video/lyrics.txt
-music-video/assets/lib/lyrics.js
-music-video/storyboard/*.jpg
 
-# Generated or heavy: renders, snapshot caches, separated stems, model caches, environments.
+# Generated or heavy: renders, snapshot caches, contact sheets, separated stems, model caches, environments.
+music-video/storyboard/*.jpg
 music-video/renders/
 music-video/.hyperframes/
-# HyperFrames Studio caches: preview thumbnails (frames, words included) and the song's waveform.
+# HyperFrames Studio caches: preview thumbnails and the song's waveform.
 music-video/.thumbnails/
 music-video/.waveform-cache/
 analysis/stems/
@@ -30,5 +28,5 @@ reference-jtech-lyric-video/
 .DS_Store
 *.swp
 
-# An early speech-to-text attempt: transcripts can hold sung words.
+# An early speech-to-text attempt, superseded by the forced aligner.
 analysis/whisper/

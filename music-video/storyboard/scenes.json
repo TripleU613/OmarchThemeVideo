@@ -1,5 +1,5 @@
 {
-  "_note": "Single source of truth for the cut. Lyric lines are referenced by id only; no lyric text lives in this project. 'at' is the scene's start (seconds); a scene ends where the next begins. 'enter' is how many seconds the scene starts early to transition over the previous one. 'device' must be unique across the film. Palette rule: Tokyo Night everywhere; other themes only where switching themes is the idea (or the deliberate grey 'rented' world of verse 1).",
+  "_note": "Single source of truth for the cut. Lyric lines are referenced by id; their words live in lyrics.txt. 'at' is the scene's start (seconds); a scene ends where the next begins. 'enter' is how many seconds the scene starts early to transition over the previous one. 'device' must be unique across the film. Palette rule: Tokyo Night everywhere; other themes only where switching themes is the idea (or the deliberate grey 'rented' world of verse 1).",
   "scenes": [
     {
       "id": "i-01",

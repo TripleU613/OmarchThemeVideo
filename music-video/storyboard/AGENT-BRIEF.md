@@ -60,12 +60,11 @@ The names are night, spark, glow, field, word, screen, grid, line and spot; read
 ## The lyrics ARE the motion
 
 - `OM.sung(id)` returns `[{ text, space, t0, t1 }]`: your line's words with their
-  aligned onset and end in global seconds. The text loads from the user's lyrics
-  file at runtime.
-- **Never type the lyric words** in code, comments or your report. Never open
-  `lyrics.txt` or `assets/lib/lyrics.js`. Work with word indices, measure text at
-  runtime (`ctx.measureText`), and design for any word length (2 to 10 letters).
-  You will see the real words in your snapshots. That's fine; don't transcribe them.
+  aligned onset and end in global seconds. The text loads from
+  `assets/lib/lyrics.js`, built from `lyrics.txt`.
+- **Never hard-code the words** in scene code: take them from `OM.sung(id)`, so a
+  lyric fix reaches your scene. Work with word indices, measure text at runtime
+  (`ctx.measureText`), and design for any word length (2 to 10 letters).
 - **The words are not a caption.** No text parked below the picture. The words
   are the material the idea acts on: the cracks that get filled, the parts that
   get assembled, the trace that gets drawn. Test: if you removed the words, the
@@ -136,7 +135,7 @@ rounds. Don't run assemble and don't edit any other file; the orchestrator does 
 - Music-only scenes are full set pieces with no words.
 - Budget: at most 2 snapshot rounds per scene. Batch timestamps for several scenes
   into one snapshot run.
-- Report (150 words or less, no lyric text): one line per scene with its device name
+- Report (150 words or less): one line per scene with its device name
   (unique) and key hits, plus anything that needs fixing outside your files.
 
 ## Camera and effects pass
@@ -172,7 +171,7 @@ Each scene gets the camera move, signature shader and extras from its row in
   (the motion must flow, with no jump at the cut). Add your scene's peak effect
   moment too.
 
-## Report back (120 words or less, no lyric text)
+## Report back (120 words or less)
 
 - Device name (8 words or less, unique in the film).
 - One sentence: the idea, and how the words drive it.
@@ -200,8 +199,8 @@ to the music.
 - **Optional:** in the last ~0.4 s before the exit, a small anticipation of what
   comes next, with the out-handoff unchanged.
 - **Same rules as ever:** pure function of T, Tokyo Night, 12 ms per frame
-  (extra draws and particles are the usual cost, so time it), no lyric text, at
-  most 2 snapshot rounds per scene through the flock.
+  (extra draws and particles are the usual cost, so time it), at most 2
+  snapshot rounds per scene through the flock.
 - **Report each sprinkle by name,** with the hits it lands on. Names are unique
   across the film, because nothing repeats.
 

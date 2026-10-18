@@ -33,7 +33,7 @@ the video in front of the Omarchy community / onto omarchy.org. The user asked f
 
 ## Notes
 
-- Lyrics are never shown as on-screen text (they are the songwriter's copyrighted words). Each line is interpreted visually; on-screen words are limited to Omarchy's own: the wordmark, the song title, theme names, keybinds, real command names.
+- The sung words are on screen as the material of each line's idea (the owner has permission; they load from lyrics.txt via lyrics.js). Other on-screen words are Omarchy's own: the wordmark, the song title, theme names, keybinds, real command names.
 - No single overlay or post shader across the whole piece: each scene owns its surface; index.html has no global grain, vignette, CRT or bloom layer.
 - Nothing off theme: every color comes from the 22 site themes (tokens in assets/lib/themes.js), type is JetBrains Mono or Geist, corners are square, the pixel lattice is the recurring motif. Tokyo Night (green on #0e0e14) is home base.
-- Lines are referenced by id (v1-01 … o-01), never by their text.
+- Lines are referenced by id (v1-01 … o-01) in code.

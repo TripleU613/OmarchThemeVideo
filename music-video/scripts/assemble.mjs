@@ -189,7 +189,7 @@ ${scripts}
 // dev.html only: each local script and stylesheet URL carries a hash of its content, so a
 // rewritten scene is a new URL and a browser can never run a stale cached copy. A content
 // hash (not mtime) keeps the page identical on every machine; lyrics.js is left unstamped
-// because it is built locally from your own lyrics file and never committed.
+// so the pages stay the same whether it holds the real words or placeholder words.
 const hash = (p) => createHash('sha1').update(readFileSync(here('../' + p))).digest('hex').slice(0, 8)
 const versioned = (html) =>
   html.replace(/(src|href)="(assets\/[^"?]+\.(?:js|css))"/g, (m, attr, p) => (p === 'assets/lib/lyrics.js' ? m : `${attr}="${p}?v=${hash(p)}"`))

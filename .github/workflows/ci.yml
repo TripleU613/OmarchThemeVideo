@@ -23,19 +23,19 @@ jobs:
       - name: Every script parses
         run: for f in assets/scenes/*.js assets/lib/*.js assets/dev/*.js scripts/*.mjs; do node --check "$f"; done
 
-      # The real lyrics never live in the repo; a placeholder gives every scene its timed words.
-      - name: Placeholder lyrics
-        run: node scripts/build-lyrics.mjs --placeholder
+      # The lyrics live in the repo; a checkout without them gets timed placeholder words.
+      - name: Lyrics (placeholder only when missing)
+        run: test -f assets/lib/lyrics.js || node scripts/build-lyrics.mjs --placeholder
 
       - name: Pages are assembled from the storyboard and in sync
         run: node scripts/assemble.mjs && git diff --exit-code -- index.html dev.html STORYBOARD.md
 
-      - name: Repo hygiene (no song audio, no lyric text, no stray scenes, no big files)
+      - name: Repo hygiene (no placeholders committed, no stray scenes, no big files)
         run: node scripts/verify.mjs
 
-      # Static checks of the composition. The song never lives in the repo, so a silent
-      # placeholder of the same length stands in. HyperFrames is pinned to match local runs.
-      - name: Placeholder audio
+      # Static checks of the composition. The song lives in the repo; a checkout without it
+      # gets a silent placeholder of the same length. HyperFrames is pinned to match local runs.
+      - name: Placeholder audio (only when missing)
         run: node scripts/placeholder-audio.mjs
 
       - name: HyperFrames lint

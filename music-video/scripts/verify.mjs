@@ -1,8 +1,9 @@
 // Repo hygiene, run locally (`npm run verify`) and in CI:
 // - every storyboard scene has a scene file that names its id, and no scene file is a stray;
 // - every sung line's scene draws its own words (OM.ownWords.add): the words are the motion;
-// - nothing that must stay local is tracked: song audio, lyric text, renders, snapshot caches;
-// - no tracked file is over 25 MB.
+// - nothing that must stay local is tracked: renders, snapshot caches, raw source material;
+// - the tracked song and lyrics are the real ones, never the silent placeholder or placeholder words;
+// - no tracked file is over 25 MB, except the song (95 MB, under GitHub's 100 MB limit).
 import { execFileSync } from 'node:child_process'
 import { readFileSync, readdirSync, statSync } from 'node:fs'
 
@@ -28,13 +29,24 @@ let tracked = []
 try {
   tracked = execFileSync('git', ['ls-files'], { cwd: here('../..'), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split('\n').filter(Boolean)
 } catch {}
-const local = [/(^|\/)lyrics\.txt$/, /assets\/lib\/lyrics\.js$/, /\.(wav|mp3|flac|m4a|aac|ogg|mp4|mov|webm|mkv)$/i, /(^|\/)renders\//, /(^|\/)\.hyperframes\//, /^source\//]
+const local = [/(^|\/)renders\//, /(^|\/)\.hyperframes\//, /^source\//]
+const SONG = 'music-video/assets/audio/song.wav', LYRICS = 'music-video/assets/lib/lyrics.js'
 for (const f of tracked) {
   if (local.some((r) => r.test(f))) fail.push(`must stay local, but is tracked: ${f}`)
   try {
-    if (statSync(here('../../' + f)).size > 25 * 1024 * 1024) fail.push(`over 25 MB: ${f}`)
+    if (statSync(here('../../' + f)).size > (f === SONG ? 95 : 25) * 1024 * 1024) fail.push(`too big for the repo: ${f}`)
   } catch {}
 }
+// The placeholders stand in for the song and its words on machines without them; never commit them.
+/** True for the all-zero WAV that scripts/placeholder-audio.mjs writes. */
+const silent = (url) => {
+  const b = readFileSync(url), d = b.indexOf('data', 12)
+  if (d < 0) return false
+  for (let i = d + 8; i < b.length; i += 997) if (b[i]) return false
+  return true
+}
+if (tracked.includes(SONG) && silent(here('../../' + SONG))) fail.push(`${SONG} is the silent placeholder: put the real song there`)
+if (tracked.includes(LYRICS) && readFileSync(here('../../' + LYRICS), 'utf8').slice(0, 200).includes('(placeholder words)')) fail.push(`${LYRICS} holds placeholder words: run npm run lyrics:build`)
 
 if (fail.length) {
   for (const f of fail) console.error(`verify: ${f}`)

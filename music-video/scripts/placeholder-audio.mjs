@@ -1,6 +1,7 @@
 // Writes a silent assets/audio/song.wav the length of the film when no song is
-// present, so the composition lints and previews without the real (copyrighted,
-// never committed) audio. Leaves an existing song.wav untouched.
+// present (a checkout without the tracked song), so the composition lints and
+// previews without it. Leaves an existing song.wav untouched. Never commit it:
+// npm run verify fails on a tracked silent song.
 //
 //   node scripts/placeholder-audio.mjs
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'

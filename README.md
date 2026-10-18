@@ -16,7 +16,7 @@ make one for your own song.
 
 ```
 song.wav ──► analysis/          stems, word timing, beats      lines.json, audiomap.json
-lyrics   ──► lyrics-from-lrc    your words on that timing      lyrics.txt → lyrics.js (local only)
+lyrics   ──► lyrics-from-lrc    your words on that timing      lyrics.txt → lyrics.js
 ideas    ──► storyboard/        one idea per line              IDEAS.md, scenes.json
          ──► assemble           scene windows and pages        index.html, dev.html, STORYBOARD.md
          ──► assets/scenes/     one JS file per scene          66 scenes, built by agents
@@ -32,7 +32,7 @@ ideas    ──► storyboard/        one idea per line              IDEAS.md, s
 2. **Bring your lyrics.** Point `npm run lyrics:from` at a word-by-word `.lrc`,
    `.srt` or `.ass` file. Only the words are used; they're placed on the aligned
    timing and checked word for word (`lyrics.txt`), then `npm run lyrics:build`
-   writes `assets/lib/lyrics.js`. Both stay on your machine.
+   writes `assets/lib/lyrics.js`. Both are tracked, with the song.
 3. **Write one idea per line.** Every sung line gets a visual metaphor with a
    setup, a turn on the key word and a payoff, and the words are the material it
    acts on. The three choruses escalate: one person and one machine, then a
@@ -102,7 +102,7 @@ then checked every cut and scene and sent fixes back.
 | `npm run lyrics:build` | Build `lyrics.js` from `lyrics.txt` (counts only, no text printed) |
 | `npm run lyrics:placeholder` | Timed placeholder words, for working without lyrics |
 | `npm run audio:placeholder` | A silent song of the film's length, for working without the audio |
-| `npm run verify` | Repo hygiene: scenes, words, nothing local tracked |
+| `npm run verify` | Repo hygiene: scenes, words, no placeholders or local files tracked |
 | `npm run snapshot -- --at 81.2,85.0 -o .hyperframes/check` | Exact frames as a contact sheet |
 | `npm run render:preview` | Draft 1080p render at 24 fps |
 | `node scripts/edge-need.mjs <draft.mp4>` | Re-measure which scenes need frame effects (render that draft with `NO_FRAMES=1`) |
@@ -114,9 +114,11 @@ M to mute. The time lives in the URL (`#t=81.25`).
 
 ## Not in this repo
 
-- **The song and its lyrics.** They're someone else's copyrighted work, so bring
-  your own. The scenes never contain lyric text; they render whatever your
-  local lyrics file holds.
+- **Raw source material** (`source/`): the master the analysis reads, the
+  lyric sheet and stems. The song the film plays (`assets/audio/song.wav`) and
+  its words (`lyrics.txt`, `assets/lib/lyrics.js`) are tracked, with the owner's
+  permission. Scenes take the words from `OM.sung(id)`, never hard-coded, so a
+  fork can swap in its own song and lyrics.
 - **Renders and snapshot caches.** They're large and regenerated on demand.
 - **The omarchy.org site source,** which the look is based on. See
   [omarchy.org](https://omarchy.org).

@@ -39,7 +39,7 @@ Every scene runs at full intensity, so nothing builds or releases. Use `audiomap
 
 ## On lyrics
 
-The project deliberately keeps no lyric text, because this is a third-party song (REARRANGED on YouTube). That's a sensible default, so don't change it on your own. If TripleU wants words on screen, ask them directly whether they have the right to show this song's lyrics, and let them decide. Until then, make the sync visible through the motion itself (Problem 2).
+Resolved: TripleU has permission to use the song and show its lyrics. The song and the lyrics now live in the repo, and every line's words are on screen as the material of its scene.
 
 ## Process that worked on the JTech video
 
