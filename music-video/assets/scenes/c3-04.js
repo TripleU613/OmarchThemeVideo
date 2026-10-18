@@ -7,6 +7,10 @@
 // every phone in the house flares, and the crowd dissolves cell by cell into
 // the homepage field.
 OM.ownWords.add('c3-04');
+// Edit camera: the defaults fit. The key word (w2) lands 7 ms after the 256.138 beat-3 punch, and the
+// scene's own camera adds a pop on its onset (fxAt), so that beat is the biggest in the scene; the
+// downbeat flare (259.334) is a light flare, not a camera move, so the camera's punch carries it.
+OM.edit.plan('c3-04', {});
 OM.scene({
   id: 'c3-04',
   build(el, { start, duration }) {
@@ -21,8 +25,11 @@ OM.scene({
     const on = words.map((w) => w.t0);
     const n = words.length;
     const KEY = words.reduce((b, w, k) => (w.t1 - w.t0 > words[b].t1 - words[b].t0 ? k : b), 0);
-    const FLARE = 259.367, KICKS = [255.954, 256.302, 256.813, 256.929, 257.207, 257.347, 258.485, 259.065];
-    const CELL = 6, SW = 0.14; // phone cell px; seconds the wave takes to cross a word
+    // On the drum as measured: the downbeat flare after the line, and the kicks the key word pulses on.
+    const FLARE = OM.beatOnset(259.367), KICKS = [255.954, 256.302, 256.813, 256.929, 257.207, 257.347, 258.485, 259.065].map((t) => C.onDrum(t, 'kick'));
+    // Phone cell px; seconds the wave takes to cross a word (key word x1.4): quick, so each word lands
+    // whole within a few frames of its onset (it read up to 0.35 s late at 0.14 s x2.5).
+    const CELL = 6, SW = 0.05, SWK = 1.4;
     const ZOOM = 2.4; // how far in the camera starts, on the stage
     const split = Math.min(n, KEY + 1);
 
@@ -42,7 +49,7 @@ OM.scene({
         const p = place[k];
         if (!p) return;
         if (k === split) knots.push([on[k] - 0.02, -300]);
-        knots.push([on[k], p.x], [on[k] + SW * (k === KEY ? 2.5 : 1), p.x + p.w]);
+        knots.push([on[k], p.x], [on[k] + SW * (k === KEY ? SWK : 1), p.x + p.w]);
       });
       const last = knots[knots.length - 1];
       knots.push([last[0] + 0.5, 2300]);
@@ -72,7 +79,8 @@ OM.scene({
 }`;
     const fxAt = (T) => ({
       amount: 1, p0: [1.4 * C.decay(T, FLARE, 0.18), 0, 0, 0],
-      cam: { zoom: 1.1, x: 60 * Math.sin((T - start) * 0.6), y: -25 * Math.sin((T - start) * 0.45) },
+      // The key word lands with a pop on top of the camera's beat-3 punch.
+      cam: { zoom: 1.1 + 0.03 * C.decay(T, on[KEY], 0.08), x: 60 * Math.sin((T - start) * 0.6), y: -25 * Math.sin((T - start) * 0.45) },
     });
     return OM.c3.withFx(el, c, start, END, FX, fxAt)({
       render(t, T) {
@@ -104,7 +112,7 @@ OM.scene({
             const tier = Math.floor((y - 120) / 18);
             let p = SEAT[tier & 1];
             const dx = X - x;
-            const cross = k >= 0 ? on[k] + SW * (k === KEY ? 2.5 : 1) * OM.clamp((x - place[k].x) / place[k].w) : 0;
+            const cross = k >= 0 ? on[k] + SW * (k === KEY ? SWK : 1) * OM.clamp((x - place[k].x) / place[k].w) : 0;
             if (k >= 0 && T >= cross) {
               // A word phone: held up once the wave has crossed it, flashing at the crossing.
               const since = T - cross;

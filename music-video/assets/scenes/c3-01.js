@@ -8,9 +8,19 @@
 //
 // Also defines OM.c3, the helpers the rest of chorus 3 shares.
 OM.ownWords.add('c3-01');
+// Edit camera: the 244.388 downbeat is a bare beat (no drum) 166 ms before the key word, whose own
+// explosion punches and shakes the scene camera; the camera's punch there would land first and blur
+// that hit, so it is skipped. The rest (the chorus drop at 243.344, the backbeats) fit as they are.
+OM.edit.plan('c3-01', { skip: [244.388] });
 (() => {
   const C = (OM.c3 = {});
   C.FONT = (w, px) => `${w} ${px}px 'JetBrains Mono'`;
+  /** A hit on the drum as measured on the song (OM.T.drums): the nearest of `kind` within 50 ms of t, else t. */
+  C.onDrum = (t, kind) => {
+    let best = t, d = Infinity;
+    for (const [x] of OM.edit.hits(kind, t - 0.05, t + 0.05)) if (Math.abs(x - t) < d) (d = Math.abs(x - t)), (best = x);
+    return best;
+  };
   window.__hf = window.__hf || {};
   window.__hf.buildReady = window.__hf.buildReady || {};
   window.__hf.buildReady['c3-type'] = Promise.all([document.fonts.load(C.FONT(800, 100)), document.fonts.load(C.FONT(700, 100))]);
@@ -247,8 +257,9 @@ OM.ownWords.add('c3-01');
       const words = OM.sung('c3-01');
       const on = words.map((w) => w.t0);
       const K = words.length - 1; // the key word: the widest curtain, on the downbeat
-      const SNARES = [243.879, 245.296, 245.435, 246.155];
-      const FALL = 246.596; // last downbeat: the curtains fall into the horizon
+      const SNARES = [243.879, 245.296, 245.435, 246.155].map((t) => C.onDrum(t, 'snare'));
+      const PAUSE = SNARES.slice(1); // the pause snares: curtain surge and ridge echo
+      const FALL = OM.beatOnset(246.596); // last downbeat (on the drum): the curtains fall into the horizon
       const HL = OM.HOME, hc = OM.cellAt(HL, 960, 540);
       const LINE_Y = HL.y0 + (hc.row + 0.5) * HL.ch;
       const RIDGE = (x) => 965 + 38 * Math.sin(x * 0.0041 + 1.3) + 22 * Math.sin(x * 0.011 + 0.4) + 10 * Math.sin(x * 0.031);
@@ -311,7 +322,7 @@ OM.ownWords.add('c3-01');
             OM.cell(ctx, HL, hc.col, hc.row, dpr);
             ctx.globalAlpha = 1;
           }
-          const surge = T > 245.25 ? OM.pulse([245.296, 245.435, 246.155], T, 0.14) : 0;
+          const surge = T > 245.25 ? OM.pulse(PAUSE, T, 0.14) : 0;
           // The sky glows green behind every curtain that has opened, flaring on each onset.
           let flare = 0;
           words.forEach((w, k) => (flare = Math.max(flare, (k === K ? 1 : 0.55) * C.decay(T, on[k], 0.16))));
@@ -392,7 +403,7 @@ OM.ownWords.add('c3-01');
               const y = Math.round(RIDGE(x + 4) / 4) * 4;
               // Ridge echo: each pause snare runs a lit band along the ridge crest.
               let echo = 0;
-              for (const s of [245.296, 245.435, 246.155]) {
+              for (const s of PAUSE) {
                 const a = T - s;
                 if (a >= 0 && a < 0.4 && Math.abs(x - a * 5000) < 320) echo = Math.max(echo, (1 - a / 0.4) * (1 - Math.abs(x - a * 5000) / 400));
               }

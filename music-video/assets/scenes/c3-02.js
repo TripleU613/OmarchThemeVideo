@@ -9,6 +9,10 @@
 // one spinning ring of lights, which snaps tight on the beat before the cut and
 // flares: that ring is the drone swarm c3-03 bursts out of.
 OM.ownWords.add('c3-02');
+// Edit camera: the key word (w4) locks on the 248.670 downbeat, so the downbeat punch is raised to
+// make it the biggest beat in the scene (the 250.806 downbeat, where the ring is drawn in, rises
+// with it). The scene's own camera only rolls and pushes slowly, so nothing stacks on the beats.
+OM.edit.plan('c3-02', { down: 2 });
 // The c3-02 > c3-03 match cut: the orbital ring tightened into a ring of drone lights round the core.
 OM.c3cut = OM.c3cut || {};
 (() => {
@@ -52,7 +56,10 @@ OM.scene({
     const words = OM.sung('c3-02');
     const on = words.map((w) => w.t0);
     const n = words.length;
-    const DOWN = 248.709, KICKS = [249.754, 250.032, 250.54], COLLAPSE = 250.845;
+    // On the drum as measured: the kicks the power runs round on, and the downbeat the ring is drawn in on
+    // (the shared ring keeps its own clock, R.COLLAPSE, for the spin of the cut frames).
+    const DOWN = 248.709, KICKS = [249.754, 250.032, 250.54].map((t) => C.onDrum(t, 'kick')), COLLAPSE = OM.beatOnset(250.845);
+    const PAUSE = [249.893, 250.404].map((t) => C.onDrum(t, 'snare'));
     const KEY = words.reduce((b, w, k) => (Math.abs(w.t0 - DOWN) < Math.abs(words[b].t0 - DOWN) ? k : b), 0);
     const LAST = n - 1;
     const HL = OM.HOME, hc = OM.cellAt(HL, 960, 540);
@@ -222,7 +229,7 @@ OM.scene({
             }
             // Bolts at the seams on the lock.
             // Seam re-strike: the pause snares spark every seam of the closed ring again.
-            const bh = Math.max(q.hit, T > on[LAST] + 0.3 ? 0.55 * OM.pulse([249.893, 250.404], T, 0.07) : 0);
+            const bh = Math.max(q.hit, T > on[LAST] + 0.3 ? 0.55 * OM.pulse(PAUSE, T, 0.07) : 0);
             if (bh > 0.05) {
               for (const a of [sg.a0, sg.a1]) {
                 const [x, y] = P(a);

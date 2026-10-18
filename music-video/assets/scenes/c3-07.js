@@ -10,6 +10,11 @@
 // parts from the sun outward, the drops flash and burn off, and light floods
 // the frame: the glow.
 OM.ownWords.add('c3-07');
+// Edit camera: the 269.996 downbeat has no kick or snare under it and falls 94 ms before the snare
+// thunder (the scene's own flash shake) and 200 ms before the key word's nova; its punch would blur
+// both, so it is skipped and the key word's own camera pop (fxAt) is raised to carry the bar. The
+// 270.526 kick, the strongest in the scene, keeps its jolt: the deck parts and light floods on it.
+OM.edit.plan('c3-07', { skip: [269.996] });
 OM.scene({
   id: 'c3-07',
   build(el, { start, duration }) {
@@ -25,7 +30,9 @@ OM.scene({
     const words = OM.sung('c3-07');
     const on = words.map((w) => w.t0);
     const n = words.length;
-    const K = n - 1, PART = 270.536, CELL = 6, TEAR = 0.12;
+    // PART: the deck parts on the kick inside the key word (measured). TEAR: seconds a break takes to
+    // tear across its word, quick so each word is whole within a few frames of its onset (was 0.12).
+    const K = n - 1, PART = C.onDrum(270.536, 'kick'), CELL = 6, TEAR = 0.06;
     const CL = [th['bg-deep'] || '#16161e', th.surface || '#1f2335', th['surface-2'] || '#292e42', th['border-strong'] || '#3b4261'].map(C.pack);
     const P = { crest: C.pack(ink.crest), hover: C.pack(ink.hover), lit: C.pack(ink.lit), mid: C.pack(ink.mid) };
     const RN = OM.c3cut.rain, rain = RN.drops; // the rain the flock came down as
@@ -66,7 +73,7 @@ OM.scene({
 
     // Camera: a tilt up as the clouds part, with flash shakes on the thunder. Effect: lightning exposure
     // flashes and cloud shadows sweeping over the deck; the lit letters are masked out of both.
-    const FL = [269.746, 270.095, 270.536];
+    const FL = [C.onDrum(269.746, 'kick'), C.onDrum(270.095, 'snare'), PART]; // the thunder, on the drums as measured
     const flashAt = (T) => FL.reduce((m, f) => Math.max(m, C.decay(T, f, 0.06)), 0);
     const FX = C.GLSL_LUM + `vec4 effect(vec2 uv) {
   vec2 p = cam(uv);
@@ -81,7 +88,7 @@ OM.scene({
       const f = flashAt(T);
       return {
         amount: 1, p0: [f, 0, 0, 0],
-        cam: { zoom: 1.06 + 0.03 * C.decay(T, on[K], 0.07), y: -30 + 60 * OM.ease.inOutCubic(OM.prog(T, start, END)), x: 9 * f * Math.sin(T * 91), rot: 0.004 * f * Math.cos(T * 73) },
+        cam: { zoom: 1.06 + 0.05 * C.decay(T, on[K], 0.07), y: -30 + 60 * OM.ease.inOutCubic(OM.prog(T, start, END)), x: 9 * f * Math.sin(T * 91), rot: 0.004 * f * Math.cos(T * 73) },
       };
     };
     return OM.c3.withFx(el, c, start, END, FX, fxAt)({
@@ -119,14 +126,15 @@ OM.scene({
             buf[idx] = 0;
             // The deck rolls in cell by cell; the parting opens from the sun.
             const h = OM.hash(i, j, 0x77);
-            if (h > roll * 1.1) continue;
             if (k >= 0 && nova && T >= on[k]) continue; // flung out in the nova: the break shows through
+            // A torn letter is whole from its tear, even while the deck is still rolling in round the first word.
             if (k >= 0 && T >= tearAt(place, k, x) && h < wordsA) {
               const age = T - tearAt(place, k, x);
               const v = (age < 0.08 ? 1.3 : 0.7) + 0.4 * C.decay(T, on[k], 0.16) - 0.5 * (1 - wordsA) + (h > 0.8 ? 0.2 : 0);
               buf[idx] = v > 1 ? P.crest : v > 0.45 ? P.hover : P.lit;
               continue;
             }
+            if (h > roll * 1.1) continue;
             // The parting clears the cloud round the letters; the letters themselves hold until they fade.
             const dist = Math.hypot(x - SX, (y - SY) * 1.5) / 1150;
             if (dist < part * 1.25 - 0.12 * h) continue;

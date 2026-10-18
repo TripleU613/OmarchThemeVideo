@@ -5,6 +5,9 @@
 // the field to the edges of the frame on the kick fill. Then the flowers fold
 // shut again, words first, back into buds, and the meadow is the field.
 OM.ownWords.add('c3-05');
+// Edit camera: the key word (w2) opens on the 261.452 downbeat, so the downbeat punch is raised to make
+// it the scene's biggest beat. The scene's own camera is a slow dolly, so nothing stacks on the beats.
+OM.edit.plan('c3-05', { down: 2.2 });
 OM.scene({
   id: 'c3-05',
   build(el, { start, duration }) {
@@ -19,10 +22,13 @@ OM.scene({
     const words = OM.sung('c3-05');
     const on = words.map((w) => w.t0);
     const n = words.length;
-    const DOWN = 261.503, FILL = 261.735, CLOSE = 262.4;
+    const DOWN = OM.beatOnset(261.503), FILL = 261.735, CLOSE = 262.4; // the downbeat on the drum
     const KEY = words.reduce((b, w, k) => (Math.abs(w.t0 - DOWN) < Math.abs(words[b].t0 - DOWN) ? k : b), 0);
-    const PK = [262.15, 262.27, 262.52, 262.76]; // the pause kicks: petal shake and heart beat
-    const OPEN = 0.22; // seconds for the bloom to cross a word
+    const PK = [262.15, 262.27, 262.52, 262.76].map((t) => C.onDrum(t, 'kick')); // the pause kicks (measured): petal shake and heart beat
+    const KK = [261.062, 261.201].map((t) => C.onDrum(t, 'kick')); // the kicks before the key word
+    // Seconds for the bloom to cross a word, and for each flower to pop open: quick, so each word is in
+    // full bloom within a few frames of its onset (it took up to 0.38 s at 0.22 s + 0.16 s).
+    const OPEN = 0.05, POP = 0.07;
 
     const type = C.lazy(() => {
       const first = words.map((_, k) => k).filter((k) => k !== KEY);
@@ -111,12 +117,12 @@ OM.scene({
           for (let i = 0; i < P.length; i += 2) {
             const x = P[i], y = P[i + 1];
             const tb = on[k] + OPEN * (big ? 0.7 : 1) * OM.clamp((x - p.x) / p.w);
-            const open = OM.ease.outBack(OM.clamp((T - tb) / 0.16), 2.2);
+            const open = OM.ease.outBack(OM.clamp((T - tb) / POP), 2.2);
             const shut = 1 - OM.ease.inCubic(OM.prog(T, closeAt(x) - 0.05, Math.min(closeAt(x) + 0.3, END - 0.1)));
             const s = Math.max(T >= on[k] ? 0.25 : 0, open) * shut;
             if (s <= 0.02) continue;
             const age = T - tb;
-            const kickGlow = OM.pulse(big ? [261.062, 261.201, ...PK] : PK, T, 0.1); // heart beat on the pause kicks
+            const kickGlow = OM.pulse(big ? [...KK, ...PK] : PK, T, 0.1); // heart beat on the pause kicks
             const heart = age < 0.1 || kickGlow > 0.5 ? ink.crest : (OM.hash(x, y, k) > 0.3 ? ink.crest : ink.hover);
             flower(ctx, x, y, s, sz * (1.15 + 0.25 * kickGlow), heart, age < 0.2 || kickGlow > 0.4 ? ink.crest : ink.hover);
           }

@@ -8,6 +8,10 @@
 // of c3-07's storm, every bird stretching into a falling drop round the sun,
 // landing on the snare before the cut.
 OM.ownWords.add('c3-06');
+// Edit camera: the defaults fit. The kick fill builds into the 263.608 downbeat, the drop, where the
+// first word holds in formation well clear of the edges (9.3% peak zoom), and the scene's own camera
+// only glides, so nothing stacks on the beats; the flock's wingbeat flares light the pause hits.
+OM.edit.plan('c3-06', {});
 // The c3-06 > c3-07 match cut: the flock come down as rain, falling past the sun.
 OM.c3cut = OM.c3cut || {};
 (() => {
@@ -55,7 +59,10 @@ OM.scene({
     const words = OM.sung('c3-06');
     const on = words.map((w) => w.t0);
     const n = words.length;
-    const DOWNS = [263.639, 265.776].map(OM.beatOnset), WILD = 266.008, TURNS = [266.89, 267.424], POUR = 267.889;
+    // On the drum: the downbeats, the wild kick, the pour downbeat. TURNS centre the flock's smooth
+    // one-second bends (not hits); the wingbeat flares (WB) are hits, on the drums as measured.
+    const DOWNS = [263.639, 265.776].map(OM.beatOnset), WILD = 266.008, TURNS = [266.89, 267.424], POUR = OM.beatOnset(267.889);
+    const WB = [[266.008, 'kick'], [266.89, 'snare'], [267.424, 'snare'], [267.59, 'kick'], [268.0, 'kick']].map(([t, k]) => C.onDrum(t, k));
     const start0 = OM.heroLit(start, L, { gain: 0.8 });
 
     const flock = C.lazy(() => {
@@ -151,7 +158,7 @@ OM.scene({
         if (C.seam(ctx, T, dpr, start, END, 'field', 'spark')) return; // out-side never reached: the rain paints the last frames
         const { F, B } = flock();
         const lift = OM.ease.inOutCubic(OM.prog(T, start + 0.05, start + 0.7));
-        const pour = OM.ease.inOutCubic(OM.prog(T, POUR - 0.046, LANDR)); // the flock flares out and falls as the rain
+        const pour = OM.ease.inOutCubic(OM.prog(T, POUR, LANDR)); // the flock flares out and falls as the rain
         const rainC = C.th['text-muted'] || ink.mid;
         const down = OM.pulse(DOWNS, T, 0.14);
 
@@ -198,7 +205,7 @@ OM.scene({
           }
           // Wingbeat flare: on each pause hit a beat of light runs through the free flock.
           if (inForm < 0 && T > 265.8) {
-            const wb = OM.pulse([266.008, 266.89, 267.424, 267.59, 268.0], T, 0.09) * (0.4 + 0.6 * (0.5 + 0.5 * Math.sin(b.u * 5 + b.v * 3)));
+            const wb = OM.pulse(WB, T, 0.09) * (0.4 + 0.6 * (0.5 + 0.5 * Math.sin(b.u * 5 + b.v * 3)));
             v += 0.8 * wb;
             sz += 1.5 * wb * (1 - pour);
           }

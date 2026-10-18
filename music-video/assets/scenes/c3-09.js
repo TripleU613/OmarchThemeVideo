@@ -8,6 +8,12 @@
 // it the homepage field and the wordmark are reborn, cell by cell, across the
 // held note, settling into the field with the wordmark at home.
 OM.ownWords.add('c3-09');
+// Edit camera: the scene's own camera owns the end of the line. The crash zoom into the collapse slams
+// to a stop on the 277.998 backbeat (a hat, no kick or snare), and the finale kicks punch and shake it
+// (K2 279.600, K3 280.180, K4 280.524); the camera beats on or just before them would stack, so they
+// are skipped. The 278.544 downbeat (the mark locks on the kick) keeps its punch, the camera's biggest
+// in the scene.
+OM.edit.plan('c3-09', { skip: [277.998, 279.6, 280.134, 280.524] });
 OM.scene({
   id: 'c3-09',
   build(el, { start, duration }) {
@@ -24,6 +30,11 @@ OM.scene({
     const n = words.length;
     const NAME = C.nameIndex(words);
     const PULL = on[NAME], LOCK = 278.547, BOOM = 278.802, REST = 279.4;
+    // The downbeat the mark pulses on, and the finale's four kicks, on the drum as measured.
+    const DOWN = OM.beatOnset(278.57), FIN = [279.429, 279.615, 280.149, 280.497].map((t) => C.onDrum(t, 'kick'));
+    // The collapse lands on the beat after the name (its onset): the cells lock into the mark there
+    // (the pull's ease reaches 0.98 on it), and the crash zoom slams to a stop and the mark flashes with it.
+    const LANDP = OM.beatOnset(278.036);
     const home = OM.cellAt(L, 960, 540);
     // The mark: the 15x15 logo, each logo pixel a 2x2 block of home cells, centred.
     const mark = [];
@@ -62,11 +73,11 @@ OM.scene({
       const back = OM.ease.outExpo(OM.clamp((T - BOOM) / 0.7));
       const shake = C.decay(T, BOOM, 0.08);
       // The finale kicks punch the camera in, each harder (zero by the cut through the window envelope).
-      const punch = [[279.429, 0.012], [279.615, 0.02], [280.149, 0.03], [280.597, 0.045]].reduce((m, [k, a]) => Math.max(m, a * C.decay(T, k, 0.06)), 0);
+      const punch = [[FIN[0], 0.012], [FIN[1], 0.02], [FIN[2], 0.03], [FIN[3] + 0.1, 0.045]].reduce((m, [k, a]) => Math.max(m, a * C.decay(T, k, 0.06)), 0);
       return {
         amount: T >= BOOM && T < BOOM + 1 ? 1 - out : 0, p0: [out * 1500, 0, 0, 0],
         cam: {
-          zoom: 1 + 0.22 * OM.ease.inCubic(OM.prog(T, PULL - 0.05, PULL + 0.32)) * (1 - back) + (T > REST ? punch : 0),
+          zoom: 1 + 0.22 * OM.ease.inCubic(OM.prog(T, PULL - 0.05, LANDP)) * (1 - back) + (T > REST ? punch : 0),
           x: 14 * shake * Math.sin(T * 97) + (T > REST ? 900 * punch * Math.sin(T * 97) : 0), y: 10 * shake * Math.cos(T * 83),
         },
       };
@@ -84,7 +95,7 @@ OM.scene({
           // echo; the field flips to crest in a giant wordmark filling the frame, the home letters cut dark
           // out of it; and the giant mark contracts into the home wordmark and rebounds as one last echo.
           // Everything settles to the exact field with the wordmark at home before the cut.
-          const [K1, K2, K3, K4] = [279.429, 279.615, 280.149, 280.497], OFF = 280.68;
+          const [K1, K2, K3, K4] = FIN, OFF = 280.68;
           if (T >= OFF || T < K1) return OM.handoff('word', ctx, T, dpr);
           const g = 1 - C.sm(T, 280.6, OFF);
           const WR = OM.WORDMARK.rows, WC = 40.5, WRc = 9.5, BIG = 2.05;
@@ -172,7 +183,7 @@ OM.scene({
           }
           // The mark, locked solid once the cells arrive, pulsing on the kick and the downbeat.
           if (pull >= 0.98) {
-            const p = C.decay(T, PULL + 0.32, 0.12) + C.decay(T, LOCK, 0.1) + 0.6 * C.decay(T, 278.57, 0.14);
+            const p = C.decay(T, LANDP, 0.12) + C.decay(T, LOCK, 0.1) + 0.6 * C.decay(T, DOWN, 0.14);
             C.pool(ctx, 960, 540, 520, ink.lit, 0.18 + 0.3 * p);
             ctx.fillStyle = p > 0.6 ? ink.crest : p > 0.25 ? ink.hover : ink.lit;
             for (const [col, row] of mark) OM.cell(ctx, L, col, row, dpr);

@@ -8,6 +8,10 @@
 // breaks formation and the whole swarm pours down into a stage spotlight,
 // becoming the dust in its beam.
 OM.ownWords.add('c3-03');
+// Edit camera: the pour starts on the strong 254.104 kick, 100 ms after the 254.002 beat (a bare hat);
+// the beat's punch would stack on the kick's, so it is skipped and the kick punches as a full beat
+// (offbeat 1). The name lands between beats, so the scene's own camera punches on it (fxAt).
+OM.edit.plan('c3-03', { skip: [253.99], offbeat: 1 });
 OM.scene({
   id: 'c3-03',
   build(el, { start, duration }) {
@@ -21,7 +25,10 @@ OM.scene({
     const words = OM.sung('c3-03');
     const on = words.map((w) => w.t0);
     const NAME = C.nameIndex(words);
-    const DOWN = 252.981, SNARES = [253.167, 253.469], BREAK = 253.887, POUR = 254.073;
+    // On the drum as measured: the downbeat and snare colour waves, the break and pour kicks, the beam pulses.
+    const DOWN = OM.beatOnset(252.981), SNARES = [253.167, 253.469].map((t) => C.onDrum(t, 'snare'));
+    const BREAK = C.onDrum(253.887, 'kick'), POUR = C.onDrum(254.073, 'kick');
+    const BEAM = [254.073, 254.68, 255.35].map((t) => C.onDrum(t, 'kick'));
     const HL = OM.HOME, hc = OM.cellAt(HL, 960, 540);
     const SX = HL.x0 + (hc.col + 0.5) * HL.cw, SY = HL.y0 + (hc.row + 0.5) * HL.ch;
     const EXTRA = 700;
@@ -66,7 +73,8 @@ OM.scene({
 }`;
     const fxAt = (T) => ({
       amount: 1, p0: [Math.max(1 - OM.ease.outExpo(OM.prog(T, start + 0.03, start + 0.45)), OM.clamp(OM.prog(T, POUR, END - 0.25) * 3), C.decay(T, on[NAME], 0.2)), 0, 0, 0],
-      cam: { zoom: 1.07, x: 55 * Math.sin((T - start) * 0.7) },
+      // The name slams into formation: the camera punches in on its onset, the scene's biggest hit.
+      cam: { zoom: 1.07 + 0.05 * C.decay(T, on[NAME], 0.08), x: 55 * Math.sin((T - start) * 0.7) },
     });
     let XS = new Float32Array(0), YS = XS;
     return OM.c3.withFx(el, c, start, END, FX, fxAt)({
@@ -148,7 +156,7 @@ OM.scene({
             sz = OM.lerp(sz, 3, p);
             v = OM.lerp(v, 0.3, p);
             // Beam pulse: each kick sends a bright band falling down the spotlight through the drones.
-            for (const k of [254.073, 254.68, 255.35]) {
+            for (const k of BEAM) {
               const a = T - k;
               if (a >= 0 && a < 0.45 && Math.abs(y - (140 + a * 1700)) < 55) v += 0.7 * (1 - a / 0.45) * p;
             }

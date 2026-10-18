@@ -11,6 +11,10 @@
 // girder lattice across the whole frame on the beat after, laid on the home
 // grid, which c3-09 then sheds back to the bare grid.
 OM.ownWords.add('c3-08');
+// Edit camera: the key word (w2) slams down 40 ms after the 272.120 downbeat, so the downbeat punch is
+// raised to make it the scene's biggest beat. On the 274.260 downbeat the scene's own camera starts its
+// push into the girders; a punch there would zoom in, fall back and zoom in again, so it is skipped.
+OM.edit.plan('c3-08', { down: 2.2, skip: [274.26] });
 // The c3-08 > c3-09 match cut: the tower's steel laid out as a girder lattice on every fourth home grid line.
 OM.c3cut = OM.c3cut || {};
 (() => {
@@ -57,10 +61,11 @@ OM.scene({
     const words = OM.sung('c3-08');
     const on = words.map((w) => w.t0);
     const n = words.length;
-    const DOWN = 272.161, PUSH = 274.297, GROUND = 925, FH = 168, CELL = 8;
+    const DOWN = OM.beatOnset(272.161), PUSH = 274.297, GROUND = 925, FH = 168, CELL = 8; // DOWN on the drum
+    const RIVET = [273.276, 273.554].map((t) => C.onDrum(t, 'snare')); // the pause snares, as measured
     const KEY = words.reduce((b, w, k) => (Math.abs(w.t0 - DOWN) < Math.abs(words[b].t0 - DOWN) ? k : b), 0);
     // Every storey and when it lands: the words, then a bare one on each beat until the push.
-    const PUSH0 = PUSH - 0.046, TB = 274.785; // the push (on the drum), and the burst a beat later
+    const PUSH0 = OM.beatOnset(PUSH), TB = 274.785; // the push (on the drum), and the burst a beat later
     const GD = OM.c3cut.girders;
     const bare = OM.beatsIn(words[n - 1].t1 + 0.05, PUSH0).map(OM.beatOnset); // on the drum, like the push; nothing still on the crane when the tower bursts
     const lands = [...on, ...bare];
@@ -201,7 +206,7 @@ OM.scene({
           beam(y1, word && s.landed, s.hit);
           // Rivet chain: on the pause snares the joints flash storey by storey up the tower.
           if (s.landed) {
-            for (const sn of [273.276, 273.554]) {
+            for (const sn of RIVET) {
               const a = T - sn - i * 0.035;
               if (a < 0 || a > 0.22) continue;
               ctx.fillStyle = C.rgba(ink.crest, 1 - a / 0.22);
@@ -274,7 +279,7 @@ OM.scene({
           ctx.fillStyle = ink.mid;
           ctx.fillRect(X0 + 77 - cl, top - 2, 60, 28); // counterweight
           let kickSwing = 0; // cable kick: the hook swings out on the pause snares
-          for (const sn of [273.276, 273.554]) if (T >= sn) kickSwing += 60 * C.decay(T, sn, 0.3) * Math.sin((T - sn) * 12);
+          for (const sn of RIVET) if (T >= sn) kickSwing += 60 * C.decay(T, sn, 0.3) * Math.sin((T - sn) * 12);
           const hookX = X0 + 77 + jl * (0.55 + 0.4 * Math.sin((T - start) * 2.3)) + kickSwing;
           const next = lands.find((x) => x > T + 0.3);
           const hookY = top + 60 + 120 * (0.5 + 0.5 * Math.sin((T - start) * 3.1));
