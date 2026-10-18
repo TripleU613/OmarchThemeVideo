@@ -55,7 +55,7 @@
       const on = sung.map((w) => w.t0);
       // Hits: the kick under word 1, the downbeat in the held word, the kick where the energy turns high, the snare.
       const KICK1 = 98.36, KICK2 = 100.01, SNARE = 100.7;
-      const DOWN = OM.downbeatsIn(on[2], KICK2)[0] || 99.451;
+      const DOWN = OM.beatOnset(OM.downbeatsIn(on[2], KICK2)[0] || 99.451); // the drum onset, not the late grid
       const D = [0.26, 0.2, 0.34]; // seconds each window takes to render, cell by cell
 
       // Everything inside the screen sits on home-lattice lines.

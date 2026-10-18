@@ -78,7 +78,7 @@ OM.ownWords.add('c1-08');
       const ink = OM.fieldInks('tokyo-night');
       const th = OM.theme('tokyo-night');
       const [w0, w1, w2] = OM.words('c1-08');
-      const DB1 = OM.downbeatsIn(112, 112.5)[0] || 112.245;
+      const DB1 = OM.beatOnset(OM.downbeatsIn(112, 112.5)[0] || 112.245); // on its kick, not the late grid
       const DB2 = OM.downbeatsIn(114.2, 114.6)[0] || 114.381;
       const KICK = 110.99, ROLL0 = 112.71, ROLL1 = 114.33, SN_PRE = 113.43, SN_A = 113.78, SN_B = 113.94;
       const OUT = start + duration - 0.07; // the push eases to a stop on the screen handoff, held for the last two frames
