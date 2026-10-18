@@ -6,6 +6,10 @@
 // last word is struck on in highlight and the plane launches; on the downbeat
 // it is thrown for real, swooping away into the night trailing lattice light
 // until it is a single crest cell with a halo: the spark chorus 1 opens on.
+// Edit camera: the throw on the downbeat (80.170) starts the scene's own whip, so
+// that punch is lowered to a snap under the whip rather than a second move; the
+// cut-landing punch, the backbeat jolts and the build into chorus 1 run as set.
+OM.edit.plan('p1-04', { down: 1.2 });
 OM.ownWords.add('p1-04');
 OM.scene({
   id: 'p1-04',
@@ -25,7 +29,9 @@ OM.scene({
     const YC = L.y0 + (H.row + 0.5) * L.ch, SX = L.x0 + (H.col + 0.5) * L.cw;
     const OPEN = [start + 0.01, on[0]]; // unfolds from the cut, fully open on word 0's onset
     const F1 = [on[0] + 0.05, on[0] + 0.24], F2 = [on[1] + 0.01, on[K] - 0.03];
-    const THROW = 80.18, ARRIVE = END - 0.085;
+    const DOWN = OM.beatOnset(80.202); // the downbeat at its drum onset: the throw
+    const SNARE = 79.63, KICK = 79.376; // measured drum onsets (OM.T.drums)
+    const THROW = DOWN, ARRIVE = END - 0.085;
     const W2 = 800, H2 = 360; // half sheet
     const PAPER = th.text, SHADE = th['text-secondary'], BACK = th['text-muted'];
     const PRINT = OM.mix(th.text, ink.bg, 0.42);
@@ -86,8 +92,8 @@ OM.scene({
         const o = OM.smooth(OM.prog(T, OPEN[0], OPEN[1])); // smoothstep: at most ~30% of the sheet per 1/24 s
         const f1 = OM.ease.inOutCubic(OM.prog(T, F1[0], F1[1])), f2 = OM.ease.inOutCubic(OM.prog(T, F2[0], F2[1]));
         const P = pose(T);
-        const kick = decay(T, on[0], 0.08) + decay(T, 79.644, 0.06);
-        const launch = decay(T, on[K], 0.14), thr = decay(T, 80.202, 0.12);
+        const kick = decay(T, on[0], 0.08) + decay(T, SNARE, 0.06);
+        const launch = decay(T, on[K], 0.14), thr = decay(T, DOWN, 0.12);
 
         // The light trail, lattice cells along the throw.
         const fadeT = 1 - sm(P.u, 0.7, 0.97);
@@ -145,7 +151,7 @@ OM.scene({
           ctx.scale(hw / W2, hh / H2);
           const lightK = sm(P.u, 0.2, 0.8); // far away it is just light
           // Brightness: the thin line eases down to 30% as it opens, then the page lights to full on the kick, with word 0's stamp.
-          const lit = OM.lerp(OM.lerp(1, 0.3, sm(o, 0, 0.25)), 1, OM.ease.outCubic(OM.prog(T, 79.366, 79.396)));
+          const lit = OM.lerp(OM.lerp(1, 0.3, sm(o, 0, 0.25)), 1, OM.ease.outCubic(OM.prog(T, KICK, KICK + 0.03)));
           const col = (hex) => OM.mix(ink.bg, OM.mix(OM.mix(ink.crest, hex, o), ink.crest, lightK), lit);
           // Body: the sheet below the folds.
           const py = OM.lerp(-H2, -H2 * (1 - 1240 / 1600), f2), px = W2 - H2;

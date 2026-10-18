@@ -6,6 +6,10 @@
 // layout: three tiles over one wide master, every border on the home
 // lattice. On the snare the words drain and the empty layout holds: p1-03 turns its tiles into gears.
 // the lattice comes up, so the layout is exactly the grid p1-03 cuts in on.
+// Edit camera: the key word is written on the downbeat (75.892), so that punch is
+// raised to the scene's biggest; the scene's own roll is a slow arc, never on the
+// drums, so nothing stacks; the outer words stay 90+ px clear of the band.
+OM.edit.plan('p1-02', { down: 1.9 });
 OM.ownWords.add('p1-02');
 // Shared with p1-03: the tiling layout and the seam frame (the empty tiles, borders lit).
 (() => {
@@ -77,7 +81,7 @@ OM.scene({
     const words = OM.sung('p1-02');
     const on = words.map((w) => w.t0);
     const K = words.length - 1;
-    const DOWN = 75.929, SNARE = 76.278;
+    const DOWN = OM.beatOnset(75.929), SNARE = 76.246; // the downbeat and the snare, at their measured drum onsets
     const L = OM.HOME;
     const ci = (x) => Math.round((x - L.x0) / L.cw), ri = (y) => Math.round((y - L.y0) / L.ch);
     const gx = (col) => L.x0 + col * L.cw, gy = (row) => L.y0 + row * L.ch;

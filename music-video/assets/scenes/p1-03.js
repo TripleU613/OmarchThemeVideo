@@ -7,6 +7,11 @@
 // sixteenth on the kick roll, faster and faster. Then the words go dark and
 // the whole train is crushed edge-on into one crest line across the frame:
 // the paper's edge that p1-04 opens.
+// Edit camera: the key word's drop on the downbeat (78.032) is the scene's own
+// designed hit (frame shake, teeth burst, ratchet click), and its stamp reaches
+// near the right band, so the camera skips that beat; the kicks and backbeats
+// that wind the train keep their default punches and jolts.
+OM.edit.plan('p1-03', { skip: [78.032] });
 OM.ownWords.add('p1-03');
 OM.scene({
   id: 'p1-03',
@@ -22,8 +27,8 @@ OM.scene({
     const words = OM.sung('p1-03');
     const on = words.map((w) => w.t0);
     const K = words.length - 1;
-    const KICKS = [76.974, 77.485];
-    const DOWN = 78.065, ROLL = 78.832;
+    const KICKS = [76.964, 77.502]; // measured kick onsets (OM.T.drums)
+    const DOWN = OM.beatOnset(78.065), ROLL = 78.832; // the downbeat at its drum onset
     const OFF = [78.79, END - 0.1]; // words dark, then the crush
     const L = OM.HOME, H = OM.cellAt(L, 960, 540);
     const YC = L.y0 + (H.row + 0.5) * L.ch; // the centre row: where the line will be

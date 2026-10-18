@@ -5,6 +5,10 @@
 // downbeat with the spot flaring and its vinyl sliding out. Then the sleeves
 // drop back into the crate and the spotlight closes down to a single point
 // of light on the floor: the pen p1-02 starts with.
+// Edit camera: the key sleeve is pulled on the downbeat (73.734), so that punch is
+// raised to the scene's biggest; the scene's own camera only steps 10 px per pull,
+// so nothing stacks, and the words stay 100+ px clear of the band at the peak.
+OM.edit.plan('p1-01', { down: 2 });
 OM.ownWords.add('p1-01');
 (() => {
   const rgba = (hex, a) => {
