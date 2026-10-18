@@ -42,7 +42,7 @@ OM.ownWords.add('c2-02');
       const on = words.map((w) => w.t0);
       const K = words.length - 1;
       const KICKS = [164.374, 164.676, 164.792, 164.862];
-      const RUN = 164.98, DB2 = OM.downbeatsIn(165.3, 165.7)[0] || 165.489;
+      const RUN = 164.98, DB2 = OM.beatOnset(OM.downbeatsIn(165.3, 165.7)[0] || 165.489);
       const HM = OM.HOME, cR = OM.cellAt(HM, 960, 540).row;
       const CS = 9, PADX = 30, PADY = 30, GAP = 36, NECK = 22, MAXW = 1840;
       const rowY = (r) => HM.y0 + r * HM.ch;

@@ -80,7 +80,7 @@ OM.ownWords.add('c2-04');
       // The key word: the longest held one (the city-wide wave lands with it).
       let K = 0;
       words.forEach((w, k) => { if (w.t1 - w.t0 > words[K].t1 - words[K].t0) K = k; });
-      const DB1 = OM.downbeatsIn(171.6, 172)[0] || 171.851, DB2 = OM.downbeatsIn(173.8, 174.2)[0] || 173.987;
+      const DB1 = OM.beatOnset(OM.downbeatsIn(171.6, 172)[0] || 171.851), DB2 = OM.downbeatsIn(173.8, 174.2)[0] || 173.987;
       const SNARES = [170.365, 170.852, 171.433, 171.897, 172.176, 172.71, 172.965, 173.383];
       const OUT = DB2, GONE = 174.42;
       const HM = OM.HOME, V = 5200;
