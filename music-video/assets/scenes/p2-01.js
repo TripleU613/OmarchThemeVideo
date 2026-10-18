@@ -4,6 +4,9 @@
 // is the biggest; on the downbeat every record starts to spin. Then the rail
 // swallows them, one after another, and only the line is left for p2-02.
 OM.ownWords.add('p2-01');
+// Edit camera: the key word lands on the downbeat (150.562) with its slam, the tonearm and the spin,
+// and the scene's own camera is a slow orbit with no drum hits, so that downbeat punches harder.
+OM.edit.plan('p2-01', { down: 2 });
 (() => {
   // Shared by the pre-chorus 2 scenes (p2-01 to p2-04).
   const FONT = "800 100px 'JetBrains Mono'";
@@ -27,6 +30,11 @@ OM.ownWords.add('p2-01');
         const text = (w.text || '').toUpperCase();
         return { ...w, text, w100: meter.measureText(text).width };
       });
+    },
+    /** The measured drum onset (OM.T.drums) of the `kind` hit within 40 ms of t, or t itself. */
+    drum: (kind, t) => {
+      const v = OM.edit.hits(kind, t - 0.04, t + 0.04).reduce((m, h) => (Math.abs(h[0] - t) < Math.abs(m - t) ? h[0] : m), Infinity);
+      return Number.isFinite(v) ? v : t;
     },
     /** Cap height and advance per px of font size. */
     CAP: 0.73,
@@ -102,6 +110,7 @@ OM.ownWords.add('p2-01');
       const h = OM.cellAt(L, 960, 540);
       const YC = L.y0 + (h.row + 0.5) * L.ch; // the rail: the handoff line's centre
       const DB = OM.beatOnset(150.605), EXIT = 151.2;
+      const ed = OM.edit.scene(start, END); // its clock surges the orbit through each beat
 
       let lay = null;
       const layout = () => {
@@ -289,7 +298,7 @@ OM.ownWords.add('p2-01');
 
           // Camera: a slow orbit round the turntable; the glow eases in and out of the cuts.
           const env = OM.post.envelope(T, start, END, { ramp: 0.35 });
-          const ph = (T - start) * 2.2;
+          const ph = (ed.clock(T) - start) * 2.2;
           fx.apply(T, {
             amount: env * (0.55 + 0.45 * (T > DB ? Math.exp(-(T - DB) / 0.5) : 0)),
             cam: { zoom: 1 + 0.05 * env, rot: 0.022 * env * Math.sin(ph), x: 20 * env * Math.cos(ph), y: 12 * env * Math.sin(ph) },

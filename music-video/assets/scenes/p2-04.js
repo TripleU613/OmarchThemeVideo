@@ -6,6 +6,10 @@
 // on every word, the light strobes on the kicks, and on the downbeat surge we
 // whip up through the cloud tops: wing and trail fall away into the glow.
 OM.ownWords.add('p2-04');
+// Edit camera: the scene's own camera already shakes on every kick and on the key word's blast, so
+// the off-beat kick punches (155.962, 157.080, 157.608) go lighter; the downbeat punch (156.936)
+// stays full as the surge the climb whips up on, and the build into chorus 2 runs through.
+OM.edit.plan('p2-04', { offbeat: 0.35 });
 OM.scene({
   id: 'p2-04',
   build(el, { start, duration }) {
@@ -38,8 +42,10 @@ OM.scene({
     const h = OM.cellAt(L, 960, 540);
     const SX = L.x0 + (h.col + 0.5) * L.cw, SY = L.y0 + (h.row + 0.5) * L.ch; // the spark
     const on = OM.words('p2-04');
-    const KICKS = [155.945, 156.294, 156.804, 156.944, 157.083, 157.617];
-    const DB = 156.99, WHIP = 157.05, SETTLE = on[0] + 0.4;
+    // The kicks, the downbeat, the snare and the sunbreak hits on their measured drum onsets.
+    const KICKS = [155.945, 156.294, 156.804, 156.944, 157.083, 157.617].map((t) => P.drum('kick', t));
+    const DB = OM.beatOnset(156.99), WHIP = 157.05, SETTLE = on[0] + 0.4;
+    const BEAD = P.drum('snare', 157.29), SUN = [P.drum('kick', 157.62), P.drum('snare', 157.83)];
     const TIP = { x: 1400, y: 600 }, BANK = -0.15;
 
     // Cloud planes, far to near: depth, noise scale, coverage bias, inks (edge, core).
@@ -98,7 +104,7 @@ OM.scene({
 
         // Clouds rush down past us; above the tops, open sky.
         const y = Y(T);
-        const sun = OM.pulse([157.62, 157.83], T, 0.06); // sunbreak cells: cloud tops catch the light
+        const sun = OM.pulse(SUN, T, 0.06); // sunbreak cells: cloud tops catch the light
         const cloudIn = OM.prog(T, start + 0.05, start + 0.35) * (1 - OM.prog(T, end - 0.3, end - 0.1));
         if (cloudIn > 0)
           for (const pl of PLANES) {
@@ -127,7 +133,7 @@ OM.scene({
 
         // The contrail: the words stream back out of the wingtip, a ticker of the line.
         const it = lay.items;
-        const E = it.reduce((a, w) => a + (w.lead + w.tw) * OM.ease.outExpo(OM.prog(T, w.t0, w.t0 + 0.26)), 0);
+        const E = it.reduce((a, w) => a + (w.lead + w.tw) * OM.ease.outExpo(OM.prog(T, w.t0, w.t0 + 0.2)), 0);
         const drift = T > on[0] ? 70 * (T - on[0]) : 0;
         const ox = tip.x - 46 - E - drift, base = tip.y + lay.cap / 2 + fall;
         const out = 1 - OM.prog(T, WHIP + 0.15, end - 0.2);
@@ -142,7 +148,7 @@ OM.scene({
             for (const sg of [-1, 1])
               for (let j = 0; j < 3; j++) {
                 if (OM.hash(xi, j * sg, 5) > dens * (1 - j * 0.28)) continue;
-                const bead = T >= 157.29 && Math.abs(d - (T - 157.29) * 2600) < 60; // trail bead: a pulse runs out the vortex trails
+                const bead = T >= BEAD && Math.abs(d - (T - BEAD) * 2600) < 60; // trail bead: a pulse runs out the vortex trails
                 ctx.fillStyle = d < 120 || bead ? ink.crest : j ? ink.mid : ink.lit;
                 ctx.fillRect(x, tip.y + fall + sg * (spread + j * cs) - cs / 2, cs - 2, cs - 2);
               }
@@ -198,7 +204,7 @@ OM.scene({
             ctx.lineTo(X + 900, Yt + 150 + 410 * f);
             ctx.stroke();
           }
-          const flick = OM.pulse([156.804, 156.944, 157.083], T, 0.05); // leading-edge flick on the kicks
+          const flick = OM.pulse(KICKS.slice(2, 5), T, 0.05); // leading-edge flick on the kicks
           ctx.strokeStyle = flick > 0.2 ? OM.mix(ink.lit, ink.crest, flick) : ink.lit;
           ctx.lineWidth = 3 + 3 * flick;
           ctx.beginPath();

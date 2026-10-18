@@ -4,6 +4,10 @@
 // every line (the words and the rail) rises into walls, overshooting on the
 // kick. Then the walls sink, the floor flattens, and the plan's grid is left.
 OM.ownWords.add('p2-02');
+// Edit camera: the defaults fit. The downbeat punch (152.684) lands with the key word as the floor
+// tilts and the walls rise, the 153.216 snare's jolt with the rail's flash, and the scene's own
+// camera follows the tilt with no drum hits of its own to stack on.
+OM.edit.plan('p2-02', {});
 OM.scene({
   id: 'p2-02',
   build(el, { start, duration }) {
@@ -36,7 +40,11 @@ OM.scene({
     const END = start + duration;
     const h = OM.cellAt(L, 960, 540);
     const YL = L.y0 + h.row * L.ch, YC = YL + L.ch / 2;
-    const DB = 152.741, KICK = 152.834, SNARE = 153.228, SINK = 153.5, FLAT = 153.86;
+    // The downbeat's drum onset (the grid runs late), and the kick and snare on their measured onsets.
+    const DB = OM.beatOnset(152.741), KICK = P.drum('kick', 152.834), SNARE = P.drum('snare', 153.228), SINK = 153.5, FLAT = 153.86;
+    // The walls rise with the key word, which the voice lands on the downbeat's drum (22 ms after it).
+    const keyOn = OM.words('p2-02').slice(-1)[0];
+    const RISE = Math.max(DB, keyOn ?? DB);
     // The reading moment: after the kick the floor turns to face front with a short extrusion.
     const FRONT = 152.9, FACED = 153.02;
     const faceAt = (T) => OM.ease.inOutCubic(OM.prog(T, FRONT, FACED));
@@ -86,9 +94,9 @@ OM.scene({
       return { ok: P.ready(), items };
     };
 
-    const tiltAt = (T) => OM.ease.outExpo(OM.prog(T, lay.items.length ? lay.items[lay.items.length - 1].t0 : DB, DB + 0.12)) * (1 - OM.ease.inOutCubic(OM.prog(T, SINK + 0.06, FLAT)));
+    const tiltAt = (T) => OM.ease.outExpo(OM.prog(T, lay.items.length ? lay.items[lay.items.length - 1].t0 : RISE, RISE + 0.12)) * (1 - OM.ease.inOutCubic(OM.prog(T, SINK + 0.06, FLAT)));
     const wallAt = (T) =>
-      (78 * OM.ease.outBack(OM.prog(T, DB, KICK), 2.2) + 14 * Math.exp(-Math.max(0, T - KICK) / 0.08) * (T >= KICK ? 1 : 0)) *
+      (78 * OM.ease.outBack(OM.prog(T, RISE, KICK), 2.2) + 14 * Math.exp(-Math.max(0, T - KICK) / 0.08) * (T >= KICK ? 1 : 0)) *
       (1 - OM.ease.inOutCubic(OM.prog(T, SINK, FLAT - 0.08)));
 
     return {
@@ -181,7 +189,7 @@ OM.scene({
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         const bases = [[0, 1920, YL + L.ch], ...lay.items.map((it) => [it.x, it.x + it.tw, it.y])];
         for (let i = 0; i < 90; i++) {
-          const born = DB + OM.hash(i, 3, 2) * 0.25 + (i % 2 ? 0 : SINK - DB), age = T - born;
+          const born = RISE + OM.hash(i, 3, 2) * 0.25 + (i % 2 ? 0 : SINK - RISE), age = T - born;
           if (age < 0 || age > 0.8) continue;
           const b = bases[i % bases.length];
           const [x, y] = scr(OM.lerp(b[0], b[1], OM.hash(i, 4, 2)), b[2]);

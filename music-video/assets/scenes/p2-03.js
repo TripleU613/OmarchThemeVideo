@@ -5,6 +5,9 @@
 // from the road. Unbuilt lots fill in around them. The key word powers the
 // whole city on the downbeat; then we climb away until the city is one spark.
 OM.ownWords.add('p2-03');
+// Edit camera: the key word lands on the downbeat (154.810) as the whole city powers on, and the
+// scene's own camera only turns slowly through it, so that downbeat punches harder.
+OM.edit.plan('p2-03', { down: 2 });
 OM.scene({
   id: 'p2-03',
   build(el, { start, duration }) {
@@ -37,7 +40,7 @@ OM.scene({
     const h = OM.cellAt(L, 960, 540);
     const AVE = h.row; // the avenue runs along the centre row
     const PX = L.x0 + (h.col + 0.5) * L.cw, PY = L.y0 + (h.row + 0.5) * L.ch; // the spark's cell
-    const DB = OM.beatOnset(154.854), KICK2 = 154.97, CLIMB = 155.45, GONE = END - 0.09;
+    const DB = OM.beatOnset(154.854), KICK2 = P.drum('kick', 154.97), CLIMB = 155.45, GONE = END - 0.09;
     const cellX = (col) => L.x0 + col * L.cw, cellY = (row) => L.y0 + row * L.ch;
 
     let lay = null;
@@ -167,13 +170,15 @@ OM.scene({
           else ctx.fillRect(xm, ya, 4, OM.lerp(ya, yd, g) - ya);
         }
 
-        // Districts: the power reaches the word at its onset and spreads out block by block.
+        // Districts: the power reaches the word at its onset and spreads out block by block, the farthest
+        // block lit within 45 ms (under three frames at 60 fps) so the word lands on its onset (the key
+        // word on the downbeat's punch).
         for (const d of D) {
           const age = T - d.t0;
           if (age < 0) continue;
           const key = d === last;
           for (const [col, row, dd] of d.cells) {
-            const a = age - dd * 0.0022;
+            const a = age - dd * 0.0011;
             if (a < 0) continue;
             const pulse = key && T >= DB ? Math.exp(-(T - DB) / 0.2) : 0;
             ctx.fillStyle = a < 0.07 || pulse > 0.5 ? ink.crest : OM.hash(col, row, 3) < 0.3 ? ink.hover : ink.crest;
