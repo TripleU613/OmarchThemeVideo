@@ -68,17 +68,16 @@
 
   // ---------- the beat jiggle ----------
   // One small bump per beat while the drums play, for scenes that opt in by
-  // feeding it into their own camera or one element. The analysis grid and the
-  // drum events both sit on 23 ms analysis frames, and the grid runs 46 ms late
-  // against the drums, so each bump peaks on the grid smoothed into an even
-  // pulse (a local linear fit over 7 beats) and moved 46 ms early: the closest
-  // fit to the measured kicks and snares. Its size follows the beat's drum hit,
+  // feeding it into their own camera or one element. The analysis grid runs
+  // about 44 ms late against the drums, so each bump peaks on the beat's attack
+  // as measured on the song (OM.T.beatsOn, from analysis/refine_events.py), or,
+  // without it, on the grid smoothed over 7 beats and moved 46 ms early. Its size follows the beat's drum hit,
   // and it is 0 wherever the drums are out. No bump comes within two frames of
   // a cut, so cut frames stay exact.
   const JIG = { RISE: 0.024, FALL: 0.17, GUARD: 0.034, LATE: 0.046 };
   let onsets = null, bumps = null;
   /** Each grid beat's drum onset: the grid smoothed into an even pulse and moved 46 ms early. */
-  const beatOnsets = () => onsets || (onsets = (T ? T.beats : []).map((b, i, B) => {
+  const beatOnsets = () => onsets || (onsets = T && T.beatsOn ? T.beatsOn.slice() : (T ? T.beats : []).map((b, i, B) => {
     let n = 0, sx = 0, sy = 0, sxx = 0, sxy = 0;
     for (let j = Math.max(0, i - 3); j <= Math.min(B.length - 1, i + 3); j++, n++) {
       sx += j; sy += B[j]; sxx += j * j; sxy += j * B[j];
@@ -167,6 +166,132 @@
   /** Every bump { t, w, k, down }, for checks. */
   OM.jiggle.bumps = () => allBumps().slice();
   OM.jiggle.SHAPE = JIG;
+
+  // ---------- the edit layer ----------
+  // Music-video edit moves keyed to the drums measured on the song (OM.T.drums):
+  // a zoom punch on kicks, a jolt and roll on snares, a build through drum fills
+  // that snaps off on the fill's last hit, a flash on chosen accents, and a
+  // camera clock that surges through each beat. Every move is exactly 0 within
+  // `hold` of the scene's cuts (whole bumps are dropped, never cut short), so cut
+  // frames stay exact. A scene adds the result to its own camera (rule 9).
+  const ED = { RISE: 0.016, PUNCH: 0.2, JOLT: 0.16, TICK: 0.07, FLASH: 0.14 };
+  /** Hits of one kind ('kick', 'snare', 'hat', 'perc') in [a, b) with strength at least `min`: [[t, s], ...]. */
+  const hitsOf = (kind, a, b, min = 0) => (T && T.drums && T.drums[kind] ? T.drums[kind].filter((h) => h[0] >= a && h[0] < b && h[1] >= min) : []);
+  /** A punch: a raised-cosine rise to 1 on the onset, then a smooth settle to exactly 0. */
+  const punchShape = (d, fall) => {
+    if (d < -ED.RISE || d >= fall) return 0;
+    if (d < 0) return 0.5 - 0.5 * Math.cos((Math.PI * (d + ED.RISE)) / ED.RISE);
+    const u = d / fall;
+    return (1 - u) ** 3 * (1 + 3 * u);
+  };
+  /** A jolt: 0 on the onset, a sharp throw, one and a half swings, then exactly 0. */
+  const joltShape = (d, fall) => (d < 0 || d >= fall ? 0 : (1 - d / fall) ** 2 * Math.sin(3 * Math.PI * (d / fall)));
+  /** A flash: full on the onset, then a quick fade to exactly 0. */
+  const flashShape = (d, fall) => (d < 0 || d >= fall ? 0 : (1 - d / fall) ** 2);
+  const weight = (s) => Math.pow(OM.clamp(s / 0.45), 0.6);
+  OM.edit = {
+    hits: hitsOf,
+    /**
+     * The edit layer for one scene window [start, end): call once in build(), then
+     * ed.at(T) in render() for { zoom, x, y, rot, flash, build } (all 0 at rest).
+     * Options (0 turns a move off):
+     *   kick  zoom punch for a full-strength kick (0.03); downbeat kicks get x1.4
+     *   snare jolt in px for a full-strength snare (12), with a roll of snareRot rad (0.006)
+     *   hat   jitter in px on hi-hats (0)
+     *   fill  zoom creep through each drum fill (0.04), shaking up to fillShake px (5),
+     *         snapping back on the fill's end (or at the cut's hold, if it runs into it)
+     *   flash 0..1 flash on each time in flashAt ([]), e.g. the key word's hit
+     *   min   weakest hit kept (0.12); skip: the scene's own hit times, bumps within 0.12 s dropped whole
+     *   hold  seconds at each cut where everything is exactly 0 (0.07); from/to: limit the window
+     */
+    scene(start, end, o = {}) {
+      const opt = { kick: 0.03, snare: 12, snareRot: 0.006, hat: 0, fill: 0.04, fillShake: 5, flash: 0.6, flashAt: [], min: 0.12, skip: [], hold: 0.07, ...o };
+      const a = Math.max(start, opt.from ?? start) + opt.hold, b = Math.min(end, opt.to ?? end) - opt.hold;
+      const downs = new Set(((T && T.downbeatsOn) || []).map((t) => Math.round(t * 50)));
+      const free = (t, lead, fall) => t - lead >= a && t + fall <= b && !opt.skip.some((h) => Math.abs(h - t) < 0.12);
+      const kicks = opt.kick ? hitsOf('kick', start, end, opt.min).filter((h) => free(h[0], ED.RISE, ED.PUNCH))
+        .map((h, i) => ({ t: h[0], w: opt.kick * weight(h[1]) * ([-1, 0, 1].some((k) => downs.has(Math.round(h[0] * 50) + k)) ? 1.4 : 1) })) : [];
+      const snares = opt.snare ? hitsOf('snare', start, end, opt.min).filter((h) => free(h[0], 0, ED.JOLT))
+        .map((h, i) => { const th = OM.hash(i, Math.round(h[0] * 100), 31) * 0.9 - 0.45; return { t: h[0], w: weight(h[1]), dx: (i % 2 ? 1 : -1) * Math.cos(th), dy: Math.sin(th), r: i % 2 ? 1 : -1 }; }) : [];
+      const hats = opt.hat ? hitsOf('hat', start, end, opt.min).filter((h) => free(h[0], 0, ED.TICK))
+        .map((h, i) => ({ t: h[0], w: weight(h[1]), dx: OM.hash(i, 3, 37) - 0.5, dy: OM.hash(i, 5, 41) - 0.5 })) : [];
+      const fills = opt.fill ? ((T && T.fills) || []).filter((f) => f[1] > a && f[0] < b).map((f) => ({ t0: Math.max(f[0], a), t1: Math.min(f[1], b) })) : [];
+      const flashes = opt.flash ? opt.flashAt.filter((t) => free(t, 0, ED.FLASH)) : [];
+      const near = (list, T, lead, fall) => list.filter((h) => T >= h.t - lead && T < h.t + fall);
+      return {
+        kicks, snares, fills, flashes,
+        at(T) {
+          const e = { zoom: 0, x: 0, y: 0, rot: 0, flash: 0, build: 0 };
+          if (T < a || T >= b) return e;
+          for (const k of near(kicks, T, ED.RISE, ED.PUNCH)) e.zoom += k.w * punchShape(T - k.t, ED.PUNCH);
+          e.zoom = Math.min(e.zoom, opt.kick * 1.6);
+          for (const sn of near(snares, T, 0, ED.JOLT)) {
+            const j = sn.w * joltShape(T - sn.t, ED.JOLT);
+            e.x += opt.snare * sn.dx * j; e.y += opt.snare * 0.6 * sn.dy * j; e.rot += opt.snareRot * sn.r * j;
+          }
+          for (const h of near(hats, T, 0, ED.TICK)) {
+            const j = h.w * joltShape(T - h.t, ED.TICK);
+            e.x += opt.hat * h.dx * j; e.y += opt.hat * h.dy * j;
+          }
+          for (const f of fills) {
+            if (T < f.t0 || T >= f.t1) continue;
+            const g = OM.smooth(OM.clamp((T - f.t0) / Math.max(0.2, f.t1 - f.t0)));
+            e.build = Math.max(e.build, g);
+          }
+          if (e.build > 0) {
+            e.zoom += opt.fill * e.build;
+            const s = opt.fillShake * e.build;
+            e.x += s * (0.6 * Math.sin(2 * Math.PI * 17.3 * T + 1.1) + 0.4 * Math.sin(2 * Math.PI * 29.7 * T + 2.3));
+            e.y += s * (0.6 * Math.sin(2 * Math.PI * 21.1 * T + 0.4) + 0.4 * Math.sin(2 * Math.PI * 33.9 * T + 1.7));
+          }
+          for (const t of near(flashes.map((t) => ({ t })), T, 0, ED.FLASH)) e.flash = Math.max(e.flash, opt.flash * flashShape(T - t.t, ED.FLASH));
+          return e;
+        },
+        /**
+         * The scene's camera clock: time that surges through each beat (speed 1+amount
+         * on the beat, 1-amount between) and equals T at the window's ends and on
+         * every beat. Feed it to the camera's own motion, never to word timing.
+         */
+        clock(T, amount = 0.35) {
+          if (T <= start || T >= end) return T;
+          const B = beatOnsets();
+          let lo = start, hi = end;
+          for (const t of B) { if (t <= T && t > lo) lo = t; if (t > T && t < hi) { hi = t; break; } }
+          const u = (T - lo) / (hi - lo);
+          return lo + (hi - lo) * (u + (amount / (2 * Math.PI)) * Math.sin(2 * Math.PI * u));
+        },
+      };
+    },
+    /**
+     * A camera with an edit result added: zoom multiplied, shift and roll added,
+     * and the zoom raised just enough that the extra shift or roll never shows
+     * the canvas edge. With nothing to add, the camera comes back unchanged.
+     */
+    apply(cam, e) {
+      if (!e.zoom && !e.x && !e.y && !e.rot) return cam;
+      const c = cam || {}, z0 = c.zoom ?? 1, r0 = c.rot || 0, x0 = c.x || 0, y0 = c.y || 0;
+      const W = 1920, H = 1080;
+      const need = (r, x, y) => {
+        const cr = Math.abs(Math.cos(r)), sr = Math.abs(Math.sin(r));
+        return Math.max((cr * (W + 2 * Math.abs(x)) + sr * (H + 2 * Math.abs(y))) / W, (sr * (W + 2 * Math.abs(x)) + cr * (H + 2 * Math.abs(y))) / H);
+      };
+      const out = { ...c, zoom: z0 * (1 + e.zoom), rot: r0 + e.rot, x: x0 + e.x, y: y0 + e.y };
+      const grow = need(out.rot, out.x, out.y) / need(r0, x0, y0);
+      if (grow > 1) out.zoom *= grow;
+      return out;
+    },
+    /** Paint a flash over the scene's 2D frame (before its post pass): `ink` at up to `a` opacity. */
+    flash(ctx, f, ink, a = 0.35) {
+      if (f <= 0) return;
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = a * f;
+      ctx.fillStyle = ink;
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      ctx.restore();
+    },
+  };
 
   // ---------- placeholder slate for scenes not built yet ----------
   OM.slate = ({ id, device, theme, line }) =>
