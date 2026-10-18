@@ -8,6 +8,13 @@
 // accelerate through the gap and the held note; on the last word the whole
 // workspace swipes home to Tokyo Night. The words clear and the desk powers
 // back down to the empty seven-tile still that is the cut into v2-03.
+
+// Edit camera: the theme flicks already cut the line to the words, and the first word sits 64 px from
+// the left edge all line long, so the camera stays light here: zoom capped at 0.8% (the scene's own
+// sway and zoom cut down to match). The downbeat after the key word (122.868) is skipped so the swipe
+// home on the key word stays the line's last big moment, and the word there would reach the band.
+OM.edit.plan('v2-02', { skip: [122.868], max: 0.008 });
+
 OM.ownWords.add('v2-02');
 OM.scene({
   id: 'v2-02',
@@ -33,14 +40,22 @@ OM.scene({
     }`;
     const c = OM.canvas(cv, { alpha: false });
     const fx = OM.post(el, c, { effect: FX });
+    const beat = OM.edit.scene(start, start + duration); // the sway runs on the beat clock, surging through each beat
     const ink = V.ink();
     const sung = OM.sung('v2-02');
     const N = sung.length;
     const on = sung.map((w) => w.t0);
     const END = start + duration;
     const FROM = V.grid(6), TO = V.grid(N);
-    const KICKS = [119.211, 119.676, 120.279];
-    const GAP_SNARE = 121.25, SNARE = 122.95, G0 = 119.119, H16 = 60 / 112.3 / 4; // hats: true 16ths
+    // Every drum time on the measured hit (OM.T.drums, OM.T.beatsOn).
+    const KICKS = [119.211, 119.676, 120.279].map((t) => V.drum('kick', t));
+    const GAP_SNARE = V.drum('snare', 121.25), SNARE = V.drum('snare', 122.95);
+    // Hats: true 16ths, four to each measured beat, from the first beat of the line.
+    const BO = ((OM.T && OM.T.beatsOn) || []).filter((b) => b > start - 1 && b < END + 1);
+    const G0 = BO.find((b) => b >= on[0] - 0.03) ?? 119.119;
+    const S16 = [];
+    for (let i = 0; i + 1 < BO.length; i++) for (let j = 0; j < 4; j++) { const s = BO[i] + ((BO[i + 1] - BO[i]) * j) / 4; if (s >= G0 - 0.001) S16.push(s); }
+    const GAPD = OM.beatOnset(120.767), Q8 = 30 / ((OM.T && OM.T.bpm) || 112.3); // the gap: its downbeat's drum hit, an 8th
     const CL0 = 123.0, CL1 = END - 0.08;
     const KEY = N - 1; // the last word: the workspace swipes home
     const at = (k, fb) => (on[k] !== undefined ? on[k] : fb);
@@ -50,9 +65,9 @@ OM.scene({
       [at(0, 119.114), 'kanagawa', 0],
       [at(1, 119.694), 'nord', 1],
       [at(2, 120.375), 'gruvbox', 2],
-      [120.721, 'everforest', -1], // the gap: true downbeat, then 8th and 16th
-      [120.988, 'rose-pine', -1],
-      [121.122, 'catppuccin', -1],
+      [GAPD, 'everforest', -1], // the gap: true downbeat, then 8th and 16th
+      [GAPD + Q8, 'rose-pine', -1],
+      [GAPD + 1.5 * Q8, 'catppuccin', -1],
       [at(3, 121.316), 'retro-82', 3],
       [at(4, 121.536), 'osaka-jade', 4],
       [at(5, 121.796), 'hackerman', 5],
@@ -379,9 +394,10 @@ OM.scene({
           const wt = tokAt(wi);
           // Sprinkle, the hats: lattice cells of the wallpaper itself blink on every true 16th.
           if (wi >= 0) {
-            const n = Math.floor((T - G0) / H16);
+            let n = -1;
+            while (n + 1 < S16.length && S16[n + 1] <= T) n++;
             for (let m = n; m >= n - 1 && m >= 0; m--) {
-              const age = T - (G0 + m * H16), a = Math.exp(-age / 0.06) * (1 - clear);
+              const age = T - S16[m], a = Math.exp(-age / 0.06) * (1 - clear);
               if (a < 0.03) continue;
               ctx.globalAlpha = a;
               ctx.fillStyle = wt.crest;
@@ -419,9 +435,12 @@ OM.scene({
             ctx.fillStyle = th.brand;
             ctx.fillRect(x0 + 40, y0 + 24, 6, 10);
             if (opened && sung[k] && fits) {
-              const big = k === KEY ? 0.34 : 0.18;
+              // The landing pop: the key word's the biggest; a word hard against the frame's left edge pops
+              // about its own left edge, so neither ever reaches into the border band.
+              const big = k === KEY ? 0.22 : 0.18;
               const col = OM.mix(th.crest, th.text, OM.clamp(age / 0.35));
-              V.drawWord(ctx, sung[k].text, 0, 10 + 70 * clear * clear, fits[k], OM.mix(col, th.bg, clear), { s: 1 + big * Math.exp(-age / 0.09), alpha: 1 - clear });
+              const ps = 1 + big * Math.exp(-age / 0.09), a0 = fits[k].at[0], ax = a0.x < 100 ? a0.x - (r1.x + r1.w / 2) : 0;
+              V.drawWord(ctx, sung[k].text, ax * (1 - ps), 10 + 70 * clear * clear, fits[k], OM.mix(col, th.bg, clear), { s: ps, alpha: 1 - clear });
             }
             ctx.restore();
           });
@@ -470,13 +489,16 @@ OM.scene({
         const ce = V.camEnv(T, start, END), fe = V.env(T, start, END);
         const flick = OM.pulse(SWT, T, 0.08);
         const lead = sp !== null ? -8 * Math.sin(Math.PI * sp) : 0;
+        const C = beat.clock(T) - start;
+        // The sway is kept small enough, and the zoom just big enough to cover it, that the first word
+        // (64 px from the left edge) stays clear of the border band, under the edit camera too.
         fx.apply(T, {
           amount: fe * (0.5 + 0.5 * flick),
           cam: {
-            zoom: 1 + ce * (0.03 + 0.015 * keyHit),
-            rot: ce * 0.005 * Math.sin((T - start) * 1.7),
-            x: ce * (9 * Math.sin((T - start) * 1.2) + lead),
-            y: ce * 5 * Math.cos((T - start) * 0.9),
+            zoom: 1 + ce * (0.0095 + 0.0045 * Math.abs(lead / 8) + 0.008 * keyHit),
+            rot: ce * 0.002 * Math.sin(C * 1.7),
+            x: ce * (4 * Math.sin(C * 1.2) + lead),
+            y: ce * 3 * Math.cos(C * 0.9),
           },
           p0: [OM.clamp(flick + keyHit), tokAt(iNow).light ? 1 : 0, 0, 0],
         });

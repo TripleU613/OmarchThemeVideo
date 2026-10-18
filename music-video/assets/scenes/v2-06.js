@@ -5,6 +5,13 @@
 // plane holding the other end. When the line has been read the plane puts its
 // nose down the centre row and dashes through, gathering the words into its
 // trail, the light shooting ahead, and the trail is the line handoff for v2-07.
+
+// Edit camera: on the fourth word (138.873, beat 3) the light darts down to the second row and the
+// formation slides back, carrying the end of the first row to within 54 px of the right edge, so the
+// camera's beat-3 punch and the off-beat kick after it (138.854, 138.962) are skipped: the dart is the
+// hit there. The rest keeps the defaults, the downbeat kick at 137.788 (the verse's strongest) on top.
+OM.edit.plan('v2-06', { skip: [138.854, 138.962] });
+
 OM.ownWords.add('v2-06');
 OM.scene({
   id: 'v2-06',
@@ -30,6 +37,7 @@ OM.scene({
     }`;
     const c = OM.canvas(cv, { alpha: false });
     const fx = OM.post(el, c, { effect: FX });
+    const beat = OM.edit.scene(start, start + duration); // the chase cam's roll and lift run on the beat clock
     const ink = V.ink(), th = V.th();
     const sung = OM.sung('v2-06');
     const N = sung.length;
@@ -145,7 +153,9 @@ OM.scene({
           const a = F.at[k];
           [...w.text].forEach((ch, j) => {
             const fx = a.x + (j + 0.5) * F.A;
-            const lit = on[k] + 0.14 * OM.clamp((j + 0.5) / w.text.length);
+            // Lit as the light's dash (outExpo over 0.14 s) covers its share of the word: the first letter
+            // on the onset, the whole word within about two frames.
+            const lit = on[k] + (0.14 * -Math.log2(1 - j / w.text.length)) / 10;
             if (T < lit) return;
             const x = sx(fx);
             if (dash > 0 && x < px) return; // gathered into the trail
@@ -191,10 +201,10 @@ OM.scene({
           ctx.fillStyle = V.rgba(ink.crest, (1 - age / 0.6) * fadeIn * (1 - dash));
           ctx.fillRect(x - 2, y - 2, 4, 4);
         }
-        const ce = V.camEnv(T, start, END);
+        const ce = V.camEnv(T, start, END), C = beat.clock(T) - start;
         fx.apply(T, {
           amount: V.env(T, start, END) * 0.85,
-          cam: { zoom: 1 + ce * 0.055, rot: ce * 0.028 * Math.sin(d * 1.4), y: ce * 12 * Math.sin(d * 2.2) },
+          cam: { zoom: 1 + ce * 0.055, rot: ce * 0.028 * Math.sin(C * 1.4), y: ce * 12 * Math.sin(C * 2.2) },
         });
       },
       release: () => { fx.release(); c.release(); },

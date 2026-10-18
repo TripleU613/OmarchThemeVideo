@@ -5,6 +5,12 @@
 // crest and cools. The space bar thumps between words. On the last word the
 // whole line is pulled down into one point of light, the board goes dark, and
 // the spark is the cut into v2-06.
+
+// Edit camera: the defaults fit. The scene's own camera is a slow glide (now on the beat clock) with
+// nothing on the drums, so its old beat jiggle is gone and the edit camera carries the beat: the
+// downbeat punch lands with the sixth word on 135.660, and the line sits well inside the frame.
+OM.edit.plan('v2-05', {});
+
 OM.ownWords.add('v2-05');
 // The paper plane, shared with v2-06: the v2-05 > v2-06 match cut folds the typed line into it,
 // beside the spark that becomes the agent light.
@@ -112,6 +118,7 @@ OM.scene({
     const space = keys.find((k) => k.label === 'Space');
     const camera = new THREE.PerspectiveCamera(30, 1920 / 1080, 10, 4000);
     camera.setViewOffset(1920, 1080, 0, -250, 1920, 1080); // the board sits low, the line above it
+    const beat = OM.edit.scene(start, END); // the glide runs on the beat clock, surging through each beat
 
     // The overlay: typed letters, beams, the fade [line] closing spark.
     const ov = document.createElement('canvas');
@@ -174,8 +181,8 @@ OM.scene({
           k.mesh.position.y = pressed ? 5 : 15;
           if (pressed !== k.lit) { k.paint(pressed); k.lit = pressed; }
         });
-        // A low glide along the board across the line.
-        const p = OM.ease.inOutSine(OM.clamp(t / duration));
+        // A low glide along the board across the line, on the beat clock (T at both ends).
+        const p = OM.ease.inOutSine(OM.clamp((beat.clock(T) - start) / duration));
         camera.position.set(OM.lerp(-380, 340, p), 430, 760);
         camera.lookAt(OM.lerp(-160, 140, p), 0, -20);
         camera.updateMatrixWorld();
@@ -267,11 +274,10 @@ OM.scene({
           }
         }
         const ce = V.camEnv(T, start, END);
-        // The board thumps on the beat: a half-percent push on each drum hit, gone in the collapse.
-        const jig = 0.005 * OM.jiggle(T) * (1 - suck);
+        // The beat is the edit camera's now (OM.edit.plan above): no jiggle of its own.
         fx.apply(T, {
           amount: V.env(T, start, END) * (1 - suck),
-          cam: { zoom: 1 + ce * (0.012 + 0.025 * p + jig), x: ce * -10 * Math.sin(p * 3.1) },
+          cam: { zoom: 1 + ce * (0.012 + 0.025 * p), x: ce * -10 * Math.sin(p * 3.1) },
           p0: [OM.lerp(0.5, 0.18, p), 0, 0, 0],
         });
       },

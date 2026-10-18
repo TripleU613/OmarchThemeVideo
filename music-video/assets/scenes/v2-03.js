@@ -10,6 +10,13 @@
 // clock counting down, and every shard flies back along its own path, trailing
 // the way it came. The last word lands as the last shard locks in: the
 // restore, the biggest hit. The line reads whole, then dissolves to night.
+
+// Edit camera: the restore on the last word (126.621) is the scene's own biggest hit, its camera
+// snapping in 3% with the ring of light, so the backbeat jolt 25 ms before it (126.596) is skipped
+// rather than stacked on it. Elsewhere the defaults fit: the burst (124.738 snare) and the scrub steps
+// fall between the camera's beats, and the line sits well inside the frame.
+OM.edit.plan('v2-03', { skip: [126.596] });
+
 OM.ownWords.add('v2-03');
 (() => {
   const P = 9, CELL = 8;
@@ -126,10 +133,11 @@ OM.scene({
     const END = start + duration;
     const NB = Math.min(6, N); // words that are in the picture when it breaks
     const KB = Math.min(2, N - 1); // the word that cracks it
-    const SH = Math.max(on[NB - 1] + 0.03, 124.761); // the snare: the burst
-    const GLINT = 125.16; // the kick inside the burst
+    // Drum times on the measured hits (OM.T.drums).
+    const SH = Math.max(on[NB - 1] + 0.015, V.drum('snare', 124.761)); // the snare: the burst
+    const GLINT = V.drum('kick', 125.16); // the kick inside the burst
     // The scrub back: a step on each hit, the last word the lock.
-    const RW = [on[Math.min(6, N - 1)], 125.945, 126.224, on[Math.min(7, N - 1)], on[N - 1]].filter((x, i, a) => i === 0 || x > a[i - 1]);
+    const RW = [on[Math.min(6, N - 1)], V.drum('kick', 125.945), V.drum('kick', 126.224), on[Math.min(7, N - 1)], on[N - 1]].filter((x, i, a) => i === 0 || x > a[i - 1]);
     const LOCK = on[N - 1];
     const ARR = RW.slice(1); // each scrub step lands on a hit
     const STEP = ARR.map((_, i) => 1 - (i + 1) / ARR.length);

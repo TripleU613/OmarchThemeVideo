@@ -6,6 +6,12 @@
 // lit letters under their feet, and the runner walks it. The long key word takes
 // the downbeat as a surge of light along the path. Then path and runner fold
 // down into the crest row, the line handoff into v2-08.
+
+// Edit camera: the key word's downbeat (142.046, the surge of light along the path) punches hardest:
+// down 2.3 takes it to 3%; the cap keeps the bar's other downbeat (144.176, a stronger kick) level
+// with it rather than above, and the last word clear of the right-hand border band.
+OM.edit.plan('v2-07', { down: 2.3, max: 0.03 });
+
 OM.ownWords.add('v2-07');
 OM.scene({
   id: 'v2-07',
@@ -38,6 +44,13 @@ OM.scene({
     const SURGE = OM.beatOnset(V.hitsIn(OM.T && OM.T.downbeats, on[Math.min(3, N - 1)], END, [142.083])[0]);
     const FOLD0 = END - 0.42, FOLD1 = END - 0.12;
     const RX0 = 330; // where the runner plants
+    // Beats elapsed at T, on the measured drum onsets (OM.T.beatsOn): the gait's clock.
+    const BO = ((OM.T && OM.T.beatsOn) || []).filter((b) => b > start - 2 && b < END + 2);
+    const strides = (T) => {
+      let i = 0;
+      while (i + 2 < BO.length && BO[i + 1] <= T) i++;
+      return BO.length > 1 ? i + (T - BO[i]) / (BO[i + 1] - BO[i]) : (T - start) * 3;
+    };
 
     // The runner, 9 x 11 cells facing right: two strides and a stand.
     const SPR = {
@@ -168,26 +181,29 @@ OM.scene({
         const gone = OM.ease.inCubic(OM.prog(T, STOP, STOP + 0.22));
         glossy(ctx, OM.lerp(160, 100, chase) - 120 * gone, TOP - 170 + 30 * chase, OM.lerp(0.8, 0.4, chase) * (1 - gone), OM.clamp((T - start - V.HOLD_IN) / 0.08) * (1 - gone));
 
-        // The path: each word slams up out of the dark into the ground on its onset.
+        // The path: each word slams up out of the dark into the ground on its onset. The rise (outBack
+        // 2.2 over 0.12 s) first reaches the ground 1/3.2 of the way in, so it starts that much (37.5 ms)
+        // early: the impact, and the word whole at full height, land on the onset frame, not two frames after.
+        const SLAM = 0.12 / (2.2 + 1);
         ctx.font = F.font;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'alphabetic';
         sung.forEach((w, k) => {
-          if (T < w.t0) return;
-          const a = F.at[k], age = T - w.t0;
-          const rise = OM.ease.outBack(OM.clamp(age / 0.12), 2.2);
+          if (T < w.t0 - SLAM) return;
+          const a = F.at[k], age = T - w.t0, u = age + SLAM;
+          const rise = OM.ease.outBack(OM.clamp(u / 0.12), 2.2);
           const y = OM.lerp(a.top, TOP, fold) + 150 * (1 - rise);
           const sy = 1 - fold; // folding flat into the row
           const col = OM.mix(OM.mix(ink.crest, ink.hover, OM.clamp(age / 0.4)), ink.crest, surge);
           ctx.save();
-          ctx.globalAlpha = OM.clamp(age / 0.04);
+          ctx.globalAlpha = OM.clamp(u / 0.04);
           ctx.translate(0, y);
           ctx.scale(1, Math.max(0.02, sy));
           // The capPx glyph box sits with its top on the ground line.
           ctx.fillStyle = col;
           ctx.fillText(w.text, a.x, F.capPx);
           ctx.restore();
-          if (age < 0.25) {
+          if (age >= 0 && age < 0.25) {
             const g = 1 - age / 0.25;
             V.pool(ctx, a.x + a.w / 2, a.top, a.w * 0.7, 50, ink.lit, 0.6 * g);
           }
@@ -236,11 +252,12 @@ OM.scene({
           for (let i = 0; i < 4; i++) V.burst(ctx, a.x + (a.w * (i + 0.5)) / 4, a.top, age, 2707 + k * 9 + i, { n: 6, sp: 320, life: 0.42, up: 260 });
         });
         const ce = V.camEnv(T, start, END), run = pace(T) * (1 - fold);
-        const gait = Math.abs(Math.sin((T - start) * Math.PI * 6));
+        // The gait: a footfall on every 8th of the measured beat, the sway changing sides with each.
+        const step = 2 * Math.PI * strides(T), gait = Math.abs(Math.sin(step));
         const RW = T >= STOP ? walk(T) : { x: RX0, y: TOP };
         fx.apply(T, {
           amount: V.env(T, start, END),
-          cam: { zoom: 1 + ce * 0.03, y: ce * run * 9 * gait, rot: ce * run * 0.006 * Math.sin((T - start) * Math.PI * 6) },
+          cam: { zoom: 1 + ce * 0.03, y: ce * run * 9 * gait, rot: ce * run * 0.006 * Math.sin(step) },
           p0: [RW.x / 1920, 1 - (RW.y - 80) / 1080, run, 0],
         });
       },

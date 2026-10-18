@@ -6,6 +6,13 @@
 // in front of the coming sunrise, until the whole line stands there. Then the
 // sun comes up, the skyline and the road sink into the horizon, and the frame
 // is the crest line handoff into pre-chorus 2.
+
+// Edit camera: the defaults fit. Nothing of the scene's own camera hits the drums but a 3 px lift on
+// the kicks (now on the measured hits), the last word's sign lights on the strong snare that carries one
+// of the two hardest backbeat jolts (147.898), and the skyline sits well inside the frame (the signs
+// and the painted words leave it by design, overhead and under the car).
+OM.edit.plan('v2-08', {});
+
 OM.ownWords.add('v2-08');
 OM.scene({
   id: 'v2-08',
@@ -29,6 +36,7 @@ OM.scene({
     }`;
     const c = OM.canvas(cv, { alpha: false });
     const fx = OM.post(el, c, { effect: FX });
+    const beat = OM.edit.scene(start, start + duration); // the slow roll runs on the beat clock
     const ink = V.ink(), th = V.th();
     const sung = OM.sung('v2-08');
     const N = sung.length;
@@ -39,8 +47,9 @@ OM.scene({
     const FL = 900, CAMH = 1.3, VEL = 16, ROAD = 4.2;
     const Z_SIGN = 10, Z_MARK = 5.5, LZ = 4.5;
     const SET0 = END - 0.62, SET1 = END - 0.12; // the sun up, everything into the horizon
-    const PAUSEK = [148.84, 149.12, 149.37, 149.51], PAUSES = 148.91;
-    const KICKS = [146.193, 146.704, 147.377, 148.19, 148.445, 148.84, 149.119, 149.374];
+    // Every drum time on the measured hit (OM.T.drums).
+    const PAUSEK = [148.84, 149.12, 149.37, 149.51].map((t) => V.drum('kick', t)), PAUSES = V.drum('snare', 148.91);
+    const KICKS = [146.193, 146.704, 147.377, 148.19, 148.445, 148.84, 149.119, 149.374].map((t) => V.drum('kick', t));
     const X = (x, z) => 960 + (FL * x) / z;
     const Y = (y, z) => YH - (FL * (y - CAMH)) / z;
     const zOf = (k, T) => (k % 2 ? Z_MARK : Z_SIGN) - VEL * (T - on[k]);
@@ -222,7 +231,7 @@ OM.scene({
         const ce = V.camEnv(T, start, END);
         fx.apply(T, {
           amount: V.env(T, start, END),
-          cam: { zoom: 1 + ce * 0.03, rot: ce * 0.014 * Math.sin((T - start) * 0.9), y: ce * (2 * Math.sin(T * 53) + 1.4 * Math.sin(T * 77) + 3 * kick) },
+          cam: { zoom: 1 + ce * 0.03, rot: ce * 0.014 * Math.sin((beat.clock(T) - start) * 0.9), y: ce * (2 * Math.sin(T * 53) + 1.4 * Math.sin(T * 77) + 3 * kick) },
           p0: [0.4 + 0.6 * dawn + 0.8 * flare, 1 - YH / 1080, 0, 0],
         });
       },

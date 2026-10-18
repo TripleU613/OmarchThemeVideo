@@ -8,6 +8,13 @@
 // reboot. In the pause, echo lines from both sides are absorbed into it on the
 // kicks, it blinks through a reboot on the snare and holds, the tube browns
 // out, and on the last kicks it powers off, CRT style, into the night.
+
+// Edit camera: the defaults fit. The key word (131.125) falls between beats and is the scene's own
+// biggest hit (its camera punches 5% as both boots implode into it), so nothing stacks on it; the
+// downbeat after it (131.394) lands with the second echo line's absorb flash, the reboot blink rides
+// the backbeat jolt (131.909), and the line sits well inside the frame.
+OM.edit.plan('v2-04', {});
+
 OM.ownWords.add('v2-04');
 // The v2-05 keyboard, shared so v2-04 can land its match cut on the board's key tops exactly as
 // v2-05's camera first sees them: layout, camera pose, the projected top faces.
@@ -91,6 +98,7 @@ OM.scene({
     }`;
     const c = OM.canvas(cv, { alpha: false });
     const fx = OM.post(el, c, { effect: FX });
+    const beat = OM.edit.scene(start, start + duration); // the parallax sway runs on the beat clock
     const off = document.createElement('canvas'); // the frame, drawn once, printed or powered off
     const oc = OM.canvas(off, { alpha: false });
     const ink = V.ink(), th = V.th();
@@ -99,10 +107,12 @@ OM.scene({
     const on = sung.map((w) => w.t0);
     const END = start + duration;
     const KEY = N - 1, LOCK = on[KEY];
-    const SNARES = [127.896, 128.174, 128.29, 128.708, 128.964, 130.287];
-    const MERGE0 = 130.287; // the panes start sliding together on this snare
-    const ECHO = [131.26, 131.402, 131.54], BLINK = 131.913, DIP = 132.075;
-    const K1 = 132.331, K2 = 132.47; // power-off: to a line, to a dot
+    // Every drum time on the measured hit (OM.T.drums).
+    const SNARES = [127.896, 128.174, 128.29, 128.708, 128.964, 130.287].map((t) => V.drum('snare', t));
+    const MERGE0 = SNARES[SNARES.length - 1]; // the panes start sliding together on this snare
+    // Each echo line is absorbed (its flash at 0.18 s into its flight) on a pause kick.
+    const ECHO = [131.26, 131.402, 131.54].map((t) => V.drum('kick', t) - 0.18), BLINK = V.drum('snare', 131.913), DIP = V.drum('kick', 132.075);
+    const K1 = V.drum('kick', 132.331), K2 = V.drum('kick', 132.47); // power-off: to a line, to a dot
     const FLY = 0.14;
     // Two boots, two different logs.
     const LOGA = ['Linux version 6.17.9-arch1-1', 'Command line: root=UUID quiet splash', 'Booting paravirtualized kernel', 'ACPI: 12 ACPI AML tables loaded', 'nvme0n1: p1 p2', 'Run /init as init process',
@@ -303,7 +313,7 @@ OM.scene({
         const grow = OM.ease.inOutCubic(OM.prog(T, start + V.HOLD_IN, start + 0.45));
         fx.apply(T, {
           amount: V.env(T, start, END),
-          cam: { zoom: 1 + ce * (0.04 + 0.05 * punch), x: ce * 22 * s * Math.sin((T - start) * 1.2) },
+          cam: { zoom: 1 + ce * (0.04 + 0.05 * punch), x: ce * 22 * s * Math.sin((beat.clock(T) - start) * 1.2) },
           p0: [(36 * s) / 1920, (10 * s) / 1080, 0.16 * s * grow, 0],
         });
       },

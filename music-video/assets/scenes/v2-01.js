@@ -7,6 +7,14 @@
 // like dropped cards; each is pulled in, accelerating, and clicks into its tile
 // exactly on its word's onset, the word lit inside it. The downbeats ring the
 // grid; the words clear and the empty grid is the cut into v2-02.
+
+// Edit camera: the fifth word clicks in on beat 3 (117.532 against the 117.510 drum), where the scene's
+// own snap punch is the hit, so the camera's punch there is skipped. The first word sits 64 px from the
+// left edge for the whole line, so the camera's zoom is capped at 1.1% (with the scene's own zoom cut
+// to what its drift needs) to keep it clear of the border band; the downbeat punches land with the
+// grid's downbeat rings.
+OM.edit.plan('v2-01', { skip: [117.51], max: 0.011 });
+
 OM.ownWords.add('v2-01');
 (() => {
   const FONT = "800 100px 'JetBrains Mono'";
@@ -149,6 +157,12 @@ OM.ownWords.add('v2-01');
     const h = (list || []).filter((x) => x >= a && x < b);
     return h.length ? h : fallback;
   };
+  /** The measured drum hit of `kind` ('kick', 'snare', 'hat', 'perc') nearest t within r seconds (OM.T.drums), else t. */
+  const drum = (kind, t, r = 0.05) => {
+    let best = t, d = r;
+    for (const [x] of (OM.T && OM.T.drums && OM.T.drums[kind]) || []) if (Math.abs(x - t) < d) { d = Math.abs(x - t); best = x; }
+    return best;
+  };
 
   /** Effect and camera envelopes: exactly at rest at a cut, easing in and out with zero speed. */
   const env = (T, s, e) => OM.post.envelope(T, s, e, { ramp: 0.4, hold: 0.07 });
@@ -167,7 +181,7 @@ OM.ownWords.add('v2-01');
     }
     ctx.globalAlpha = 1;
   };
-  OM.v2 = { env, camEnv, burst, FONT, ink, th, rgba, pool, met, fontOf, layout, fitWord, drawWord, grid, lerpRect, win, still, ring, hitsIn, HOLD_IN: 0.04, HOLD_OUT: 0.07 };
+  OM.v2 = { env, camEnv, burst, FONT, ink, th, rgba, pool, met, fontOf, layout, fitWord, drawWord, grid, lerpRect, win, still, ring, hitsIn, drum, HOLD_IN: 0.04, HOLD_OUT: 0.07 };
 })();
 
 OM.scene({
@@ -207,6 +221,7 @@ OM.scene({
       return src(q + normalize(d + 1e-5) * w * 0.006 * uAmount * vec2(uRes.y / uRes.x, 1.0));
     }`;
     const fx = OM.post(el, c, { effect: FX });
+    const beat = OM.edit.scene(start, END); // the camera drift runs on the beat clock, surging through each beat
     let fits = null;
     const fit = () => SLOT.map((r, k) => V.fitWord((sung[k] && sung[k].text) || '', r.x + r.w / 2, r.y + r.h / 2 + 10, r.w - 56, 112));
 
@@ -279,9 +294,12 @@ OM.scene({
         const ce = V.camEnv(T, start, END), fe = V.env(T, start, END);
         const k = Math.max(0, OM.hitCount(on, T) - 1), r = SLOT[k];
         const punch = OM.pulse(on.slice(1), T, 0.07);
+        const C = beat.clock(T) - start;
+        // Zoom kept to what the drift needs plus the snap punch, so the first word (64 px from the left edge)
+        // stays clear of the border band under the edit camera's beats too.
         fx.apply(T, {
           amount: fe * (T >= on[0] ? 1 : 0),
-          cam: { zoom: 1 + ce * (0.018 + 0.03 * punch), x: ce * 9 * Math.sin((T - start) * 0.8), y: ce * 6 * Math.cos((T - start) * 0.6) },
+          cam: { zoom: 1 + ce * (0.012 + 0.0135 * punch), x: ce * 9 * Math.sin(C * 0.8), y: ce * 6 * Math.cos(C * 0.6) },
           p0: [(r.x + r.w / 2) / 1920, 1 - (r.y + r.h / 2) / 1080, Math.max(0, T - on[k]), 0],
         });
       },
