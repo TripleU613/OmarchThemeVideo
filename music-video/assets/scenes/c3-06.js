@@ -55,7 +55,7 @@ OM.scene({
     const words = OM.sung('c3-06');
     const on = words.map((w) => w.t0);
     const n = words.length;
-    const DOWNS = [263.639, 265.776], WILD = 266.008, TURNS = [266.89, 267.424], POUR = 267.889;
+    const DOWNS = [263.639, 265.776].map(OM.beatOnset), WILD = 266.008, TURNS = [266.89, 267.424], POUR = 267.889;
     const start0 = OM.heroLit(start, L, { gain: 0.8 });
 
     const flock = C.lazy(() => {

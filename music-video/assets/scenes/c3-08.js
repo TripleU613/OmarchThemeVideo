@@ -62,7 +62,7 @@ OM.scene({
     // Every storey and when it lands: the words, then a bare one on each beat until the push.
     const PUSH0 = PUSH - 0.046, TB = 274.785; // the push (on the drum), and the burst a beat later
     const GD = OM.c3cut.girders;
-    const bare = OM.beatsIn(words[n - 1].t1 + 0.05, PUSH0); // nothing still on the crane when the tower bursts
+    const bare = OM.beatsIn(words[n - 1].t1 + 0.05, PUSH0).map(OM.beatOnset); // on the drum, like the push; nothing still on the crane when the tower bursts
     const lands = [...on, ...bare];
     const steel = th['border-strong'] || '#3b4261', dark = th['bg-deep'] || '#16161e';
 

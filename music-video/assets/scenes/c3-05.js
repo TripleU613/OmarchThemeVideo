@@ -65,7 +65,9 @@ OM.scene({
         const { place, pts, step } = type();
         OM.handoff('field', ctx, T, dpr);
         const keyP = place[KEY] || { cx: 960, cy: 650 };
-        const boxes = place.filter(Boolean).map((p) => [p.x - 30, p.base - p.cap - 30, p.x + p.w + 30, p.base + 30]);
+        // One box per row of beds, so no ring blossom lands in the gap between two words.
+        const rowsOf = [...new Set(place.filter(Boolean).map((p) => p.cy))].map((cy) => place.filter((p) => p && p.cy === cy));
+        const boxes = rowsOf.map((r) => [Math.min(...r.map((p) => p.x)) - 30, Math.min(...r.map((p) => p.base - p.cap)) - 30, Math.max(...r.map((p) => p.x + p.w)) + 30, Math.max(...r.map((p) => p.base)) + 30]);
 
         // The meadow: lit field cells bloom as the wave out of the key word reaches them, and fold before the cut.
         if (T > DOWN) {

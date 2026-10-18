@@ -56,21 +56,34 @@ OM.scene({
             cells: cells.filter((q) => q[2] === j),
           });
       });
-      return { set, candles };
+      // Each letter's cells and a one-cell margin round them, keyed to when the letter lights:
+      // a flaring flame burns behind its lit letters, never over them.
+      const near = new Map();
+      for (const cd of candles)
+        for (const [q, r] of cd.cells)
+          for (let dq = -1; dq <= 1; dq++)
+            for (let dr = -1; dr <= 1; dr++) {
+              const key = (q + dq) * 8192 + r + dr;
+              if (!(near.get(key) <= cd.at)) near.set(key, cd.at);
+            }
+      return { set, candles, near };
     });
     const flick = (i, T) => 0.85 + 0.15 * Math.sin(T * 23 + i * 1.7) * Math.sin(T * 9.3 + i * 0.6);
-    const flame = (ctx, x, y, s, a) => {
+    const flame = (ctx, x, y, s, a, near, T) => {
       if (s <= 0 || a <= 0) return;
       ctx.globalAlpha = a;
       B.pool(ctx, x, y - 14 * s, 70 * s, ink.lit, 0.35);
       const P = 4;
-      // A lattice flame: rows narrowing upward, crest at the heart.
-      const rows = Math.round(7 * s);
+      // A lattice flame: rows narrowing upward, crest at the heart. Above its resting size it
+      // grows as one shape, round foot and all; below it, it narrows faster than it shortens.
+      const rows = Math.round(7 * s), g = Math.min(1, s), b = Math.max(1, s), foot = Math.round(2 * b);
       for (let r = 0; r < rows; r++) {
-        const half = Math.max(0, Math.round((r < 2 ? r + 1 : rows - r) * 0.8 * s));
+        const half = Math.max(0, Math.round((r < foot ? r + b : rows - r) * 0.8 * g));
         for (let q = -half; q <= half; q++) {
+          const px = Math.round(x + q * P - P / 2), py = Math.round(y - (r + 1) * P);
+          if (near && near.get(Math.floor((px + P / 2 - H.x0) / H.cw) * 8192 + Math.floor((py + P / 2 - H.y0) / H.ch)) <= T) continue;
           ctx.fillStyle = Math.abs(q) < half * 0.5 && r < rows - 2 ? ink.crest : r > rows - 3 ? ink.lit : ink.hover;
-          ctx.fillRect(Math.round(x + q * P - P / 2), Math.round(y - (r + 1) * P), P, P);
+          ctx.fillRect(px, py, P, P);
         }
       }
       ctx.globalAlpha = 1;
@@ -107,7 +120,7 @@ OM.scene({
         if (T < on[0]) return B.waxCut(ctx, T);
         ctx.fillStyle = ink.bg;
         ctx.fillRect(0, 0, 1920, 1080);
-        const { set, candles } = lay();
+        const { set, candles, near } = lay();
         const first = candles[0];
         const rise = OM.ease.inCubic(OM.prog(T, RISE, RISE + 0.45));
         const keep = 1 - OM.prog(T, RISE + 0.1, END - 0.16);
@@ -149,7 +162,7 @@ OM.scene({
             ctx.fillStyle = d < 0.45 ? ink.crest : d < 0.75 ? ink.hover : ink.lit;
             OM.cell(ctx, H, q, r, dpr);
           }
-          flame(ctx, fx, cd.top - 8 - rise * 260, s * (1 - 0.5 * rise), keep);
+          flame(ctx, fx, cd.top - 8 - rise * 260, s * (1 - 0.5 * rise), keep, rise > 0 ? null : near, T);
         });
         ctx.globalAlpha = 1;
       },
