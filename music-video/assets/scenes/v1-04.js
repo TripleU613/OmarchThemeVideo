@@ -8,6 +8,11 @@
 // cell by cell in the gap's world, the key word on the snare fill. Then the
 // letters let go cell by cell and fall as v1-05's rain (V.letterRain, the
 // shared cut frame).
+
+// Edit camera: the rip on the 52.268 kick is the scene's own big hit (its camera punches 5% as the
+// page tears), so the camera's downbeat punch there is skipped rather than stacked on it.
+OM.edit.plan('v1-04', { skip: [52.256] });
+
 OM.ownWords.add('v1-04');
 (() => {
   const V = OM.v1;
@@ -101,11 +106,14 @@ vec4 effect(vec2 uv) {
       const spread = (T) => 70 * OM.ease.outExpo(OM.prog(T, RIP, RIP + 0.14)) + 1500 * OM.ease.inCubic(OM.prog(T, PEEL, GONE));
 
       // Camera: handheld tension building to the rip, a punch on it, then released. Scraps fly off the seam.
+      // The handheld runs on the beat clock, so it surges through each beat.
+      const beat = OM.edit.scene(start, END);
       const FXP = (ctx, dpr, T) => {
         const e = V.env(T, start, END);
         const tense = 1.5 + 9 * OM.prog(T, CRACK0, RIP) * (T < RIP ? 1 : Math.exp(-(T - RIP) / 0.3));
         const punch = T >= RIP ? 0.05 * Math.exp(-(T - RIP) / 0.12) : 0;
-        const x = tense * (Math.sin(T * 13.1) + 0.6 * Math.sin(T * 29.7)), y = tense * (Math.cos(T * 11.3) + 0.5 * Math.sin(T * 23.9));
+        const C = beat.clock(T);
+        const x = tense * (Math.sin(C * 13.1) + 0.6 * Math.sin(C * 29.7)), y = tense * (Math.cos(C * 11.3) + 0.5 * Math.sin(C * 23.9));
         const s = T >= RIP - 0.02 ? spread(T) : 0;
         const bleed = OM.smooth(OM.prog(T, CRACK0, RIP)) * (1 - OM.prog(T, GONE, GONE + 0.5));
         if (T >= RIP && T < RIP + 1.3 && e > 0) {
@@ -124,7 +132,7 @@ vec4 effect(vec2 uv) {
             ctx.restore();
           }
         }
-        return { amount: e, cam: { zoom: 1 + (0.035 + punch) * e, x: x * e, y: y * e, rot: tense * 0.0005 * Math.sin(T * 7.3) * e }, p0: [s, bleed, 0, 0] };
+        return { amount: e, cam: { zoom: 1 + (0.035 + punch) * e, x: x * e, y: y * e, rot: tense * 0.0005 * Math.sin(C * 7.3) * e }, p0: [s, bleed, 0, 0] };
       };
       return {
         render(t, T) {

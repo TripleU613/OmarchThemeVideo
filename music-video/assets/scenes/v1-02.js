@@ -3,10 +3,17 @@
 // no names) hangs from strings. Its display is the line: each word comes out
 // from under the notch on its onset, falls into its place and bounces off a
 // gate that slams shut round it, a padlock on its corner. The gates rattle on
-// the snares, and on the 44.745 kick they all clamp tighter. After the line
+// the snares, and on the 44.748 kick they all clamp tighter. After the line
 // has read, the camera tilts up the strings (into the 45.836 downbeat) to the
 // hand on the control bar that owns them; it yanks every string and hauls
 // them up, and what rises on them is v1-03's fare meter (V.rig, the shared cut).
+
+// Edit camera: the section's defaults fit. The scene's own camera only nods a few px as each word
+// hits its gate; the gates' rattle on the 44.196 snare and their clamp on the 44.748 kick are props,
+// so the camera's jolt and punch on those beats drive them home, and the punch on the 45.806
+// downbeat lands the hand's yank.
+OM.edit.plan('v1-02', {});
+
 OM.ownWords.add('v1-02');
 (() => {
   const V = OM.v1;
@@ -32,7 +39,7 @@ vec4 effect(vec2 uv) {
       const on = OM.sung('v1-02').map((w) => w.t0);
       const LAP = V.LAP, LID = V.LID, DK = V.DECK, LCY = V.LCY;
       const TILT0 = 45.25, YANK = V.YANK;
-      const RATTLE = [42.284, 44.211, 44.745], CLAMP = 44.745; // snare and kick events
+      const RATTLE = [42.306, 44.196, 44.748], CLAMP = 44.748; // the measured snares and kick
       const BAR = -720; // the control bar's height in world px
       const FLY = 0.13; // a word's fall from the notch
 
@@ -50,8 +57,8 @@ vec4 effect(vec2 uv) {
       // The camera: holds on the laptop through the line, then the tilt to the hand, then out past it.
       const camY = (T) => 1000 * OM.ease.inOutCubic(OM.prog(T, TILT0, YANK));
       const yank = V.yank; // the jerk starts on the drum hit, ahead of the grid downbeat
-      // String pluck: on the 45.53 kick in the pause every string twangs, bowing and settling.
-      const PLUCK = 45.53;
+      // String pluck: on the 45.494 kick in the pause every string twangs, bowing and settling.
+      const PLUCK = 45.494;
       let pluck = 0;
       const string = (ctx, x0, y0, x1, y1) => {
         ctx.beginPath();

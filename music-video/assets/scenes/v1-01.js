@@ -10,6 +10,12 @@
 //
 // Also defines OM.v1, the section's shared helpers (scene files load in
 // timeline order, so v1-02..v1-08 use them).
+
+// Edit camera: the section's defaults fit. The scene's own camera only shakes a few px as each
+// lock snaps on its word, and the laptop's landing on the 41.510 kick is a prop slamming down,
+// not a camera move, so the downbeat punch there lands the payoff with it.
+OM.edit.plan('v1-01', {});
+
 OM.ownWords.add('v1-01');
 (() => {
   // ---------- OM.v1: shared by the verse 1 scenes ----------
@@ -251,13 +257,13 @@ OM.ownWords.add('v1-01');
   // ---------- strings to meter (v1-02 > v1-03) ----------
   // The hand on the control bar hauls its strings up: the bar and hand lift out
   // of the top, and what rises from below on the strings is v1-03's fare meter,
-  // arriving on the 46.301 snare. The strings let go on v1-03's 46.602 snare.
+  // arriving on the 46.301 snare. The strings let go on v1-03's 46.620 snare.
   // Both scenes draw V.rig at the cut, so it is one shared state.
   V.YANK = 45.836; // the downbeat on the grid: the yank peaks here and settles as before
   V.YANK_ON = OM.beatOnset(V.YANK); // its drum hit: the yank starts here
   V.RIG0 = 45.95;
   V.RIG1 = 46.301;
-  V.RIG_FREE = 46.602;
+  V.RIG_FREE = 46.62; // the measured snare
   V.MT = { M: { x: 110, y: 230, w: 720, h: 620 }, D: { x: 150, y: 290, w: 640, h: 230 }, SLOT: { x: 470, y: 222 }, HEAD: { x: 920, y: 940, w: 890 } };
   /** The yank: the bar jerks 40 px up from the drum hit, then settles. */
   V.yank = (T) => (T < V.YANK_ON ? 0 : T < V.YANK ? 40 * OM.ease.outCubic(OM.prog(T, V.YANK_ON, V.YANK)) : 40 * Math.exp(-(T - V.YANK) / 0.12));
@@ -655,13 +661,14 @@ vec4 effect(vec2 uv) {
         BD.forEach((row, r) => { for (let q = 0; q < 7; q++) if (row[q] === '#') ctx.fillRect(x + (q - 3.5) * s, y + (r - 4) * s, s, s); });
       };
 
-      // Camera: dive in to 1.25 off the white page, then crane up to 1.0 across the line; a shake as each lock snaps.
+      // Camera: dive in to 1.25 off the white page, then crane up to 1.0 across the line; a shake as each lock snaps,
+      // the hardest on the last word's lock (the key word, which no camera beat falls on).
       const FXP = (ctx, dpr, T) => {
         const e = V.env(T, start, END);
         const M = get();
         const dive = OM.smooth(OM.prog(T, start + 0.07, start + 0.5)), pull = OM.ease.inOutCubic(OM.prog(T, 37.3, 41.1));
         let sh = 0;
-        for (const t0 of M.ons) if (T >= t0) sh += 6 * Math.exp(-(T - t0) / 0.06);
+        M.ons.forEach((t0, i) => { if (T >= t0) sh += (i === M.ons.length - 1 ? 10 : 6) * Math.exp(-(T - t0) / 0.06); });
         return { amount: e, cam: { zoom: 1 + 0.25 * dive * (1 - pull), x: sh * Math.sin(T * 93), y: sh * Math.cos(T * 71) } };
       };
       return {

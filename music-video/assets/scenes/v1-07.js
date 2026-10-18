@@ -8,6 +8,13 @@
 // new: an original. Then the lamp closes back to one row, and the row bends
 // into a ring that squares up into the mark at v1-08's print core
 // (V.lampRing, the shared cut frame).
+
+// Edit camera: the section's defaults fit. The scene's own camera only rides each sweep of the lamp
+// (a soft vertical move per word, no drum hits), so nothing stacks. The key word (the held last
+// word, 65.663) takes the camera's 65.686 backbeat jolt, and the scene's own camera adds a punch on
+// its onset, so the original's print is the biggest hit of the scene.
+OM.edit.plan('v1-07', {});
+
 OM.ownWords.add('v1-07');
 (() => {
   const V = OM.v1;
@@ -119,14 +126,16 @@ vec4 effect(vec2 uv) {
         ctx.restore();
       };
 
-      // Camera: tracks the lamp's sweep, riding out with the bars. The copy's degradation is in the shader too,
-      // and it resolves to nothing on the last word: the original is crisp.
+      // Camera: tracks the lamp's sweep, riding out with the bars, and punches in as the original prints on
+      // the last word. The copy's degradation is in the shader too, and it resolves to nothing on the last
+      // word: the original is crisp.
       const FXP = (ctx, dpr, T) => {
         const e = V.env(T, start, END);
         const k = OM.hitCount(on, T) - 1;
         const d = k < 0 ? 0 : k < LAST ? 0.25 + 0.4 * deg(k) : Math.max(0, 0.6 * (1 - OM.prog(T, on[LAST], on[LAST] + 0.3)));
         const sweep = k < 0 ? 0 : Math.sin(Math.PI * OM.prog(T, on[k], on[k] + 0.32));
-        return { amount: e * d, cam: { zoom: 1 + 0.03 * e, y: 18 * sweep * e } };
+        const punch = T >= on[LAST] ? 0.035 * Math.exp(-(T - on[LAST]) / 0.1) : 0;
+        return { amount: e * d, cam: { zoom: 1 + (0.03 + punch) * e, y: 18 * sweep * e } };
       };
       return {
         render(t, T) {
@@ -157,7 +166,7 @@ vec4 effect(vec2 uv) {
               const back = (k - 1 - j) + OM.ease.outExpo(OM.prog(T, on[k], on[k] + 0.22));
               copy(ctx, S, j, -back * 38, -back * 26, -back * 0.016);
             }
-            const e = k ? ext(T, on[k], SH.h / 2 + 40, 0.15) : (SH.h / 2 + 40) * OM.ease.inOutCubic(OM.prog(T, on[0], on[0] + 0.3)); // the first sweep eases off the cut
+            const e = ext(T, on[k], SH.h / 2 + 40, k ? 0.15 : 0.2); // each sweep snaps open on its word (the first a touch softer)
             ctx.save();
             ctx.beginPath();
             ctx.rect(0, LY - e, 1920, 2 * e);

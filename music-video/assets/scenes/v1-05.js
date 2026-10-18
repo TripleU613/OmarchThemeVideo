@@ -6,6 +6,13 @@
 // trails. The downbeat on the key word makes the glow breathe and the beads
 // catch it. Then the words run off the glass and the monitor's glow rises to
 // fill the frame: the glow the forge in v1-06 opens on.
+
+// Edit camera: nothing of the scene's own camera moves on the drums (a slow drift), so the camera
+// carries the beat. The key word lands just after the 56.502 downbeat (its onset 56.594), where the glow
+// breathes and the beads catch it: that downbeat punches harder (down 2, about 2.4%), and the cut beat (54.402) keeps its
+// strength (cut 1 with the higher down), so the two are level and nothing tops the key word's hit.
+OM.edit.plan('v1-05', { down: 2, cut: 1 });
+
 OM.ownWords.add('v1-05');
 (() => {
   const V = OM.v1;
@@ -43,7 +50,8 @@ vec4 effect(vec2 uv) {
       const ink = OM.fieldInks('tokyo-night'), th = OM.theme('tokyo-night');
       const on = OM.sung('v1-05').map((w) => w.t0);
       const HM = OM.HOME, G = { x0: HM.x0, y0: HM.y0, cw: HM.cw / 2, ch: HM.ch / 2 };
-      const BEAT = 56.564, KICK = 55.774, TRACE = 0.2;
+      // The downbeat's and the kick's drum hits; each word's trace is quick enough to read on its onset.
+      const BEAT = OM.beatOnset(56.564), KICK = 55.736, TRACE = 0.14;
       const RUN0 = 58.3, RUN1 = 58.56, RISE0 = 58.26, RISE1 = END - H - 0.01;
 
       const get = V.lazy(PROBE, () => {
@@ -79,10 +87,13 @@ vec4 effect(vec2 uv) {
         x: OM.hash(i, 1, 52) * 1920, v: 900 + 700 * OM.hash(i, 2, 52), len: 40 + 90 * OM.hash(i, 3, 52), ph: OM.hash(i, 4, 52) * 1400, a: 0.08 + 0.2 * OM.hash(i, 5, 52),
       }));
 
-      // Camera: a slow diagonal drift with the focus breathing. Condensation on the glass fades as the night goes on.
+      // Camera: a slow diagonal drift with the focus breathing, both on the beat clock so they surge through
+      // each beat. Condensation on the glass fades as the night goes on.
+      const beat = OM.edit.scene(start, END);
       const FXP = (ctx, dpr, T) => {
         const e = V.env(T, start, END);
-        const p = OM.smooth(OM.prog(T, start, END));
+        const C = beat.clock(T);
+        const p = OM.smooth(OM.prog(C, start, END));
         const words = get();
         let x0 = 1920, x1 = 0, y0 = 1080, y1 = 0;
         for (const wd of words) { x0 = Math.min(x0, wd.x); x1 = Math.max(x1, wd.x + wd.w); y0 = Math.min(y0, wd.base - wd.cap); y1 = Math.max(y1, wd.base); }
@@ -97,7 +108,7 @@ vec4 effect(vec2 uv) {
         }
         return {
           amount: e,
-          cam: { zoom: 1 + (0.045 + 0.012 * Math.sin(T * 1.6)) * e, x: OM.lerp(-26, 26, p) * e, y: OM.lerp(16, -16, p) * e },
+          cam: { zoom: 1 + (0.045 + 0.012 * Math.sin(C * 1.6)) * e, x: OM.lerp(-26, 26, p) * e, y: OM.lerp(16, -16, p) * e },
           p1: V.rect(x0 - 30, y0 - 30, x1 + 30, y1 + 40),
         };
       };

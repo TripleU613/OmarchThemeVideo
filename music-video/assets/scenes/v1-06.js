@@ -7,6 +7,14 @@
 // strike, and on the 63.042 downbeat the whole line flares. Then the metal is
 // drawn out into one bar of crest cells across the frame: the line v1-07's
 // copier lamp starts from.
+
+// Edit camera: the scene's own camera already punches and jolts on every hammer blow, and the blows
+// are the drums here (the words and the four kicks), so every camera beat that lands on a blow is
+// skipped, and so is the 62.466 backbeat that would shake the frame just before the key word's
+// heavy blow (62.580). The camera keeps the cut beat, the 61.398 backbeat between blows and the
+// 63.000 downbeat where the whole line flares.
+OM.edit.plan('v1-06', { skip: [59.24, 59.774, 60.32, 60.854, 61.926, 62.466] });
+
 OM.ownWords.add('v1-06');
 (() => {
   const V = OM.v1;
@@ -32,7 +40,7 @@ vec4 effect(vec2 uv) {
       const on = OM.sung('v1-06').map((w) => w.t0);
       const N = on.length;
       const HM = OM.HOME, G = { x0: HM.x0, y0: HM.y0, cw: HM.cw / 2, ch: HM.ch / 2 };
-      const KICKS = [59.791, 60.325, 60.86, 61.928], FLARE = OM.beatOnset(63.042);
+      const KICKS = [59.786, 60.32, 60.86, 61.902], FLARE = OM.beatOnset(63.042); // the measured kicks
       const DRAW0 = 63.12, DRAW1 = 63.3, FILL1 = END - H - 0.01;
       const FACE = 770; // the anvil's top face
       const hrow = OM.cellAt(HM, 960, 540).row;
@@ -183,8 +191,8 @@ vec4 effect(vec2 uv) {
           ctx.fillStyle = ink.mid;
           ctx.fillRect(438, FACE, 1218, 3);
           // Anvil ring: the face rings on the kicks in the mid-line gap, its rim shivering crest.
-          const ring = OM.pulse([60.325, 60.86], T, 0.08);
-          if (ring > 0.02 && T >= 60.325) {
+          const ring = OM.pulse([60.32, 60.86], T, 0.08);
+          if (ring > 0.02 && T >= 60.32) {
             ctx.fillStyle = ink.crest;
             ctx.globalAlpha = world * ring;
             for (let x = 438; x < 1656; x += 24) ctx.fillRect(x, FACE - 2 + 4 * ring * Math.sin(x * 0.05 + T * 90), 24, 3 + 3 * ring);

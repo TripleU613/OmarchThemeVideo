@@ -10,6 +10,15 @@
 // completes: a crest wave runs out along the ridges and the pad lights. Then
 // the print lies down into a pool of light on the floor under a spotlight:
 // the stage pre-chorus 1 opens on.
+
+// Edit camera: the outer two words ride the print's outermost ring, 479 px from its centre, and the
+// scene's own push into the core brings them to the edge of the frame's 40 px band by its peak, so from 68.906 on
+// every camera beat is skipped: any extra zoom or jolt there would push them into it. That includes the
+// last word's pressure burst on the 71.054 snare, the scene's own big hit (its camera is sucked in, then
+// blown out), which nothing should stack on. The camera keeps the cut beat and the first two beats,
+// while the push is still small, and the 72.662 punch once the print has lain down.
+OM.edit.plan('v1-08', { skip: [68.906, 69.453, 69.98, 70.516, 71.052, 71.59, 72.124] });
+
 OM.ownWords.add('v1-08');
 (() => {
   const V = OM.v1;
@@ -44,7 +53,7 @@ vec4 effect(vec2 uv) {
       const HM = OM.HOME, hc = OM.cellAt(HM, 960, 540);
       const PX = HM.x0 + (hc.col + 0.5) * HM.cw, PY = HM.y0 + (hc.row + 0.5) * HM.ch; // the spark's centre
       const S = 8, Gp = { x0: PX - S / 2, y0: PY - S / 2, cw: S, ch: S }; // print cell (0,0) sits on the spark
-      const DONE = OM.beatOnset(71.634), SNARES = [68.104, 68.778, 69.404, 70.24, 71.053, 71.471, 71.94]; // pad blink, through the gap and the pause too
+      const DONE = OM.beatOnset(71.634), SNARES = [68.104, 68.774, 69.442, 70.25, 71.054, 71.458, 71.96]; // pad blink on the measured snares, through the gap and the pause too
       const LIE0 = 72.2, LIE1 = END - H - 0.01, PRESS = 0.22, CAPMAX = 62;
       const TOPS = Math.ceil(N / 2), RINGS = Math.max(TOPS, N - TOPS);
       // Top words run outer to inner, bottom words inner to outer, so the stack reads in order.
@@ -142,11 +151,23 @@ vec4 effect(vec2 uv) {
         pool(ctx, 960, 880, 440, 110, ink.lit, 0.42 * a);
       };
 
-      // Camera: a slow push into the core with the scanner's micro-rotation, back to rest for the spot.
-      // Verification particles ride the completion wave.
-      const FXP = (ctx, dpr, T) => {
+      // Camera: a slow push into the core with the scanner's micro-rotation, back to rest for the spot. The push
+      // and the rotation run on the beat clock, so they surge through each beat. The outermost words' glyphs
+      // reach RMAX - 24 from the print's centre, so the push goes only as deep as keeps them clear of the
+      // frame's 40 px border band (EDGE: the furthest a glyph may sit from the frame's centre line, 3 px short of
+      // the band; PUSH comes to about 3.7%). Verification particles ride the completion wave.
+      const EDGE = 497, PUSH = (EDGE - Math.abs(PY - 540)) / (RMAX - 24) - 1;
+      const beat = OM.edit.scene(start, END);
+      const camAt = (T) => {
         const e = V.env(T, start, END, 0.5);
-        const push = OM.smooth(OM.prog(T, start, DONE)) * (1 - OM.smooth(OM.prog(T, LIE0 - 0.3, LIE1)));
+        const C = beat.clock(T);
+        const push = OM.smooth(OM.prog(C, start, DONE)) * (1 - OM.smooth(OM.prog(T, LIE0 - 0.3, LIE1)));
+        const ba = T - BURST;
+        const vac = ba >= 0 && ba < VAC ? Math.sin((ba / VAC) * Math.PI / 2) : 0, blast = ba >= VAC ? Math.exp(-(ba - VAC) / 0.12) : 0;
+        return { e, zoom: 1 + (PUSH * push - 0.025 * vac + 0.045 * blast) * e, rot: 0.0035 * Math.sin(C * 9) * push * e };
+      };
+      const FXP = (ctx, dpr, T) => {
+        const { e, zoom, rot } = camAt(T);
         const wv = T >= DONE ? OM.prog(T, DONE, DONE + 0.6) : -1;
         if (wv >= 0 && wv < 1) {
           const rr = OM.ease.outCubic(wv) * 1.15 * RMAX;
@@ -160,8 +181,7 @@ vec4 effect(vec2 uv) {
         }
         const ba = T - BURST;
         const glow = Math.max(T >= DONE ? Math.exp(-(T - DONE) / 0.5) : 0, ba >= VAC ? Math.exp(-(ba - VAC) / 0.15) : 0);
-        const vac = ba >= 0 && ba < VAC ? Math.sin((ba / VAC) * Math.PI / 2) : 0, blast = ba >= VAC ? Math.exp(-(ba - VAC) / 0.12) : 0;
-        return { amount: e * (1 - OM.prog(T, LIE0, LIE1)), cam: { zoom: 1 + (0.07 * push - 0.025 * vac + 0.045 * blast) * e, rot: 0.0035 * Math.sin(T * 9) * push * e }, p0: [glow, 0, 0, 0] };
+        return { amount: e * (1 - OM.prog(T, LIE0, LIE1)), cam: { zoom, rot }, p0: [glow, 0, 0, 0] };
       };
       return {
         render(t, T) {
@@ -212,14 +232,21 @@ vec4 effect(vec2 uv) {
             let fill = k.logo ? (done ? ink.crest : ink.lit) : k.e < 0.4 ? ink.lit : ink.mid;
             if (age < 0.5) fill = th2 > age / 0.5 ? ink.crest : age < 0.25 ? ink.hover : fill;
             if (wave >= 0 && Math.abs(k.e - wave) < 0.05) fill = ink.crest;
-            // Inward echo: on the 71.94 snare a ring runs back from the rim to the core along the ridges.
-            if (T >= 71.94 && T < 72.24 && Math.abs(k.e - (1 - (T - 71.94) / 0.3)) < 0.03) fill = ink.hover;
+            // Inward echo: on the 71.96 snare a ring runs back from the rim to the core along the ridges.
+            if (T >= 71.96 && T < 72.26 && Math.abs(k.e - (1 - (T - 71.96) / 0.3)) < 0.03) fill = ink.hover;
             if (atFront(k.rr, T)) fill = ink.crest; // the pressure front bunching the ridges as it passes
             const f = k.rr > 0 ? burstR(k.rr, T) / k.rr : 1;
             ctx.fillStyle = fill;
             ctx.fillRect(PX + k.q * S * f - S / 2, PY + k.r * S * f - S / 2, S, S);
           }
-          // The words, written along their rings, pressed in on their onsets.
+          // The words, written along their rings, pressed in on their onsets. A press, the pressure front or the
+          // cameras (this scene's and the edit camera) never carry a word into the frame's 40 px border band: its
+          // radius is held where its outer edge would cross EDGE on screen (rTop, rBot: the furthest an outer glyph
+          // edge may sit from the print's centre, through the lie and both cameras).
+          const ed = OM.edit.off ? null : OM.edit.apply(null, OM.edit.stageAt(T));
+          const reach = (EDGE - (ed ? Math.abs(ed.y) : 0)) / (camAt(T).zoom * (ed ? ed.zoom : 1));
+          const Ly = OM.lerp(PY, 880, lie), sy = OM.lerp(1, 110 / RMAX, lie);
+          const rTop = (Ly - 540 + reach) / sy, rBot = (540 + reach - Ly) / sy;
           ctx.textBaseline = 'alphabetic';
           P.rings.forEach((g, k) => {
             const age = T - on[k];
@@ -232,7 +259,7 @@ vec4 effect(vec2 uv) {
             for (let i = 0; i < n; i++) {
               const off = ((i + 0.5 - n / 2) * g.A) / g.R;
               const ang = g.top ? -Math.PI / 2 + off : Math.PI / 2 - off;
-              const rb = burstR((g.top ? g.R - g.cap / 2 : g.R + g.cap / 2) * kick, T);
+              const rb = Math.min(burstR((g.top ? g.R - g.cap / 2 : g.R + g.cap / 2) * kick, T), g.top ? rTop - g.cap : rBot);
               ctx.save();
               ctx.translate(PX + Math.cos(ang) * rb, PY + Math.sin(ang) * rb);
               ctx.rotate(g.top ? ang + Math.PI / 2 : ang - Math.PI / 2);

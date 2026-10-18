@@ -1,12 +1,18 @@
 // v1-03 · The meter is running. A fare meter and its receipt printer on the
 // white page, hauled up into frame on v1-02's strings (V.rig), which let go
-// on the 46.602 snare. Every word costs a coin: the coin drops into the slot on the
+// on the 46.620 snare. Every word costs a coin: the coin drops into the slot on the
 // word's onset, the meter's dot-matrix display rolls the word in, the fare
 // rolls [line] printer feeds out a fare line with the word and its price.
 // The key word lands on the 47.996 downbeat: the display flashes inverted and
 // the fare jumps. Then you stop paying (the accel roll from 48.785): the
 // display goes dark, the fare lines grey out from the bottom [line] whole
 // machine fades back into the white page v1-04 tears.
+
+// Edit camera: the scene's own camera already punches in on every coin (each word's onset), so the
+// camera beats that land on a word (46.822, 47.424) are skipped rather than stacked. The one kept is
+// the 47.958 downbeat under the key word: with the coin's own punch it is the scene's biggest hit.
+OM.edit.plan('v1-03', { skip: [46.822, 47.424] });
+
 OM.ownWords.add('v1-03');
 (() => {
   const V = OM.v1;
@@ -34,7 +40,7 @@ vec4 effect(vec2 uv) {
       const on = sung.map((w) => w.t0);
       const N = on.length;
       const KEY = on.findIndex((t0, k) => t0 <= 47.996 && (k === N - 1 || on[k + 1] > 47.996));
-      const SN = [49.32, 49.71, 49.81, 50.2, 50.39];
+      const SN = [49.304, 49.704, 49.842, 50.178, 50.378]; // the measured snares of the pause
       const STOP = 49.72, DARK = 49.95, FADE0 = 50.2, FADE1 = END - H - 0.02;
       // The meter, its display window and the receipt printer.
       const { D, SLOT, HEAD } = V.MT, LH = 112;
