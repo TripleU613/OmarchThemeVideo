@@ -58,19 +58,27 @@ the pipeline works; this file is what you must not break.
 9. **Camera and effects belong to the scene.** Each scene runs its own camera
    move and shader through `OM.post` (its row in `storyboard/FX.md`). Effect
    amount is 0 on the cut frames, the camera is at rest at section boundaries, and
-   the words stay readable. The one shared layer is the frame effects
-   (`assets/lib/frames.js`). They draw only in the outer border band, one idea per
+   the words stay readable. The shared layers are the edit camera (rule 10) and
+   the frame effects (`assets/lib/frames.js`). They draw only in the outer border band, one idea per
    section, always all the way round, in scenes that leave an edge empty
    (`assets/lib/frame-need.js`), and subtler where only some edges are empty.
    Beneath them, a faint pixelated rim fog is always on: it breathes on the beat and
    takes the picture's edge colour. All of it is continuous across every cut.
-10. **The beat jiggle is opt-in.** `OM.jiggle(T, ownHits)` (`assets/lib/kit.js`) is
-   0..1: one small bump per beat while the drums play, peaking on the drum onset,
-   back to exactly 0 within 0.17 s, and 0 within 34 ms of every cut. A scene adds
-   it to its own camera or one element (about 0.5% zoom), scaled by its own camera
-   envelope, and passes its own hit times so no bump stacks on them. Use it only
-   where nothing in the scene already moves on the drums: today v2-05, b-05 and
-   b-08 (noted in their `storyboard/FX.md` rows).
+10. **The edit camera cuts the film to the drums.** Over every scene, one shared
+   camera (`OM.edit.stageAt`, the end of `assets/lib/kit.js`) moves the whole
+   picture on the drums measured on the song (`OM.T.drums`, `OM.T.beatsOn`, from
+   `analysis/refine_events.py`). It punches in on beats 1 and 3, jolts and rolls on
+   2 and 4, hits harder on the beat that lands a cut, and builds through each fill
+   into a downbeat (and the bar into each chorus), snapping off on the drop. It is
+   one CSS transform on every live scene, so it runs straight through the cuts and
+   both sides of a cut still match. Each section has its own strength. A scene
+   tunes it only in its own window, with `OM.edit.plan(id, {...})` at the top of its
+   file. Use `skip` for the scene's own hits so nothing stacks, a lower `max` where
+   words sit near the border band (at peak they must still clear it), and
+   `off: true` for a held moment. Seam checks on the raw scenes add `?edit=0` to
+   the page URL. `OM.jiggle(T, ownHits)` still exists for one element that should
+   bump on the beat, and `OM.edit.scene(...).clock(T)` gives a scene's own camera
+   a time that surges through each beat.
 
 ## Working rules
 

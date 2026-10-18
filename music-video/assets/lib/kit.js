@@ -293,6 +293,151 @@
     },
   };
 
+  // ---------- the edit camera ----------
+  // The film cut to the drums: one camera move over the whole picture (every live
+  // scene's <section> gets the same CSS transform), so it runs straight through the
+  // cuts without breaking them: both sides of a cut show the same handoff frame
+  // under the same camera. The beat grid carries the pulse, at the measured drum
+  // onsets (OM.T.beatsOn): a zoom punch on beats 1 and 3 (bigger on the downbeat)
+  // and a jolt and roll on the backbeats 2 and 4, each as strong as the drums
+  // measured there and only while the drums play. Strong off-beat kicks punch
+  // lighter, the beat that lands a cut hits harder, and each drum fill into a
+  // downbeat, and the bar into each chorus, builds (zoom creep and shake) and
+  // snaps off on that downbeat, which hits hardest of all (the drop). Each section has its own
+  // strength (SECTION); a scene tunes or mutes it inside its own window with
+  // OM.edit.plan(id, { ... }) at the top of its file (keys as in STAGE, times in
+  // `skip` drop the beat within 0.1 s, `off: true` mutes the window).
+  // Add ?edit=0 to the page URL to switch it off (seam checks on the raw scenes).
+  const STAGE = { punch: 0.032, down: 1.5, offbeat: 0.55, back: 12, roll: 0.008, fill: 0.045, shake: 6, cut: 1.35, drop: 1.6, max: 0.085, skip: [] };
+  const SECTION = { i: 0.6, v1: 0.6, p1: 0.85, c1: 1, v2: 0.65, p2: 0.9, c2: 1.1, b: 0.5, x: 0.9, c3: 1.3, o: 0.7 };
+  const plans = {};
+  let stage = null;
+  OM.edit.STAGE = STAGE;
+  OM.edit.SECTION = SECTION;
+  /** Tune the edit camera inside one scene's window: { punch, down, offbeat, back, roll, fill, shake, cut, drop, max, skip, off }. */
+  OM.edit.plan = (id, o) => {
+    plans[id] = o;
+    stage = null;
+  };
+  OM.edit.off = typeof location !== 'undefined' && /[?&]edit=0(&|$)/.test(location.search);
+  const buildStage = () => {
+    const wins = [...document.querySelectorAll('section.scene')].map((el) => {
+      const from = parseFloat(el.dataset.start), enter = parseFloat(el.dataset.enter || 0);
+      return { el, id: el.id.slice(2), from, start: from + enter, end: from + parseFloat(el.dataset.duration) };
+    });
+    // A beat's onset sits up to ~60 ms before the cut it lands, so it takes the incoming scene's plan.
+    const planAt = (t) => {
+      const w = wins.find((w) => t + 0.07 >= w.start && t + 0.07 < w.end);
+      if (!w) return null;
+      const o = plans[w.id] || {};
+      if (o.off) return null;
+      const k = SECTION[w.id.split('-')[0]] ?? 1;
+      const p = { ...STAGE, punch: STAGE.punch * k, back: STAGE.back * k, roll: STAGE.roll * k, fill: STAGE.fill * k, shake: STAGE.shake * k, ...o };
+      p.skip = o.skip || [];
+      return p;
+    };
+    const D = (T && T.drums) || { kick: [], snare: [], hat: [] };
+    const all = [...D.kick, ...D.snare, ...D.hat].map((h) => h[0]).sort((a, b) => a - b);
+    const playing = (t) => all.filter((x) => Math.abs(x - t) < 1.6).length >= 4;
+    const at = (kind, t, r = 0.035) => D[kind].reduce((m, h) => (Math.abs(h[0] - t) < r ? Math.max(m, h[1]) : m), 0);
+    const B = beatOnsets(), downs = new Set(((T && T.downbeatsOn) || []).map((t) => Math.round(t * 1000)));
+    const cuts = wins.map((w) => w.start).filter((t) => t > 0.5);
+    // Builds: the measured drum fills that run into a downbeat, snapping off on it
+    // (the rest, and the hat patterns, are grooves inside the bar), and one bar into
+    // each chorus's first beat. Each snap is a drop: that beat hits hardest.
+    const DB = (T && T.downbeatsOn) || [];
+    const builds = [];
+    for (const [t0, t1, , drum] of (T && T.fills) || []) {
+      const db = DB.find((d) => t1 - d > -0.25 && t1 - d < 0.12);
+      if (db && db - t0 > 0.3 && drum !== 'hihat') builds.push({ t0, t1: db, k: 1 });
+    }
+    for (const w of wins) {
+      if (!/^c\d-01$/.test(w.id)) continue;
+      const on = B.reduce((m, b) => (Math.abs(b - w.start) < Math.abs(m - w.start) ? b : m), Infinity);
+      if (Math.abs(on - w.start) < 0.15 && !builds.some((f) => Math.abs(f.t1 - on) < 0.2)) builds.push({ t0: on - 4 * (60 / ((T && T.bpm) || 112.3)), t1: on, k: 1 });
+    }
+    const drops = builds.map((f) => f.t1);
+    const ev = [];
+    let pos = -1, n = 0;
+    for (const t of B) {
+      if (downs.has(Math.round(t * 1000))) pos = 0;
+      else if (pos >= 0) pos++;
+      if (pos < 0 || !playing(t)) continue;
+      const p = planAt(t);
+      if (!p || p.skip.some((h) => Math.abs(h - t) < 0.1)) continue;
+      const s = weight(Math.max(at('kick', t), at('snare', t), 0.2));
+      const boost = (cuts.some((c) => Math.abs(c - t) < 0.1) ? p.cut : 1) * (drops.some((d) => Math.abs(d - t) < 0.03) ? p.drop : 1);
+      const th = OM.hash(n, 7, 53) * 0.9 - 0.45, side = n++ % 2 ? 1 : -1;
+      if (pos % 2 === 0) ev.push({ t, punch: p.punch * (pos % 4 === 0 ? p.down : 1) * s * boost, max: p.max });
+      else {
+        ev.push({ t, jolt: s * boost, dx: p.back * side * Math.cos(th), dy: p.back * 0.6 * Math.sin(th), r: p.roll * side });
+        if (boost > 1) ev.push({ t, punch: p.punch * s * (boost - 1) * 2, max: p.max });
+      }
+    }
+    for (const [t, e] of D.kick) {
+      if (e < 0.35 || B.some((b) => Math.abs(b - t) < 0.07) || !playing(t)) continue;
+      const p = planAt(t);
+      if (p && !p.skip.some((h) => Math.abs(h - t) < 0.1)) ev.push({ t, punch: p.punch * p.offbeat * weight(e), max: p.max });
+    }
+    ev.sort((a, b) => a.t - b.t);
+    const fills = builds.map(({ t0, t1, k }) => {
+      const p = planAt(t1 - 0.08);
+      return p && { t0, t1, zoom: p.fill * k, shake: p.shake * k, max: p.max };
+    }).filter(Boolean);
+    return { wins, ev, fills };
+  };
+  /** The edit camera at song time t: { zoom, x, y, rot, build } (zoom 0 at rest; zoom is the extra, as in OM.edit.scene). */
+  OM.edit.stageAt = (t) => {
+    if (!stage) stage = buildStage();
+    const e = { zoom: 0, x: 0, y: 0, rot: 0, build: 0 };
+    let cap = STAGE.max;
+    const L = stage.ev;
+    let lo = 0, hi = L.length;
+    while (lo < hi) { const m = (lo + hi) >> 1; if (L[m].t < t - ED.PUNCH) lo = m + 1; else hi = m; }
+    for (let i = lo; i < L.length && L[i].t <= t + ED.RISE; i++) {
+      const h = L[i], d = t - h.t;
+      if (h.punch) { e.zoom += h.punch * punchShape(d, ED.PUNCH); cap = h.max; }
+      if (h.jolt) {
+        const j = h.jolt * joltShape(d, ED.JOLT);
+        e.x += h.dx * j; e.y += h.dy * j; e.rot += h.r * j;
+      }
+    }
+    for (const f of stage.fills) {
+      if (t < f.t0 || t >= f.t1) continue;
+      const g = OM.smooth(OM.clamp((t - f.t0) / Math.max(0.2, f.t1 - f.t0)));
+      if (g <= e.build) continue;
+      e.build = g;
+      e.zoom += f.zoom * g;
+      cap = f.max;
+      const s = f.shake * g * g;
+      e.x += s * (0.6 * Math.sin(2 * Math.PI * 17.3 * t + 1.1) + 0.4 * Math.sin(2 * Math.PI * 29.7 * t + 2.3));
+      e.y += s * (0.6 * Math.sin(2 * Math.PI * 21.1 * t + 0.4) + 0.4 * Math.sin(2 * Math.PI * 33.9 * t + 1.7));
+    }
+    e.zoom = Math.min(e.zoom, cap);
+    return e;
+  };
+  /** The edit camera's schedule, for inspection: { ev: [{ t, punch | jolt, ... }], fills: [{ t0, t1, ... }] }. */
+  OM.edit.schedule = () => {
+    if (!stage) stage = buildStage();
+    return { ev: stage.ev, fills: stage.fills };
+  };
+  const shown = new Map();
+  const tick0 = OM.tick;
+  OM.tick = (t) => {
+    tick0(t);
+    if (OM.edit.off || !T) return;
+    const e = OM.edit.stageAt(t);
+    const c = OM.edit.apply(null, e);
+    const css = c ? `translate(${c.x.toFixed(2)}px,${c.y.toFixed(2)}px) rotate(${c.rot.toFixed(5)}rad) scale(${c.zoom.toFixed(5)})` : '';
+    for (const w of stage.wins) {
+      const v = t >= w.from && t <= w.end ? css : '';
+      if ((shown.get(w.el) || '') !== v) {
+        w.el.style.transform = v;
+        shown.set(w.el, v);
+      }
+    }
+  };
+
   // ---------- placeholder slate for scenes not built yet ----------
   OM.slate = ({ id, device, theme, line }) =>
     OM.scene({

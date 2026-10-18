@@ -2,7 +2,10 @@
 // assembled into index.html), its neighbours, its sung words' onset and end
 // (timing only, never text), and the music inside the window from
 // analysis/audiomap.json: downbeats, strong kicks, snares, rolls, specials and
-// the energy level.
+// the energy level. Then the same music measured on the song itself
+// (assets/lib/timing.js, from analysis/refine_events.py), on the drum: every
+// beat's onset with its place in the bar, kicks, snares, fills, risers, stops.
+// Use these measured times for visible hits.
 //
 //   node scripts/scene-facts.mjs v1-01 v1-02 ...
 import { readFileSync } from 'node:fs'
@@ -13,6 +16,7 @@ const order = [...html.matchAll(/id="s-([^"]+)" class="clip scene" data-start="(
 const lines = Object.fromEntries(JSON.parse(readFileSync(here('../../analysis/lines.json'), 'utf8')).map((l) => [l.id, l]))
 const map = JSON.parse(readFileSync(here('../../analysis/audiomap.json'), 'utf8'))
 const f = (t) => (+t).toFixed(3)
+const TM = (() => { const window = {}; eval(readFileSync(here('../assets/lib/timing.js'), 'utf8')); return window.OM_TIMING })()
 
 for (const id of process.argv.slice(2)) {
   const k = order.findIndex((s) => s.id === id)
@@ -33,4 +37,17 @@ for (const id of process.argv.slice(2)) {
   if (special.length || keys.length) console.log(`  moments: ${[...special, ...keys].join(', ')}`)
   const ph = map.energy_phases.filter((p) => p.start < b && p.end > a).map((p) => `${p.start}-${p.end}s ${p.level} ${p.energy.toFixed(2)}`)
   console.log(`  energy: ${ph.join('; ')}`)
+  if (!TM.beatsOn) continue
+  const downs = new Set(TM.downbeatsOn.map((t) => Math.round(t * 1000)))
+  let pos = -1
+  const bar = []
+  for (const t of TM.beatsOn) { if (downs.has(Math.round(t * 1000))) pos = 0; else if (pos >= 0) pos++; if (t >= a && t < b) bar.push(`${f(t)}${pos >= 0 ? '/' + ((pos % 4) + 1) : ''}`) }
+  const hits = (kind, min) => TM.drums[kind].filter((h) => h[0] >= a && h[0] < b && h[1] >= min).map((h) => `${f(h[0])}(${h[1].toFixed(2)})`)
+  console.log(`  measured beats (onset/bar position): ${bar.join(', ') || '-'}`)
+  console.log(`  measured kicks: ${hits('kick', 0.12).join(', ') || '-'}`)
+  console.log(`  measured snares: ${hits('snare', 0.12).join(', ') || '-'}`)
+  const mf = TM.fills.filter((r) => r[0] < b && r[1] > a).map((r) => `${r[2]} ${r[3]} ${f(r[0])}-${f(r[1])}`)
+  console.log(`  measured fills (the edit camera builds through each and snaps off at its end): ${mf.join('; ') || '-'}`)
+  const sp = [...TM.risers.filter((t) => t >= a && t < b).map((t) => `riser@${f(t)}`), ...TM.stops.filter((t) => t >= a && t < b).map((t) => `stop@${f(t)}`)]
+  if (sp.length) console.log(`  measured moments: ${sp.join(', ')}`)
 }
