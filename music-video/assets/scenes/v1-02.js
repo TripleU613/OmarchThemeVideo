@@ -31,7 +31,7 @@ vec4 effect(vec2 uv) {
       const W = OM.theme('white'), WI = OM.fieldInks('white');
       const on = OM.sung('v1-02').map((w) => w.t0);
       const LAP = V.LAP, LID = V.LID, DK = V.DECK, LCY = V.LCY;
-      const TILT0 = 45.25, YANK = 45.836;
+      const TILT0 = 45.25, YANK = V.YANK;
       const RATTLE = [42.284, 44.211, 44.745], CLAMP = 44.745; // snare and kick events
       const BAR = -720; // the control bar's height in world px
       const FLY = 0.13; // a word's fall from the notch
@@ -49,7 +49,7 @@ vec4 effect(vec2 uv) {
       });
       // The camera: holds on the laptop through the line, then the tilt to the hand, then out past it.
       const camY = (T) => 1000 * OM.ease.inOutCubic(OM.prog(T, TILT0, YANK));
-      const yank = (T) => (T < YANK ? 0 : 1) * Math.exp(-(T - YANK) / 0.12) * 40;
+      const yank = V.yank; // the jerk starts on the drum hit, ahead of the grid downbeat
       // String pluck: on the 45.53 kick in the pause every string twangs, bowing and settling.
       const PLUCK = 45.53;
       let pluck = 0;
@@ -162,7 +162,7 @@ vec4 effect(vec2 uv) {
             V.notch(ctx, dy);
           }
           // The control bar and the hand that holds it.
-          if (by > -400) V.hand(ctx, by, Math.sin(OM.clamp((T - YANK) / 0.3) * Math.PI) * 0.06);
+          if (by > -400) V.hand(ctx, by, V.barTip(T));
         },
         release: () => {
           fx.release();

@@ -253,14 +253,17 @@ OM.ownWords.add('v1-01');
   // of the top, and what rises from below on the strings is v1-03's fare meter,
   // arriving on the 46.301 snare. The strings let go on v1-03's 46.602 snare.
   // Both scenes draw V.rig at the cut, so it is one shared state.
-  V.YANK = 45.836;
+  V.YANK = 45.836; // the downbeat on the grid: the yank peaks here and settles as before
+  V.YANK_ON = OM.beatOnset(V.YANK); // its drum hit: the yank starts here
   V.RIG0 = 45.95;
   V.RIG1 = 46.301;
   V.RIG_FREE = 46.602;
   V.MT = { M: { x: 110, y: 230, w: 720, h: 620 }, D: { x: 150, y: 290, w: 640, h: 230 }, SLOT: { x: 470, y: 222 }, HEAD: { x: 920, y: 940, w: 890 } };
+  /** The yank: the bar jerks 40 px up from the drum hit, then settles. */
+  V.yank = (T) => (T < V.YANK_ON ? 0 : T < V.YANK ? 40 * OM.ease.outCubic(OM.prog(T, V.YANK_ON, V.YANK)) : 40 * Math.exp(-(T - V.YANK) / 0.12));
   /** v1-02's bar height on screen, with the yank and the lift. */
-  V.barY = (T) => -720 + 1000 - (T < V.YANK ? 0 : 40 * Math.exp(-(T - V.YANK) / 0.12)) - 560 * OM.ease.inOutCubic(OM.prog(T, V.RIG0, V.RIG1));
-  V.barTip = (T) => Math.sin(OM.clamp((T - V.YANK) / 0.3) * Math.PI) * 0.06;
+  V.barY = (T) => -720 + 1000 - V.yank(T) - 560 * OM.ease.inOutCubic(OM.prog(T, V.RIG0, V.RIG1));
+  V.barTip = (T) => Math.sin(OM.clamp((T - V.YANK_ON) / 0.3) * Math.PI) * 0.06;
   /** The meter's drop below its place: rising on the strings, swinging to rest after the snare. */
   V.meterY = (T) => {
     if (T < V.RIG1) return 900 * Math.pow(1 - OM.prog(T, V.RIG0, V.RIG1), 3);
@@ -356,7 +359,7 @@ OM.ownWords.add('v1-01');
     const by = V.barY(T), my = V.meterY(T), { M, HEAD } = V.MT;
     const lap = [[LID.x + 40, LID.y], [LID.x + LID.w - 40, LID.y], [960 - 660, DFRONT], [960 + 660, DFRONT]];
     const met = [[M.x + 60, M.y], [M.x + M.w - 60, M.y], [HEAD.x + 60, HEAD.y], [HEAD.x + HEAD.w - 60, HEAD.y]];
-    const sw = OM.smooth(OM.prog(T, V.RIG0, V.RIG0 + 0.1)), dy = 1000 - 40 * Math.exp(-(Math.min(T, V.RIG0) - V.YANK) / 0.12);
+    const sw = OM.smooth(OM.prog(T, V.RIG0, V.RIG0 + 0.1)), dy = 1000 - V.yank(Math.min(T, V.RIG0));
     const free = OM.prog(T, V.RIG_FREE, V.RIG_FREE + 0.22); // let go: the feet whip up out of frame
     if (free >= 1) return;
     ctx.strokeStyle = WI.mid;

@@ -203,44 +203,10 @@ vec4 effect(vec2 uv) {
             ctx.stroke();
           }
           ctx.globalAlpha = 1;
-          // The words: forged on their strike, squashed by it, cooling.
-          for (const wd of words) {
-            if (T < on[wd.k]) continue;
-            const h = heat(wd.k, T);
-            pool(ctx, wd.cx, wd.base - wd.cap / 2, wd.w / 2 + 90, 120, ink.lit, Math.min(0.35, 0.22 * h) * (1 - draw));
-            let sq = 0;
-            for (const s of strikes) if (s.k === wd.k && T >= s.t) sq = Math.max(sq, s.p * Math.exp(-(T - s.t) / 0.07));
-            const sy = 1 - 0.32 * Math.min(1, sq), sx = 1 + 0.1 * Math.min(1, sq);
-            for (const [q, r] of wd.cells) {
-              const v = h + (OM.threshold(q, r) - 0.5) * 0.35;
-              let x = G.x0 + q * G.cw, y = G.y0 + r * G.ch;
-              x = wd.cx + (x - wd.cx) * sx;
-              y = wd.base + (y - wd.base) * sy;
-              let w = G.cw * sx, hh = G.ch * sy;
-              if (draw > 0) {
-                // Drawn out: every cell runs to the centre row.
-                const ty = HM.y0 + (hrow + (r & 1) * 0.5) * HM.ch;
-                y = OM.lerp(y, ty, draw);
-                hh = OM.lerp(hh, G.ch, draw);
-              }
-              ctx.fillStyle = draw > 0.5 || v > 0.8 ? ink.crest : v > 0.45 ? ink.hover : ink.lit;
-              ctx.fillRect(x, y, w, hh);
-            }
-          }
-          // The bar runs out to the frame's edges.
-          if (T >= DRAW1 - 0.02) {
-            const span = words.reduce((s, wd) => [Math.min(s[0], wd.x), Math.max(s[1], wd.x + wd.w)], [1920, 0]);
-            const f = OM.ease.inOutCubic(OM.prog(T, DRAW1 - 0.02, FILL1));
-            const a = OM.lerp(span[0], -20, f), b = OM.lerp(span[1], 1940, f);
-            ctx.fillStyle = ink.crest;
-            for (let col = HM.cMin; col < HM.cMin + HM.cols; col++) {
-              const x = HM.x0 + (col + 0.5) * HM.cw;
-              if (x >= a && x <= b) OM.cell(ctx, HM, col, hrow, dpr);
-            }
-          }
           // The hammer. Between blows it recoils and hangs raised; before each blow it rises and cocks
           // back, then whips down an accelerating arc about the off-frame shoulder and stops dead on the
-          // onset, its face driven into the squashed metal.
+          // onset, its face driven into the squashed metal. It is drawn behind the words, so a blow on the
+          // lower row never covers the row above.
           const sqOf = (k, t) => {
             let sq = 0;
             for (const s of strikes) if (s.k === k && t >= s.t) sq = Math.max(sq, s.p * Math.exp(-(t - s.t) / 0.07));
@@ -345,6 +311,41 @@ vec4 effect(vec2 uv) {
             if (P.prev && P.u < 0.2) {
               const s = P.prev, [cx, cy] = tgt(s, T), k = Math.exp(-P.u / (s.p >= 2 ? 0.09 : 0.05));
               pool(ctx, cx, cy, 120 + 110 * s.p, 46 + 40 * s.p, ink.crest, world * k * (s.p >= 2 ? 0.95 : 0.45 + 0.3 * s.p));
+            }
+          }
+          // The words: forged on their strike, squashed by it, cooling.
+          for (const wd of words) {
+            if (T < on[wd.k]) continue;
+            const h = heat(wd.k, T);
+            pool(ctx, wd.cx, wd.base - wd.cap / 2, wd.w / 2 + 90, 120, ink.lit, Math.min(0.35, 0.22 * h) * (1 - draw));
+            let sq = 0;
+            for (const s of strikes) if (s.k === wd.k && T >= s.t) sq = Math.max(sq, s.p * Math.exp(-(T - s.t) / 0.07));
+            const sy = 1 - 0.32 * Math.min(1, sq), sx = 1 + 0.1 * Math.min(1, sq);
+            for (const [q, r] of wd.cells) {
+              const v = h + (OM.threshold(q, r) - 0.5) * 0.35;
+              let x = G.x0 + q * G.cw, y = G.y0 + r * G.ch;
+              x = wd.cx + (x - wd.cx) * sx;
+              y = wd.base + (y - wd.base) * sy;
+              let w = G.cw * sx, hh = G.ch * sy;
+              if (draw > 0) {
+                // Drawn out: every cell runs to the centre row.
+                const ty = HM.y0 + (hrow + (r & 1) * 0.5) * HM.ch;
+                y = OM.lerp(y, ty, draw);
+                hh = OM.lerp(hh, G.ch, draw);
+              }
+              ctx.fillStyle = draw > 0.5 || v > 0.8 ? ink.crest : v > 0.45 ? ink.hover : ink.lit;
+              ctx.fillRect(x, y, w, hh);
+            }
+          }
+          // The bar runs out to the frame's edges.
+          if (T >= DRAW1 - 0.02) {
+            const span = words.reduce((s, wd) => [Math.min(s[0], wd.x), Math.max(s[1], wd.x + wd.w)], [1920, 0]);
+            const f = OM.ease.inOutCubic(OM.prog(T, DRAW1 - 0.02, FILL1));
+            const a = OM.lerp(span[0], -20, f), b = OM.lerp(span[1], 1940, f);
+            ctx.fillStyle = ink.crest;
+            for (let col = HM.cMin; col < HM.cMin + HM.cols; col++) {
+              const x = HM.x0 + (col + 0.5) * HM.cw;
+              if (x >= a && x <= b) OM.cell(ctx, HM, col, hrow, dpr);
             }
           }
           // Sparks: cells bursting off the contact point, flung up and out, falling, cooling.

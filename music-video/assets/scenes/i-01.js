@@ -95,9 +95,9 @@ OM.intro = (() => {
   // ---- the dawn (i-02, and the frame i-03 opens on) ----
   const DAWN0 = 9.265; // the downbeat the sun ignites on
   const KICK = 12.934; // the letters ignite
-  const DB2 = 13.584; // and blaze fully
+  const DB2 = OM.beatOnset(13.584); // and blaze fully, on that downbeat's drum hit
   const FREEZE = 19.96; // the dawn holds from here, so i-02's last frames and i-03's first are one picture
-  const BEATS = OM.downbeatsIn(DAWN0 + 0.5, FREEZE);
+  const BEATS = OM.downbeatsIn(DAWN0 + 0.5, FREEZE).map((b) => OM.beatOnset(b));
   const SNARES = [9.636, 14.048, 16.045];
   const HATS = [13.93, 17.81];
   const SC = word.w / 2; // the sun's column: the centre of the frame
@@ -431,8 +431,9 @@ vec4 effect(vec2 uv) {
           }
         }
 
-        // Draw the console, squashed toward its slot after the hit (the slot row keeps its height, thinning to the horizon's).
-        const ch = LM.ch, slotH = OM.lerp(LD.ch, ch, sq);
+        // Draw the console, squashed toward its slot after the hit (the slot row keeps its height, thinning to the horizon's;
+        // in the stretch before it, it grows with its neighbours so their edges still butt).
+        const ch = LM.ch, slotH = Math.max(OM.lerp(LD.ch, ch, sq), ch * sq);
         for (let i = 0; i < 5; i++) {
           ctx.fillStyle = INKS[i];
           const a = bins[i];
