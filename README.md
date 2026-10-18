@@ -28,7 +28,8 @@ ideas    ──► storyboard/        one idea per line              IDEAS.md, s
    wav2vec2 forced aligner places every word of the lyric sheet on the vocal
    (`align.py`, `refine.py`, `finalize.py` → `lines.json`, timing only). librosa
    finds beats, downbeats, kicks, snares, rolls and energy (`features.py` →
-   `audiomap.json`).
+   `audiomap.json`), and `refine_events.py` measures every drum hit and beat again
+   on the song itself, on the attack (`drums.json`).
 2. **Bring your lyrics.** Point `npm run lyrics:from` at a word-by-word `.lrc`,
    `.srt` or `.ass` file. Only the words are used; they're placed on the aligned
    timing and checked word for word (`lyrics.txt`), then `npm run lyrics:build`
@@ -51,6 +52,12 @@ ideas    ──► storyboard/        one idea per line              IDEAS.md, s
    (`assets/lib/post.js`, planned per scene in `storyboard/FX.md`). The canvas
    runs through that shader on the GPU. At the cuts both ease to rest and the
    pass switches itself off, so the handoff frames stay pixel exact.
+   Over every scene, one shared edit camera (the end of `assets/lib/kit.js`) cuts
+   the film to the drums measured on the song (`analysis/refine_events.py`): it
+   punches in on beats 1 and 3, jolts and rolls on the backbeats, hits harder on
+   the beat that lands a cut, and builds through fills into the drops. It is a
+   single transform on the whole picture, so it runs straight through the cuts,
+   and each scene tunes it in its own window with `OM.edit.plan(id, {...})`.
    Around the picture, a frame-effects layer (`assets/lib/frames.js`) adds one
    beat-synced border idea per section. It runs all the way round in scenes that
    leave an edge empty, and subtler where only some edges are. Under it, a faint

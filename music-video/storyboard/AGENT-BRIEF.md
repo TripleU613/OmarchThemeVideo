@@ -12,8 +12,10 @@ through agreed **handoff frames**.
 - Project: `/home/tripleu/Omarchy Video/music-video`
 - **Your file: `assets/scenes/<id>.js`. It is the only file you may create or edit.**
 - API to read: `assets/lib/om.js` (math, easing, lattice, inks, canvas),
-  `assets/lib/kit.js` (line and word timing, beats and `OM.beatOnset`, the beat
-  jiggle `OM.jiggle`, audio, hero field, wordmark painter),
+  `assets/lib/kit.js` (line and word timing, beats and `OM.beatOnset`, the drums
+  measured on the song (`OM.T.drums`, `OM.T.beatsOn`), the edit camera and
+  `OM.edit.plan` (AGENTS.md rule 10), the beat jiggle `OM.jiggle`, audio, hero
+  field, wordmark painter),
   `assets/lib/handoff.js` (handoff frames and the lyric helper).
 - Idioms worth copying: `assets/scenes/i-04.js` (layered canvas, float blur, type
   rasterized into cells), `assets/scenes/v1-08.js`, `assets/scenes/c1-03.js`.

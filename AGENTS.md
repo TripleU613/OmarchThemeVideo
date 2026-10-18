@@ -6,8 +6,10 @@ the pipeline works; this file is what you must not break.
 ## Layout
 
 - `analysis/` turns the song into timing data: `lines.json` (every sung word's
-  onset and end) and `audiomap.json` (beats, downbeats, kicks, snares, rolls,
-  energy). Timing only; the words live in `music-video/lyrics.txt`.
+  onset and end), `audiomap.json` (beats, downbeats, kicks, snares, rolls,
+  energy) and `drums.json` (the same drums and beats measured again on the song,
+  on the attack; `refine_events.py`). Timing only; the words live in
+  `music-video/lyrics.txt`.
 - The song (`music-video/assets/audio/song.wav`) and its words
   (`music-video/lyrics.txt`, built into `assets/lib/lyrics.js` by
   `npm run lyrics:build`) are in the repo. The owner has permission to use both.
