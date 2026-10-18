@@ -59,7 +59,7 @@ its idea:
 
 - **c1-01** · Camera: slow orbit (2 degrees, 1.00 to 1.05) around the bowl · Shader: specular glints running along the green seams · Extras: sparkles where seams meet
 - **c1-02** · Camera: turntable rotation, then a crash zoom on the slam · Shader: X-ray technical view that flips to the real render at power-on · Extras: assembly sparks at each click
-- **c1-03** · Camera: impact punch-in on each press, with overshoot · Shader: ink bleed and paper grain under the presses · Extras: ink droplets and paper-dust puffs
+- **c1-03** · Camera: impact punch-in on each press, with overshoot · Shader: ink bleed under the presses · Extras: ink droplets and paper-dust puffs
 - **c1-04** · Camera: over-the-shoulder dolly with gentle parallax · Shader: shallow depth of field, the edges falling soft · Extras: screen-light flicker, motes in the beam
 - **c1-05** · Camera: tracking pan across the sheet as the inking runs · Shader: graphite grain that fades out as the render becomes real · Extras: pencil shavings and eraser crumbs
 - **c1-06** · Camera: step zooms on each merge level · Shader: neon bloom with horizontal glare on the check sweep · Extras: bit-sparks when bars swap

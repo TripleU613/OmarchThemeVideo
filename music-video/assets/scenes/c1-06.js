@@ -145,8 +145,8 @@ OM.ownWords.add('c1-06');
       wild.forEach((w) => (w.at = slotOf(w.order)));
       const pos = sorted.map(slotOf);
       const movedAt = pos.map((p, k) => mask(k ? [...p.keys()].filter((v) => p[v] !== pos[k - 1][v]) : []));
-      // Each word carries a level; levels beyond the word count land on beats inside the held first word.
-      const extra = OM.beatsIn(on[0] + 0.25, on[1] - 0.2);
+      // Each word carries a level; levels beyond the word count land on beats (their drum onsets) inside the held first word.
+      const extra = OM.beatsIn(on[0] + 0.25, on[1] - 0.2).map(OM.beatOnset);
       const LEVELS = [on[0], ...extra.slice(Math.max(0, extra.length - (K - on.length))), ...on.slice(1)].slice(-K);
       const MOVE = 0.12;
       const calmOf = (level) => 0.03 + 0.97 * Math.pow(1 - level / K, 1.3);

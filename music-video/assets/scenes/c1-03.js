@@ -22,8 +22,7 @@ OM.ownWords.add('c1-03');
       cv.className = 'om-fill';
       el.appendChild(cv);
       const c = OM.canvas(cv, { alpha: false });
-      // Ink bleed and paper grain under the presses: fresh ink feathers out into the paper (never into the
-      // letters), and the sheet shows its tooth and fibre while the impressions are fresh.
+      // Ink bleed under the presses: fresh ink feathers out into the paper (never into the letters).
       const fx = OM.post(el, c, {
         effect: `vec4 effect(vec2 uv) {
   vec2 q = cam(uv);
@@ -43,8 +42,6 @@ OM.ownWords.add('c1-03');
   float l = dot(b.rgb, vec3(0.3, 0.59, 0.11));
   float paper = 1.0 - smoothstep(0.2, 0.4, l);
   vec3 c = mix(b.rgb, mix(vec3(0.224, 0.282, 0.180), vec3(0.404, 0.522, 0.286), n), h * paper * 0.75 * uAmount);
-  float tooth = hash(floor(q * uRes)) - 0.5, fibre = vnoise(sp * vec2(0.04, 0.6)) - 0.5;
-  c += vec3(0.145, 0.157, 0.231) * (0.45 * tooth + 0.45 * fibre) * (1.0 - smoothstep(0.08, 0.25, l)) * uP0.y * uAmount;
   return vec4(c, 1.0);
 }`,
       });
@@ -170,7 +167,7 @@ OM.ownWords.add('c1-03');
         const amount = OM.post.envelope(T, on[0] - 0.02, END - 0.1, { ramp: 0.3, hold: 0.02 });
         let fresh = 0;
         for (const [hit] of PUNCH) if (T >= hit) fresh = Math.max(fresh, Math.pow(0.5, (T - hit) / 0.3));
-        return { amount, cam: { zoom: Math.max(1, zoom) }, p0: [fresh, 0.55 + 0.45 * fresh, 0, 0] };
+        return { amount, cam: { zoom: Math.max(1, zoom) }, p0: [fresh, 0, 0, 0] };
       };
       // ---- extras: ink droplets thrown off every block's edges, a puff of paper dust along its foot ----
       const splash = (ctx, T, p) => {

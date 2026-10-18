@@ -138,7 +138,7 @@ OM.ownWords.add('c1-04');
       const TURN0 = DROP + 0.22, TURN1 = W2 - 0.03;
       const DIS0 = DROP + 0.12, DIS1 = TURN1 - 0.05;
       const KICK2 = 97.27;
-      const DB2 = OM.downbeatsIn(97.2, 97.5)[0] || 97.315;
+      const DB2 = OM.beatOnset(OM.downbeatsIn(97.2, 97.5)[0] || 97.315); // on the drum, with KICK2
       const FADE0 = END - 0.4, FADE1 = END - 0.05;
       const SEAM = 0.05;
 

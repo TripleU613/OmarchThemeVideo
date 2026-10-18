@@ -116,15 +116,22 @@ OM.scene({
       }
     };
 
-    // Specular sweep: a bright diagonal band raking across the gear faces after each lock (mid tones only, so type stays put).
+    // Specular sweep: a bright diagonal band raking across the gear faces after each lock (mid tones only, so type stays put;
+    // blue-grey metal only, so the green-lit air behind the train stays dark).
     const fx = OM.post(el, c, {
-      effect: `vec4 effect(vec2 uv) {
+      effect: `float tint(vec2 p) { vec3 t = src(p).rgb; return t.b - t.g; }
+vec4 effect(vec2 uv) {
   vec2 s = cam(uv);
   vec4 c = src(s);
   float d = dot(s * vec2(uRes.x / uRes.y, 1.0), normalize(vec2(1.0, 0.55)));
   float band = exp(-pow((d - uP0.x) / 0.07, 2.0)) + 0.4 * exp(-pow((d - uP0.x + 0.16) / 0.03, 2.0));
   float lum = dot(c.rgb, vec3(0.3, 0.59, 0.11));
-  float m = smoothstep(0.05, 0.1, lum) * (1.0 - smoothstep(0.38, 0.5, lum));
+  float m = smoothstep(0.075, 0.1, lum) * (1.0 - smoothstep(0.38, 0.5, lum));
+  if (band * m * uAmount < 0.001) return c;
+  // The tint at its bluest over a 4x4 neighbourhood: steady through the canvas's dither, and unbroken up to the outlines.
+  vec2 o = 1.5 / uRes;
+  float bt = max(max(c.b - c.g, tint(s + o)), max(tint(s - o), max(tint(s + vec2(o.x, -o.y)), tint(s - vec2(o.x, -o.y)))));
+  m *= smoothstep(0.0196, 0.0275, bt);
   c.rgb += vec3(0.855, 0.925, 0.776) * band * m * 0.55 * uAmount;
   return c;
 }`,
