@@ -105,7 +105,7 @@ frame, L loops the scene, M mutes. The time lives in the URL (`#t=81.25`).
 
 Made by [TripleU613](https://github.com/TripleU613), with coding agents working from one
 shared brief. Song: *We Can Fix Everything (The Ultimate Machine)* by Kevin Koontz /
-REARRANGED, used with permission. Omarchy by DHH. Built with HyperFrames, three.js and
+REARRANGED. Omarchy by DHH. Built with HyperFrames, three.js and
 GSAP; type is JetBrains Mono.
 
 ## License
