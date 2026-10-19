@@ -2,6 +2,13 @@
   "name": "music-video",
   "private": true,
   "type": "module",
+  "description": "A music video for the Omarchy anthem, made entirely in code.",
+  "homepage": "https://github.com/TripleU613/OmarchThemeVideo",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TripleU613/OmarchThemeVideo.git",
+    "directory": "music-video"
+  },
   "scripts": {
     "serve": "python3 scripts/serve.py 3123",
     "assemble": "node scripts/assemble.mjs",

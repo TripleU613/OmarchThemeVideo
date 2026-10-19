@@ -6,7 +6,8 @@
 
 <p align="center">
   A music video for the Omarchy anthem, made entirely in code.<br>
-  <a href="https://youtu.be/R91DhtkbYLs"><b>Watch it on YouTube</b></a> · 4K · 60 fps · 5:06
+  <a href="https://youtu.be/R91DhtkbYLs"><b>Watch it on YouTube</b></a> · 4K · 60 fps · 5:06 ·
+  <a href="https://github.com/TripleU613/OmarchThemeVideo">github.com/TripleU613/OmarchThemeVideo</a>
 </p>
 
 ---
@@ -79,7 +80,8 @@ LICENSES/              third-party license texts
 ## Run it
 
 ```bash
-cd music-video
+git clone https://github.com/TripleU613/OmarchThemeVideo
+cd OmarchThemeVideo/music-video
 npm run serve            # live player at http://localhost:3123/dev.html
 npm run assemble         # rebuild the pages after changing the storyboard
 npm run verify           # repo checks (CI runs these too)
