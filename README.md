@@ -19,6 +19,7 @@ There's no video editor, no stock footage and no generated imagery. It's 66 scen
 JavaScript drawing on canvas, rendered to video with
 [HyperFrames](https://hyperframes.heygen.com):
 
+
 - **One idea per sung line.** Every line gets its own visual metaphor, and the words
   are the material the idea acts on, never a caption.
 - **On the vocal.** Every word lands on its sung onset, from forced alignment against
