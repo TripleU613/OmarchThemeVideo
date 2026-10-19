@@ -3,10 +3,9 @@
 // hi-hat roll, tighter and brighter, drawing in the last specks. The snare cracks it open
 // and the kick blows it apart: tiles of a frame-filling field of specks fly out
 // of it on spiral paths that unwind the vortex the other way and land edge to
-// edge, settling slowly. The owner's DHH portrait then emerges in that field as
-// the music ends, only as a soft, heavily blurred, low-contrast drift in each
-// speck's brightness: up close just specks, at a glance the man. It holds through
-// the silence, then dissolves back into the even field, which stays to the end.
+// edge, settling slowly into an even field that stays to the end. (The released
+// film lets a portrait emerge in that field as a soft drift in each speck's
+// brightness; its data isn't in this repo, so here the field stays even.)
 //
 // Edit camera: x-end carries o-01's core across the cut and charges on a quiet hi-hat roll, so it takes
 // the outro's strengths (section o: punch 2.24%, jolt 8.4 px, roll 0.0056 rad) rather than the louder
@@ -14,9 +13,10 @@
 // camera punch, its biggest moment, so the camera's backbeat jolt there is skipped.
 OM.edit.plan('x-end', { punch: 0.0224, back: 8.4, roll: 0.0056, skip: [295.102] });
 (() => {
-  // The owner's portrait: 220 x 346 dots, nibble-packed 4-bit shades (0 = no dot), used as given.
+  // The portrait: 220 x 346 dots, nibble-packed 4-bit shades (0 = no dot).
   const COLS = 220, ROWS = 346;
-  const ENCODED = '';
+  // Not in the public repo: load its nibble-packed data as window.OM_PORTRAIT to bring it back.
+  const ENCODED = window.OM_PORTRAIT || '';
   // Its own speck geometry, kept from the file: 4 x 3.08 px pitch, 2.65 x 2.25 px dots, centred.
   const PIX_X = 4.0, PIX_Y = 3.08, DOT_W = 2.65, DOT_H = 2.25;
   const OX = Math.round((1920 - COLS * PIX_X) / 2), OY = Math.round((1080 - ROWS * PIX_Y) / 2);
@@ -37,6 +37,7 @@ OM.edit.plan('x-end', { punch: 0.0224, back: 8.4, roll: 0.0056, skip: [295.102] 
   const BLUR = 3, CONTRAST = 0.45, BASE = 0.4, GRAIN = 0.14;
   /** Each speck's face offset from the field's mean (blurred shade map, portrait background and outside at the mean). */
   const faceMap = () => {
+    if (!ENCODED) return new Float32Array(GX * GY); // no portrait: the field stays even
     const sh = decode();
     let sum = 0, n = 0;
     for (const v of sh) if (v) { sum += v / 15; n++; }

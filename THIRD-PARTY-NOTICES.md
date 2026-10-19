@@ -1,6 +1,7 @@
 # Third-party notices
 
-This film is built on other people's work. Their terms, as shipped in this repo:
+The code in this repository is MIT licensed (see [LICENSE](LICENSE)). The film is also
+built on other people's work, which keeps its own terms:
 
 | What | Where | License |
 |---|---|---|
@@ -20,9 +21,10 @@ their owners.
 
 *We Can Fix Everything (The Ultimate Machine)* is by Kevin Koontz / REARRANGED and is
 used in the film with permission. The song and its words belong to their owners and
-are not covered by any license in this repository.
+are not covered by the MIT license or any other license in this repository.
 
 ## The finale portrait
 
-The portrait of DHH in the finale (`music-video/assets/scenes/x-end.js`) is dot data
-traced from a photo the owner supplied.
+The released film ends on a portrait of DHH emerging in the speck field. Its data is not in
+this repository; without it, the finale (`music-video/assets/scenes/x-end.js`) settles into
+an even field.
