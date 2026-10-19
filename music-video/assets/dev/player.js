@@ -155,7 +155,7 @@
     })
     .catch((err) => console.warn('[dev] song not loaded as a blob; seeking may fail:', err));
   $('#time').textContent = 'loading…';
-  Promise.all([document.fonts.ready, OM.loadTtfx(), song]).then(() => {
+  Promise.all([document.fonts.ready, song]).then(() => {
     fit();
     audio.currentTime = t;
     show(t);

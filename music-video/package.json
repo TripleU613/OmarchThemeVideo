@@ -5,11 +5,13 @@
   "scripts": {
     "serve": "python3 scripts/serve.py 3123",
     "assemble": "node scripts/assemble.mjs",
+    "timing": "node scripts/build-timing.mjs",
     "facts": "node scripts/scene-facts.mjs",
     "lyrics:from": "node scripts/lyrics-from-lrc.mjs",
     "lyrics:build": "node scripts/build-lyrics.mjs",
     "lyrics:placeholder": "node scripts/build-lyrics.mjs --placeholder",
     "verify": "node scripts/verify.mjs",
+    "qa-sheet": "node scripts/qa-sheet.mjs",
     "snapshot": "npx --yes hyperframes@0.8.166 snapshot --no-end --timeout 60000",
     "dev": "npx --yes hyperframes@0.8.166 preview",
     "check": "npx --yes hyperframes@0.8.166 check",
@@ -18,11 +20,5 @@
     "render:4k": "node scripts/render-final.mjs",
     "publish": "npx --yes hyperframes@0.8.166 publish",
     "audio:placeholder": "node scripts/placeholder-audio.mjs"
-  },
-  "devDependencies": {
-    "animejs": "^4.5.0",
-    "esbuild": "^0.25.10",
-    "gsap": "^3.14.2",
-    "three": "^0.181.2"
   }
 }

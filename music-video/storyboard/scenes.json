@@ -149,7 +149,7 @@
       "line": "p1-02",
       "world": "choices",
       "theme": "tokyo-night",
-      "tech": "svg+anime",
+      "tech": "svg",
       "idea": "Drawing the lines. A pen with a lattice-cell nib draws partition lines that split the frame like a tiling layout: vertical, then horizontal, then vertical, then horizontal.",
       "device": "BSP partition lines drawn by a cell nib",
       "sync": "one line per word",
@@ -700,7 +700,7 @@
       "world": "credits",
       "theme": "tokyo-night",
       "tech": "dom",
-      "idea": "Credits in the site's footer voice: song, artist, made with (HyperFrames, Three.js, anime.js, GSAP), theme, omarchy.org; rows settle in on the beat.",
+      "idea": "Credits in the site's footer voice: song, artist, made with (HyperFrames, Three.js, GSAP), theme, omarchy.org; rows settle in on the beat.",
       "device": "credits in footer style",
       "sync": "a row per bar",
       "trans": "cut"

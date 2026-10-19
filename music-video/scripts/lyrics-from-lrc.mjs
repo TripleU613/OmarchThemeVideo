@@ -1,7 +1,7 @@
 // Lays out a word-by-word lyric file you supply (.lrc, .srt or .ass) as
 // lyrics.txt on the video's aligned lines, ready for build-lyrics.mjs.
 //
-//   node scripts/lyrics-from-lrc.mjs ~/Downloads/new/song.lrc
+//   node scripts/lyrics-from-lrc.mjs path/to/song.lrc
 //
 // Only your words are used. Their timestamps are estimates and are ignored:
 // the video keeps the forced-aligned timing in analysis/lines.json. Where the

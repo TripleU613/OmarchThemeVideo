@@ -184,7 +184,7 @@ Picking the defaults. A list of Omarchy's defaults (Hyprland, Alacritty, Neovim,
 ## p1-02 · 1:14.86 · line p1-02
 
 **Device:** BSP partition lines drawn by a cell nib  
-**World / theme / tech:** choices / tokyo-night / svg+anime  
+**World / theme / tech:** choices / tokyo-night / svg  
 **Sync:** one line per word
 
 Drawing the lines. A pen with a lattice-cell nib draws partition lines that split the frame like a tiling layout: vertical, then horizontal, then vertical, then horizontal.
@@ -587,7 +587,7 @@ The ultimate machine. Everything on the lattice implodes into the mark at the ce
 **World / theme / tech:** credits / tokyo-night / dom  
 **Sync:** a row per bar
 
-Credits in the site's footer voice: song, artist, made with (HyperFrames, Three.js, anime.js, GSAP), theme, omarchy.org; rows settle in on the beat.
+Credits in the site's footer voice: song, artist, made with (HyperFrames, Three.js, GSAP), theme, omarchy.org; rows settle in on the beat.
 
 ## o-01 · 4:49.79 · line o-01
 

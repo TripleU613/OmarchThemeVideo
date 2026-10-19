@@ -88,11 +88,8 @@ const html = `<!doctype html>
     <script src="assets/lib/themes.js"></script>
     <script src="assets/lib/timing.js"></script>
     <script src="assets/lib/audio.js"></script>
-    <script src="assets/lib/meetup-map.js"></script>
-    <script src="assets/lib/globe.js"></script>
     <script src="assets/lib/om.js"></script>
     <script src="assets/lib/stage.js"></script>
-    <script src="assets/lib/ttfx-player.js"></script>
     <script src="assets/lib/kit.js"></script>
     <script src="assets/lib/transitions.js"></script>
     <script src="assets/lib/handoff.js"></script>
@@ -104,17 +101,6 @@ const html = `<!doctype html>
         src: url('assets/fonts/jetbrains-mono-var.woff2') format('woff2');
         font-weight: 100 800;
         font-style: normal;
-      }
-      @font-face {
-        font-family: 'JetBrains Mono';
-        src: url('assets/fonts/jetbrains-mono-var-italic.woff2') format('woff2');
-        font-weight: 100 800;
-        font-style: italic;
-      }
-      @font-face {
-        font-family: 'Geist';
-        src: url('assets/fonts/geist-var.woff2') format('woff2');
-        font-weight: 100 900;
       }
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body { margin: 0; overflow: hidden; background: #0e0e14; }
@@ -134,10 +120,10 @@ ${sections}
 ${scripts}
     <script>
       // Bound now, so the player never sees an empty registry; the runtime holds
-      // seeking until fonts and the ttfx engine are ready.
+      // seeking until the fonts are ready.
       window.__hf = window.__hf || {};
       window.__hf.buildReady = window.__hf.buildReady || {};
-      window.__hf.buildReady['om-assets'] = Promise.all([document.fonts.ready, OM.loadTtfx()]);
+      window.__hf.buildReady['om-assets'] = document.fonts.ready;
       const tl = gsap.timeline({ paused: true });
       OM.mount(tl, ${r3(DURATION)});
       window.__timelines['main'] = tl;

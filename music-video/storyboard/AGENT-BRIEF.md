@@ -9,7 +9,7 @@ through agreed **handoff frames**.
 
 ## Where things are
 
-- Project: `/home/tripleu/Omarchy Video/music-video`
+- Project: `music-video/` in this repo (run every command below from there)
 - **Your file: `assets/scenes/<id>.js`. It is the only file you may create or edit.**
 - API to read: `assets/lib/om.js` (math, easing, lattice, inks, canvas),
   `assets/lib/kit.js` (line and word timing, beats and `OM.beatOnset`, the drums
@@ -102,14 +102,14 @@ The names are night, spark, glow, field, word, screen, grid, line and spot; read
 ## Checking your work
 
 ```bash
-cd "/home/tripleu/Omarchy Video/music-video" && node --check assets/scenes/<id>.js
+node --check assets/scenes/<id>.js
 ```
 
 Snapshots share the CPU with everyone, so always run them through the lock, at low
 priority, and only at times inside your window:
 
 ```bash
-cd "/home/tripleu/Omarchy Video/music-video" && flock /tmp/omv-snap.lock nice -n 19 npx hyperframes snapshot --at <t1,t2,...> --no-end --timeout 60000 -o .hyperframes/agent-<id>
+flock /tmp/omv-snap.lock nice -n 19 npx hyperframes snapshot --at <t1,t2,...> --no-end --timeout 60000 -o .hyperframes/agent-<id>
 ```
 
 Then Read `.hyperframes/agent-<id>/contact-sheet.jpg`: one image, and single frames
