@@ -138,6 +138,6 @@ invisible cuts, Tokyo Night, the frame budget) and the working rules for agents.
 ## Credits
 
 Made by [TripleU613](https://github.com/TripleU613). Song: *We Can Fix Everything
-(The Ultimate Machine)* by Kevin Koontz / REARRANGED (not included). Omarchy by
+(The Ultimate Machine)* by Kevin Koontz / REARRANGED, used with permission. Omarchy by
 DHH. Built with HyperFrames, Three.js and GSAP. Type is JetBrains Mono and Geist,
 both under the SIL Open Font License.
