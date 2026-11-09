@@ -53,7 +53,7 @@ ideas ─► storyboard/       one idea per line                   IDEAS.md, sce
    `storyboard/scenes.json` the scene list. The three choruses escalate: one person and
    one machine, then a crowd and a city, then the world.
 4. **Assemble.** `npm run assemble` places every scene on the beat before its first word
-   and writes `index.html` for rendering, `dev.html` for the live player, and
+   and writes `index.html` for rendering, `dev.html` for the live player, `play.html` for the public one, and
    `STORYBOARD.md`.
 5. **Scenes.** Each scene is a pure function of song time:
    `OM.scene({ id, build(el) { return { render(t, T) {} } } })`. It runs its own camera

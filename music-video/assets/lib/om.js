@@ -228,6 +228,7 @@
    * (deviceScaleFactor 2, no CSS scaling), ~1 in the scaled-down Studio preview.
    */
   OM.drawScale = (el, cssWidth = 1920) => {
+    if (window.OM_LIVE && window.OM_LIVE.scale) return window.OM_LIVE.scale; // live player: a fixed, possibly lower, resolution
     const shown = el.getBoundingClientRect().width || cssWidth;
     const s = (shown / cssWidth) * (window.devicePixelRatio || 1);
     return Math.max(1, Math.min(window.devicePixelRatio || 1, Math.ceil(s * 2) / 2));

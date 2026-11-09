@@ -8,6 +8,8 @@
   const OM = window.OM;
   const defs = {};
   const live = {};
+  /** Scenes that have been on screen; only these are torn down, so a prebuilt scene waits for its window. */
+  const drawn = {};
   /** Seconds of slack around a window before a scene is torn down. */
   const KEEP = 0.75;
 
@@ -37,15 +39,17 @@
       const w = windowOf(id);
       const near = t >= w.from - KEEP && t <= w.end + KEEP;
       if (!near) {
-        if (live[id]) {
+        if (live[id] && drawn[id]) {
           live[id].release && live[id].release();
           w.el.replaceChildren();
           delete live[id];
+          delete drawn[id];
         }
         continue;
       }
       if (t < w.from || t > w.end) continue;
       mask(id, w, t);
+      drawn[id] = true;
       try {
         if (!live[id]) live[id] = defs[id].build(w.el, { duration: w.end - w.start, start: w.start, id }) || {};
         live[id].render && live[id].render(t - w.start, t);
@@ -60,6 +64,22 @@
           w.el.appendChild(card);
           live[id] = { failed: true };
         }
+      }
+    }
+  };
+
+  /**
+   * Build every scene now. The live player does this while it loads, so no cut
+   * frame pays for a build; renders build each scene on its first frame instead.
+   */
+  OM.prebuild = () => {
+    for (const id in defs) {
+      if (live[id]) continue;
+      const w = windowOf(id);
+      try {
+        live[id] = defs[id].build(w.el, { duration: w.end - w.start, start: w.start, id }) || {};
+      } catch (err) {
+        w.el.replaceChildren(); // tick builds it again in its window and shows the error there
       }
     }
   };

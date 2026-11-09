@@ -14,6 +14,8 @@ music-video/.hyperframes/
 # HyperFrames Studio caches: preview thumbnails and the song's waveform.
 music-video/.thumbnails/
 music-video/.waveform-cache/
+# The compressed song for the live player; the Pages deploy makes its own from the wav.
+music-video/assets/audio/song.m4a
 analysis/stems/
 analysis/*.npz
 .venv*/

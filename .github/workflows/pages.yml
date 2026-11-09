@@ -1,0 +1,43 @@
+name: pages
+
+# Publishes the live player (music-video/play.html) to GitHub Pages: the film drawn
+# in the browser, with a compressed copy of the song. Needs Settings → Pages →
+# Source: GitHub Actions.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build the site
+        run: |
+          command -v ffmpeg >/dev/null || (sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg)
+          mkdir -p _site/assets/audio
+          cp music-video/play.html _site/index.html
+          cp -r music-video/assets/vendor music-video/assets/lib music-video/assets/scenes music-video/assets/fonts music-video/assets/dev _site/assets/
+          rm _site/assets/vendor/gsap.min.js   # only the render timeline uses it
+          ffmpeg -v error -i music-video/assets/audio/song.wav -c:a aac -b:a 192k _site/assets/audio/song.m4a
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deploy
+        uses: actions/deploy-pages@v4

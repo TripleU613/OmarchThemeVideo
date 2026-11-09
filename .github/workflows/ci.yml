@@ -28,7 +28,7 @@ jobs:
         run: test -f assets/lib/lyrics.js || node scripts/build-lyrics.mjs --placeholder
 
       - name: Pages are assembled from the storyboard and in sync
-        run: node scripts/assemble.mjs && git diff --exit-code -- index.html dev.html STORYBOARD.md
+        run: node scripts/assemble.mjs && git diff --exit-code -- index.html dev.html play.html STORYBOARD.md
 
       - name: Repo hygiene (no placeholders committed, no stray scenes, no big files)
         run: node scripts/verify.mjs
