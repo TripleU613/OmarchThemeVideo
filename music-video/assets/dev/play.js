@@ -7,6 +7,11 @@
   if (!document.createElement('canvas').getContext('webgl2')) return document.body.classList.add('nogl');
   const OM = window.OM;
   const audio = $('#song'), root = $('#root'), view = $('#view'), bar = $('#scrub'), head = $('#scrub b');
+  // Film time of the audio file's first sample: a copy of the song with its lead-in
+  // trimmed sets data-offset, and the film then starts from there.
+  // ponytail: the film's first OFFSET seconds are skipped, not played in silence.
+  const OFFSET = +audio.dataset.offset || 0;
+  const songEnd = () => audio.duration + OFFSET;
   const scenes = [...root.querySelectorAll('section.scene')].map((el) => ({ el, start: +el.dataset.start, end: +el.dataset.start + +el.dataset.duration }));
   const D = Math.max(window.OM_TIMING.duration, ...scenes.map((s) => s.end)); // the film can outrun the song
   const fmt = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
@@ -18,18 +23,18 @@
   }
   new ResizeObserver(fit).observe(view);
 
-  let t = 0, shown = -1;
+  let t = OFFSET, shown = -1;
   function show(time) {
     for (const s of scenes) s.el.style.display = time >= s.start && time < s.end ? '' : 'none';
     OM.tick(time);
-    shown = time;
+    shown = stats.t = time;
     head.style.width = `${(time / D) * 100}%`;
     $('#time').textContent = `${fmt(time)} / ${fmt(D)}`;
   }
   function seek(time) {
     tailFrom = null;
-    t = Math.min(D - 0.001, Math.max(0, time));
-    audio.currentTime = t;
+    t = Math.min(D - 0.001, Math.max(OFFSET, time));
+    audio.currentTime = Math.min(t - OFFSET, audio.duration - 0.05); // never seek onto the end: that fires `ended`
     show(t);
   }
 
@@ -56,13 +61,13 @@
 
   // When the audio ends the film keeps going on wall time (scenes.json `tail`).
   let tailFrom = null;
-  audio.addEventListener('ended', () => { if (t < D - 0.01) tailFrom = performance.now() - (t - audio.duration) * 1000; });
+  audio.addEventListener('ended', () => { if (t < D - 0.01) tailFrom = performance.now() - (t - songEnd()) * 1000; });
   function frame(now) {
     const playing = tailFrom !== null || !audio.paused;
     if (tailFrom !== null) {
-      t = Math.min(D - 0.001, audio.duration + (now - tailFrom) / 1000);
+      t = Math.min(D - 0.001, songEnd() + (now - tailFrom) / 1000);
       if (t >= D - 0.001) tailFrom = null;
-    } else if (playing) t = audio.currentTime;
+    } else if (playing) t = audio.currentTime + OFFSET;
     if (playing || t !== shown) {
       const a = performance.now();
       show(t);
@@ -72,7 +77,15 @@
     requestAnimationFrame(frame);
   }
 
-  const toggle = () => (tailFrom !== null ? (tailFrom = null) : audio.paused ? audio.play() : audio.pause());
+  const toggle = () => {
+    if (tailFrom !== null) tailFrom = null;
+    else if (!audio.paused) audio.pause();
+    else {
+      if (t >= D - 0.05) seek(OFFSET); // at the end: play again from the top
+      if (t >= songEnd() - 0.05) tailFrom = performance.now() - (t - songEnd()) * 1000; // past the song: only the tail is left
+      else audio.play().catch(() => {}); // refused without a gesture: the play card stays up
+    }
+  };
   view.onclick = toggle;
   const seekFromBar = (e) => seek(((e.clientX - bar.getBoundingClientRect().left) / bar.clientWidth) * D);
   bar.addEventListener('pointerdown', (e) => { bar.setPointerCapture(e.pointerId); seekFromBar(e); });
@@ -102,10 +115,11 @@
     audio.src = URL.createObjectURL(b);
     return new Promise((r) => audio.addEventListener('loadedmetadata', r, { once: true }));
   });
-  Promise.all([document.fonts.ready, song]).then(() => {
+  // OM_THREE: set by a page that loads three.js as a module, which arrives after this script.
+  Promise.all([document.fonts.ready, song, window.OM_THREE]).then(() => {
     fit();
     OM.prebuild(); // about a second and a half, here rather than on the cut frames
-    show(0);
+    show(t);
     document.body.classList.add('ready');
     requestAnimationFrame(frame);
   }, (err) => { $('#time').textContent = 'the song did not load'; console.error('[play]', err); });
